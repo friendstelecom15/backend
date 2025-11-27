@@ -1,11 +1,12 @@
 
 
-import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+import { Entity, ObjectIdColumn, Column } from 'typeorm';
+import { ObjectId } from 'mongodb';
 
 @Entity('imageconfigs')
 export class ImageConfig {
-    @PrimaryGeneratedColumn('uuid')
-    id: string;
+    @ObjectIdColumn()
+    id: ObjectId;
 
     @Column({ nullable: true })
     refId?: number;

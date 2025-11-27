@@ -13,6 +13,7 @@ import { User } from './entities/user.entity';
 import { Wishlist } from './entities/wishlist.entity';
 import { Compare } from './entities/compare.entity';
 import { Order } from '../orders/entities/order.entity';
+import { ObjectId } from 'mongodb';
 
 @Injectable()
 export class UsersService {
@@ -68,11 +69,12 @@ export class UsersService {
   }
 
 
-  async updateRole(id: string, role: string): Promise<Omit<User, 'password'>> {
+  async updateRole(id: string | ObjectId, role: string): Promise<Omit<User, 'password'>> {
     const validRoles = ['user', 'admin', 'management'];
     if (!validRoles.includes(role)) throw new BadRequestException('Invalid role');
     const isAdmin = role === 'admin';
-    const user = await this.userRepository.findOne({ where: { id } });
+    const _id = typeof id === 'string' ? new ObjectId(id) : id;
+    const user = await this.userRepository.findOne({ where: { id: _id } });
     if (!user) throw new NotFoundException('User not found');
     user.role = role;
     user.isAdmin = isAdmin;
@@ -82,8 +84,9 @@ export class UsersService {
   }
 
 
-  async findOne(id: string): Promise<Omit<User, 'password'>> {
-    const user = await this.userRepository.findOne({ where: { id } });
+  async findOne(id: string | ObjectId): Promise<Omit<User, 'password'>> {
+    const _id = typeof id === 'string' ? new ObjectId(id) : id;
+    const user = await this.userRepository.findOne({ where: { id: _id } });
     if (!user) throw new NotFoundException('User not found');
     const { password, ...rest } = user as User & { password?: string };
     return rest;
@@ -95,8 +98,9 @@ export class UsersService {
   }
 
 
-  async update(id: string, payload: Partial<CreateUserDto>): Promise<Omit<User, 'password'>> {
-    const user = await this.userRepository.findOne({ where: { id } });
+  async update(id: string | ObjectId, payload: Partial<CreateUserDto>): Promise<Omit<User, 'password'>> {
+    const _id = typeof id === 'string' ? new ObjectId(id) : id;
+    const user = await this.userRepository.findOne({ where: { id: _id } });
     if (!user) throw new NotFoundException('User not found');
     if (typeof payload.password === 'string' && payload.password.length > 0) {
       user.password = await bcrypt.hash(payload.password, 10);
@@ -108,8 +112,9 @@ export class UsersService {
   }
 
 
-  async remove(id: string): Promise<{ success: boolean }> {
-    await this.userRepository.delete(id);
+  async remove(id: string | ObjectId): Promise<{ success: boolean }> {
+    const _id = typeof id === 'string' ? new ObjectId(id) : id;
+    await this.userRepository.delete(_id);
     return { success: true };
   }
 

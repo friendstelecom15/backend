@@ -8,6 +8,7 @@ import {
   CategoryFilterDto,
 } from './dto/category.dto';
 import { Category } from './entities/category.entity';
+import { ObjectId } from 'mongodb';
 
 @Injectable()
 export class CategoriesService {
@@ -47,19 +48,21 @@ export class CategoriesService {
 
 
 
-  async update(id: string, dto: UpdateCategoryDto) {
+  async update(id: string | ObjectId, dto: UpdateCategoryDto) {
+    const _id = typeof id === 'string' ? new ObjectId(id) : id;
     const data: Record<string, unknown> = { ...dto };
     if (dto.name) {
       data.slug = dto.name.toLowerCase().replace(/\s+/g, '-');
     }
-    await this.categoryRepository.update(id, data);
-    return this.categoryRepository.findOne({ where: { id } });
+    await this.categoryRepository.update(_id, data);
+    return this.categoryRepository.findOne({ where: { id: _id } });
   }
 
 
 
-  async remove(id: string) {
-    await this.categoryRepository.delete(id);
+  async remove(id: string | ObjectId) {
+    const _id = typeof id === 'string' ? new ObjectId(id) : id;
+    await this.categoryRepository.delete(_id);
     return { success: true };
   }
 

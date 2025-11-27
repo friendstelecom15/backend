@@ -2,12 +2,13 @@
 
 
 
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm';
+import { Entity, ObjectIdColumn, Column, CreateDateColumn } from 'typeorm';
+import { ObjectId } from 'mongodb';
 
 @Entity('pricehistories')
 export class PriceHistory {
-    @PrimaryGeneratedColumn('uuid')
-    id: string;
+    @ObjectIdColumn()
+    id: ObjectId;
 
     @Column()
     productId: string;

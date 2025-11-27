@@ -1,9 +1,10 @@
-import { Entity, Column, CreateDateColumn, UpdateDateColumn, PrimaryGeneratedColumn } from 'typeorm';
+import { Entity, Column, CreateDateColumn, UpdateDateColumn, ObjectIdColumn } from 'typeorm';
+import { ObjectId } from 'mongodb';
 
 @Entity('orders')
 export class Order {
-  @PrimaryGeneratedColumn("uuid")
-    id: string;
+  @ObjectIdColumn()
+  id: ObjectId;
 
     @Column({ type: 'json', nullable: true })
     customer?: any;

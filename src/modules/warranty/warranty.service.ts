@@ -1,10 +1,10 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { v4 as uuidv4 } from 'uuid';
 import { ActivateWarrantyDto, WarrantyLookupDto } from './dto/warranty.dto';
 import { WarrantyRecord } from './entities/warrantyrecord.entity';
 import { WarrantyLog } from './entities/warrantylog.entity';
+import { ObjectId } from 'mongodb';
 
 @Injectable()
 export class WarrantyService {
@@ -37,7 +37,6 @@ export class WarrantyService {
     const expiryDate = new Date();
     expiryDate.setFullYear(expiryDate.getFullYear() + 1);
     const warranty = this.warrantyRepo.create({
-      id: uuidv4(),
       ...dto,
       purchaseDate,
       expiryDate,
@@ -46,29 +45,29 @@ export class WarrantyService {
     });
     const savedWarranty = await this.warrantyRepo.save(warranty);
     const log = this.logRepo.create({
-      id: uuidv4(),
-      warrantyId: savedWarranty.id,
+      warrantyId: String(savedWarranty.id),
       action: 'created',
       changes: this.toJsonValue(dto),
       admin: adminUsername || 'system',
     });
     await this.logRepo.save(log);
-    return { ...savedWarranty, id: savedWarranty.id };
+    return { ...savedWarranty, id: String(savedWarranty.id) };
   }
 
   async lookup(dto: WarrantyLookupDto) {
     const warranty = await this.warrantyRepo.findOne({ where: { imei: dto.imei } });
     if (!warranty) throw new NotFoundException('Warranty not found');
-    const logs = await this.logRepo.find({ where: { warrantyId: warranty.id } });
+    const logs = await this.logRepo.find({ where: { warrantyId: String(warranty.id) } });
     return {
       ...warranty,
-      id: warranty.id,
+      id: String(warranty.id),
       logs,
     };
   }
 
-  async getLogs(id: string) {
-    const logs = await this.logRepo.find({ where: { warrantyId: id } });
+  async getLogs(id: string | ObjectId) {
+    const _id = typeof id === 'string' ? new ObjectId(id) : id;
+    const logs = await this.logRepo.find({ where: { warrantyId: String(_id) } });
     return logs;
   }
 }

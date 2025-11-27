@@ -5,6 +5,7 @@ import { Repository, Like } from 'typeorm';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { Product } from './entities/product.entity';
+import { ObjectId } from 'mongodb';
 
 @Injectable()
 export class ProductsService {
@@ -67,14 +68,16 @@ export class ProductsService {
   }
 
 
-  async update(id: string, dto: UpdateProductDto) {
-    await this.productRepository.update(id, dto);
-    return this.productRepository.findOne({ where: { id } });
+  async update(id: string | ObjectId, dto: UpdateProductDto) {
+    const _id = typeof id === 'string' ? new ObjectId(id) : id;
+    await this.productRepository.update(_id, dto);
+    return this.productRepository.findOne({ where: { id: _id } });
   }
 
 
-  async remove(id: string) {
-    await this.productRepository.delete(id);
+  async remove(id: string | ObjectId) {
+    const _id = typeof id === 'string' ? new ObjectId(id) : id;
+    await this.productRepository.delete(_id);
     return { success: true };
   }
 

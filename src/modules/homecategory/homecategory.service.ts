@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { HomeCategory } from './entities/homecategory.entity';
+import { ObjectId } from 'mongodb';
 
 @Injectable()
 export class HomecategoryService {
@@ -36,21 +37,23 @@ export class HomecategoryService {
 
 
   // Get a single HomeCategory by ID
-  async findOne(id: string) {
-    const homeCategory = await this.homeCategoryRepository.findOne({ where: { id } });
+  async findOne(id: string | ObjectId) {
+    const _id = typeof id === 'string' ? new ObjectId(id) : id;
+    const homeCategory = await this.homeCategoryRepository.findOne({ where: { id: _id } });
     if (!homeCategory) throw new NotFoundException('HomeCategory not found');
     return { ...homeCategory, id: String(homeCategory.id) };
   }
 
 
   // Update a HomeCategory
-  async update(id: string, data: {
+  async update(id: string | ObjectId, data: {
     name?: string;
     priority?: number;
     categoryIds?: string[];
     productIds?: string[];
   }) {
-    const homeCategory = await this.homeCategoryRepository.findOne({ where: { id } });
+    const _id = typeof id === 'string' ? new ObjectId(id) : id;
+    const homeCategory = await this.homeCategoryRepository.findOne({ where: { id: _id } });
     if (!homeCategory) throw new NotFoundException('HomeCategory not found');
     if (data.name !== undefined) homeCategory.name = data.name;
     if (data.priority !== undefined) homeCategory.priority = data.priority;
@@ -62,8 +65,9 @@ export class HomecategoryService {
 
 
   // Assign products to a HomeCategory (update productIds array)
-  async assignProducts(homeCategoryId: string, productIds: string[]) {
-    const homeCategory = await this.homeCategoryRepository.findOne({ where: { id: homeCategoryId } });
+  async assignProducts(homeCategoryId: string | ObjectId, productIds: string[]) {
+    const _id = typeof homeCategoryId === 'string' ? new ObjectId(homeCategoryId) : homeCategoryId;
+    const homeCategory = await this.homeCategoryRepository.findOne({ where: { id: _id } });
     if (!homeCategory) throw new NotFoundException('HomeCategory not found');
     homeCategory.productIds = productIds;
     const saved = await this.homeCategoryRepository.save(homeCategory);
@@ -72,10 +76,11 @@ export class HomecategoryService {
 
 
   // Delete a HomeCategory
-  async remove(id: string) {
-    const homeCategory = await this.homeCategoryRepository.findOne({ where: { id } });
+  async remove(id: string | ObjectId) {
+    const _id = typeof id === 'string' ? new ObjectId(id) : id;
+    const homeCategory = await this.homeCategoryRepository.findOne({ where: { id: _id } });
     if (!homeCategory) throw new NotFoundException('HomeCategory not found');
-    await this.homeCategoryRepository.delete(id);
+    await this.homeCategoryRepository.delete(_id);
     return { success: true };
   }
 }

@@ -1,4 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, ObjectIdColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { ObjectId } from 'mongodb';
 
 export enum NotificationType {
     ORDER_UPDATE = 'ORDER_UPDATE',
@@ -9,8 +10,8 @@ export enum NotificationType {
 
 @Entity('notifications')
 export class Notification {
-    @PrimaryGeneratedColumn('uuid')
-    id: string;
+    @ObjectIdColumn()
+    id: ObjectId;
 
     @Column()
     userId: string;

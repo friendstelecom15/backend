@@ -9,6 +9,7 @@ import {
 } from './dto/order.dto';
 import { Order } from './entities/order.entity';
 import { OrderItem } from './entities/orderitem.entity';
+import { ObjectId } from 'mongodb';
 
 @Injectable()
 export class OrdersService {
@@ -43,23 +44,25 @@ export class OrdersService {
   async findAll() {
     const orders = await this.orderRepository.find({ order: { createdAt: 'DESC' } });
     for (const order of orders) {
-      order.orderItems = await this.orderItemRepository.find({ where: { orderId: order.id } });
+      order.orderItems = await this.orderItemRepository.find({ where: { orderId: String(order.id) } });
     }
     return orders;
   }
 
 
-  async findOne(id: string) {
-    const order = await this.orderRepository.findOne({ where: { id } });
+  async findOne(id: string | ObjectId) {
+    const _id = typeof id === 'string' ? new ObjectId(id) : id;
+    const order = await this.orderRepository.findOne({ where: { id: _id } });
     if (!order) throw new NotFoundException('Order not found');
-    order.orderItems = await this.orderItemRepository.find({ where: { orderId: order.id } });
+    order.orderItems = await this.orderItemRepository.find({ where: { orderId: String(order.id) } });
     return order;
   }
 
 
-  async updateStatus(id: string, dto: UpdateOrderStatusDto) {
-    await this.orderRepository.update(id, { status: dto.status });
-    return this.findOne(id);
+  async updateStatus(id: string | ObjectId, dto: UpdateOrderStatusDto) {
+    const _id = typeof id === 'string' ? new ObjectId(id) : id;
+    await this.orderRepository.update(_id, { status: dto.status });
+    return this.findOne(_id);
   }
 
   calculateEMI(dto: EMICalculationDto) {
@@ -77,8 +80,9 @@ export class OrdersService {
     };
   }
 
-  async generateInvoice(id: string) {
-    const order = await this.findOne(id);
+  async generateInvoice(id: string | ObjectId) {
+    const _id = typeof id === 'string' ? new ObjectId(id) : id;
+    const order = await this.findOne(_id);
     return {
       ...order,
       invoiceNumber: 'INV-' + order.orderNumber,

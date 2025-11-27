@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Product } from '../products/entities/product.entity';
 import { Category } from '../categories/entities/category.entity';
 import { Brand } from '../brands/entities/brand.entity';
+import { ObjectId } from 'mongodb';
 
 @Injectable()
 export class SeoService {
@@ -16,27 +17,30 @@ export class SeoService {
     private readonly brandRepo: Repository<Brand>,
   ) { }
 
-  async getProductSeo(id: string) {
+  async getProductSeo(id: string | ObjectId) {
+    const _id = typeof id === 'string' ? new ObjectId(id) : id;
     const product = await this.productRepo.findOne({
-      where: { id },
+      where: { id: _id },
       select: ['seoTitle', 'seoDescription', 'seoKeywords', 'slug'],
     });
     if (!product) throw new NotFoundException('Product not found');
     return product;
   }
 
-  async getCategorySeo(id: string) {
+  async getCategorySeo(id: string | ObjectId) {
+    const _id = typeof id === 'string' ? new ObjectId(id) : id;
     const category = await this.categoryRepo.findOne({
-      where: { id },
+      where: { id: _id },
       select: ['name', 'description', 'slug'],
     });
     if (!category) throw new NotFoundException('Category not found');
     return category;
   }
 
-  async getBrandSeo(id: string) {
+  async getBrandSeo(id: string | ObjectId) {
+    const _id = typeof id === 'string' ? new ObjectId(id) : id;
     const brand = await this.brandRepo.findOne({
-      where: { id },
+      where: { id: _id },
       select: ['name', 'slug'],
     });
     if (!brand) throw new NotFoundException('Brand not found');

@@ -6,6 +6,7 @@ import { Repository } from 'typeorm';
 import { CreateNotificationDto } from './dto/create-notification.dto';
 import { UpdateNotificationReadDto } from './dto/update-notification-read.dto';
 import { Notification, NotificationType } from './entities/notification.entity';
+import { ObjectId } from 'mongodb';
 
 @Injectable()
 export class NotificationService {
@@ -39,8 +40,9 @@ export class NotificationService {
 
 
 
-  async markAsRead(id: string) {
-    const notification = await this.notificationRepository.findOne({ where: { id } });
+  async markAsRead(id: string | ObjectId) {
+    const _id = typeof id === 'string' ? new ObjectId(id) : id;
+    const notification = await this.notificationRepository.findOne({ where: { id: _id } });
     if (!notification) throw new NotFoundException('Notification not found');
     notification.read = true;
     return this.notificationRepository.save(notification);
@@ -48,8 +50,9 @@ export class NotificationService {
 
 
 
-  async remove(id: string) {
-    await this.notificationRepository.delete(id);
+  async remove(id: string | ObjectId) {
+    const _id = typeof id === 'string' ? new ObjectId(id) : id;
+    await this.notificationRepository.delete(_id);
     return { success: true };
   }
 

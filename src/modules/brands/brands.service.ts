@@ -4,6 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CreateBrandDto, UpdateBrandDto } from './dto/brand.dto';
 import { Brand } from './entities/brand.entity';
+import { ObjectId } from 'mongodb';
 
 @Injectable()
 export class BrandsService {
@@ -43,19 +44,21 @@ export class BrandsService {
 
 
 
-  async update(id: string, dto: UpdateBrandDto) {
+  async update(id: string | ObjectId, dto: UpdateBrandDto) {
+    const _id = typeof id === 'string' ? new ObjectId(id) : id;
     const data: UpdateBrandDto & { slug?: string } = { ...dto };
     if (dto.name) {
       data.slug = dto.name.toLowerCase().replace(/\s+/g, '-');
     }
-    await this.brandRepository.update(id, data);
-    return this.brandRepository.findOne({ where: { id } });
+    await this.brandRepository.update(_id, data);
+    return this.brandRepository.findOne({ where: { id: _id } });
   }
 
 
 
-  async remove(id: string) {
-    await this.brandRepository.delete(id);
+  async remove(id: string | ObjectId) {
+    const _id = typeof id === 'string' ? new ObjectId(id) : id;
+    await this.brandRepository.delete(_id);
     return { success: true };
   }
 

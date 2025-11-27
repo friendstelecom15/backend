@@ -1,5 +1,4 @@
 
-import { AppDataSource } from '../../data-source';
 import { Product } from '../modules/products/entities/product.entity';
 import { Category } from '../modules/categories/entities/category.entity';
 import { Brand } from '../modules/brands/entities/brand.entity';
@@ -18,6 +17,7 @@ import { HeroBanner } from '../modules/herobanner/entities/herobanner.entity';
 import { ProductVariant } from '../modules/products/entities/productvariant.entity';
 
 import { faker } from '@faker-js/faker';
+import AppDataSource from 'src/config/data-source';
 
 async function seed() {
     await AppDataSource.initialize();

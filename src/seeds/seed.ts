@@ -17,7 +17,7 @@ import { HeroBanner } from '../modules/herobanner/entities/herobanner.entity';
 import { ProductVariant } from '../modules/products/entities/productvariant.entity';
 
 import { faker } from '@faker-js/faker';
-import AppDataSource from 'src/config/data-source';
+import AppDataSource from '../config/data-source';
 
 async function seed() {
     await AppDataSource.initialize();

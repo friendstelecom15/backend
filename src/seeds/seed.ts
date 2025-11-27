@@ -31,16 +31,23 @@ async function seed() {
     }));
     await brandRepo.save(brands);
 
-    // Categories
+    // Categories (guarantee unique names)
     const categoryRepo = AppDataSource.getMongoRepository(Category);
-    const categories = Array.from({ length: 5 }, () => categoryRepo.create({
-        name: faker.commerce.department(),
-        slug: faker.helpers.slugify(faker.commerce.department()).toLowerCase(),
-        description: faker.lorem.sentence(),
-        banner: faker.image.url(),
-        icon: faker.image.avatar(),
-        priority: faker.number.int({ min: 1, max: 10 }),
-    }));
+    const categoryNames = new Set<string>();
+    const categories: Category[] = [];
+    while (categories.length < 5) {
+        const name = faker.commerce.department();
+        if (categoryNames.has(name)) continue;
+        categoryNames.add(name);
+        categories.push(categoryRepo.create({
+            name,
+            slug: faker.helpers.slugify(name).toLowerCase(),
+            description: faker.lorem.sentence(),
+            banner: faker.image.url(),
+            icon: faker.image.avatar(),
+            priority: faker.number.int({ min: 1, max: 10 }),
+        }));
+    }
     await categoryRepo.save(categories);
 
     // Users

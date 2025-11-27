@@ -1,0 +1,53 @@
+import { Module } from '@nestjs/common';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { AuthModule } from './modules/auth/auth.module';
+import { UsersModule } from './modules/users/users.module';
+import { CategoriesModule } from './modules/categories/categories.module';
+import { BrandsModule } from './modules/brands/brands.module';
+import { ProductsModule } from './modules/products/products.module';
+import { OrdersModule } from './modules/orders/orders.module';
+import { WarrantyModule } from './modules/warranty/warranty.module';
+import { GiveawaysModule } from './modules/giveaways/giveaways.module';
+import { PoliciesModule } from './modules/policies/policies.module';
+import { FaqsModule } from './modules/faqs/faqs.module';
+import { ReviewsModule } from './modules/reviews/reviews.module';
+import { LoyaltyModule } from './modules/loyalty/loyalty.module';
+import { SeoModule } from './modules/seo/seo.module';
+import { MarketingModule } from './modules/marketing/marketing.module';
+import { AdminModule } from './modules/admin/admin.module';
+import { HomecategoryModule } from './modules/homecategory/homecategory.module';
+import { HerobannerModule } from './modules/herobanner/herobanner.module';
+
+@Module({
+  imports: [
+    TypeOrmModule.forRoot({
+      type: 'mongodb',
+      url: process.env.DATABASE_URL,
+      // extra: {},
+      entities: [__dirname + '/**/*.entity{.ts,.js}'],
+      synchronize: true, // Disable in production!
+    }),
+    AuthModule,
+    UsersModule,
+    CategoriesModule,
+    BrandsModule,
+    ProductsModule,
+    OrdersModule,
+    WarrantyModule,
+    GiveawaysModule,
+    PoliciesModule,
+    FaqsModule,
+    ReviewsModule,
+    LoyaltyModule,
+    SeoModule,
+    MarketingModule,
+    AdminModule,
+    HomecategoryModule,
+    HerobannerModule,
+  ],
+  controllers: [AppController],
+  providers: [AppService],
+})
+export class AppModule { }

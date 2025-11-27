@@ -1,0 +1,87 @@
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Query,
+  NotFoundException,
+} from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { FaqsService } from './faqs.service';
+import { CreateFaqDto, UpdateFaqDto } from './dto/faq.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
+
+@ApiTags('faqs')
+@Controller('faqs')
+export class FaqsController {
+  constructor(private readonly faqsService: FaqsService) { }
+
+  @Post()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'management')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Create FAQ (Admin/Management)' })
+  async create(@Body() dto: CreateFaqDto) {
+    const faq = await this.faqsService.create(dto);
+    return {
+      ...faq,
+      id: faq.id?.toString?.() ?? String(faq.id),
+    };
+  }
+
+  @Get()
+  @ApiOperation({ summary: 'Get all global FAQs' })
+  async findAll(@Query('productId') productId?: string) {
+    let faqs;
+    if (productId) {
+      faqs = await this.faqsService.findByProduct(productId);
+    } else {
+      faqs = await this.faqsService.findAll();
+    }
+    return faqs.map(faq => ({
+      ...faq,
+      id: faq.id?.toString?.() ?? String(faq.id),
+    }));
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get FAQ by ID' })
+  async findOne(@Param('id') id: string) {
+    const faq = await this.faqsService.findOne(id);
+    return {
+      ...faq,
+      id: faq.id?.toString?.() ?? String(faq.id),
+    };
+  }
+  @Patch(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'management')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update FAQ (Admin/Management)' })
+  async update(@Param('id') id: string, @Body() dto: UpdateFaqDto) {
+    const faq = await this.faqsService.update(id, dto);
+    if (!faq) {
+      throw new NotFoundException('FAQ not found');
+    }
+    return {
+      ...faq,
+      id: faq.id?.toString?.() ?? String(faq.id),
+    };
+  }
+  
+
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Delete FAQ (Admin only)' })
+  remove(@Param('id') id: string) {
+    return this.faqsService.remove(id);
+  }
+}

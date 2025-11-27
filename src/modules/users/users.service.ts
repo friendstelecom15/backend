@@ -39,7 +39,7 @@ export class UsersService {
     if (!name) {
       name = (createUserDto.email || '').split('@')[0];
     }
-    const role = typeof createUserDto.role === 'string' ? createUserDto.role : 'user';
+    const role: string = typeof createUserDto.role === 'string' ? createUserDto.role : 'user';
     const isAdmin = role === 'admin';
     let hashedPassword: string | undefined = undefined;
     if (typeof createUserDto.password === 'string' && createUserDto.password.length > 0) {

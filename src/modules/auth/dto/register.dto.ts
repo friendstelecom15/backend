@@ -20,5 +20,10 @@ export class RegisterDto {
   @IsOptional()
   @IsString()
   phone: string;
+
+  @ApiProperty({ example: 'user', required: false })
+  @IsOptional()
+  @IsString()
+  role?: string;
   
 }

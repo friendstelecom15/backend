@@ -5,7 +5,7 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 interface JwtPayload {
   sub: string;
   email: string;
-  roles?: string[];
+  role?: string; // Use string, not string[]
 }
 
 @Injectable()
@@ -21,8 +21,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   validate(payload: JwtPayload): {
     id: string;
     email: string;
-    roles?: string[];
+    role?: string;
   } {
-    return { id: payload.sub, email: payload.email, roles: payload.roles };
+    // Log the payload for debugging
+    console.log('JWT payload:', payload);
+    // Just return the role as-is (string)
+    return { id: payload.sub, email: payload.email, role: payload.role };
   }
 }

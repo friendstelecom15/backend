@@ -4,7 +4,9 @@ import { FileUpload, UploadType } from '../../common/decorators/file-upload.deco
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
-
+import { ApiBearerAuth } from '@nestjs/swagger';
+@UseGuards(JwtAuthGuard, RolesGuard)
+@ApiBearerAuth()
 @Controller('herobanner')
 export class HerobannerController {
     constructor(private readonly herobannerService: HerobannerService) { }

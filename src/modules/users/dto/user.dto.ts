@@ -19,6 +19,7 @@ export class CreateUserDto {
   @IsOptional()
   @IsString()
   phone?: string;
+
   @ApiProperty({ example: 'user@example.com' })
   @IsEmail()
   email: string;
@@ -33,17 +34,7 @@ export class CreateUserDto {
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  roles?: string[] = ['user'];
-
-  @ApiProperty({ example: 'user', required: false })
-  @IsOptional()
-  @IsString()
-  role?: string;
-
-  @ApiProperty({ example: 'roleId123', required: false })
-  @IsOptional()
-  @IsString()
-  roleId?: string;
+  role?: string[] = ['user'];
 }
 
 export class UpdateUserDto extends PartialType(CreateUserDto) { }

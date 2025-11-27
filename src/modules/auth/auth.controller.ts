@@ -15,6 +15,17 @@ export class AuthController {
   async register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
   }
+  @Post('decode')
+  @ApiOperation({ summary: 'Decode and verify a JWT auth code (token)' })
+  async decode(@Body('token') token: string) {
+    return this.authService.decodeAuthCode(token);
+  }
+
+  @Post('admin-register')
+  @ApiOperation({ summary: 'Register a new admin user' })
+  async adminRegister(@Body() dto: RegisterDto) {
+    return this.authService.adminRegister(dto);
+  }
 
   @Post('login')
   @ApiOperation({ summary: 'Login with email and password' })

@@ -18,7 +18,6 @@ interface AuthUser {
   role: string;
   image?: string | null;
 }
-
 @Injectable()
 export class AuthService {
   constructor(
@@ -27,6 +26,14 @@ export class AuthService {
     private readonly userRepo: MongoRepository<User>,
   ) { }
 
+  async decodeAuthCode(token: string): Promise<any> {
+    try {
+      // This both verifies and decodes the token
+      return this.jwtService.verify(token);
+    } catch (err) {
+      throw new UnauthorizedException('Invalid or expired token');
+    }
+  }
   async register(dto: RegisterDto) {
     const existing = await this.userRepo.findOne({ where: { email: dto.email } });
     if (existing) {
@@ -51,6 +58,31 @@ export class AuthService {
       image: savedUser.image ?? undefined,
     });
   }
+
+  async adminRegister(dto: RegisterDto) {
+    const existing = await this.userRepo.findOne({ where: { email: dto.email } });
+    if (existing) {
+      throw new ConflictException('Admin with this email already exists');
+    }
+
+    const hashedPassword = await bcrypt.hash(dto.password, 10);
+    const user = this.userRepo.create({
+      email: dto.email,
+      name: dto.name,
+      password: hashedPassword,
+      role: dto.role || 'admin',
+      isAdmin: true,
+    } as DeepPartial<User>);
+    const savedUser = await this.userRepo.save(user);
+    return this.login({
+      id: savedUser.id.toString(),
+      email: savedUser.email,
+      name: savedUser.name,
+      role: savedUser.role,
+      image: savedUser.image ?? undefined,
+    });
+  }
+
 
   async validateUser(email: string, plainPassword: string) {
     const user = await this.userRepo.findOne({ where: { email } });
@@ -79,6 +111,7 @@ export class AuthService {
 
   async loginWithCredentials(email: string, password: string) {
     const valid = await this.validateUser(email, password);
+    console.log('Validated user:', valid);
     if (!valid) throw new UnauthorizedException('Invalid credentials');
     return this.login({ ...valid, id: valid.id?.toString?.() ?? String(valid.id) });
   }

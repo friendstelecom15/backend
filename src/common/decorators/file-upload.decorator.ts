@@ -36,7 +36,9 @@ function getUploadPath(type: UploadType) {
 }
 
 function defaultStorage(type: UploadType) {
-  // সব টাইপেই diskStorage ব্যবহার করুন
+  if (type === UploadType.VIDEO || type === UploadType.IMAGE) {
+    return memoryStorage();
+  }
   return diskStorage({
     destination: (req, file, callback) => {
       try {

@@ -26,25 +26,55 @@ export class HerobannerService {
 
     // Get a single HeroBanner by ID
     async findOne(id: string | ObjectId) {
-        const _id = typeof id === 'string' ? new ObjectId(id) : id;
-        const heroBanner = await this.heroBannerRepository.findOne({ where: { id: _id } });
+        let objectId: ObjectId;
+        if (typeof id === 'string') {
+            try {
+                objectId = new ObjectId(id);
+            } catch {
+                throw new NotFoundException('Invalid HeroBanner id');
+            }
+        } else {
+            objectId = id;
+        }
+        const heroBanner = await this.heroBannerRepository.findOne({ where: { _id: objectId } } as any);
         if (!heroBanner) throw new NotFoundException('HeroBanner not found');
         return { ...heroBanner, id: String(heroBanner.id) };
     }
 
     // Update a HeroBanner
     async update(id: string | ObjectId, data: { img?: string }) {
-        const _id = typeof id === 'string' ? new ObjectId(id) : id;
-        await this.heroBannerRepository.update(_id, data);
-        const updated = await this.heroBannerRepository.findOne({ where: { id: _id } });
-        if (!updated) throw new NotFoundException('HeroBanner not found');
-        return { ...updated, id: String(updated.id) };
+        let objectId: ObjectId;
+        if (typeof id === 'string') {
+            try {
+                objectId = new ObjectId(id);
+            } catch {
+                throw new NotFoundException('Invalid HeroBanner id');
+            }
+        } else {
+            objectId = id;
+        }
+        const heroBanner = await this.heroBannerRepository.findOne({ where: { _id: objectId } } as any);
+        if (!heroBanner) throw new NotFoundException('HeroBanner not found');
+        if (data.img !== undefined) {
+            heroBanner.img = data.img;
+        }
+        const saved = await this.heroBannerRepository.save(heroBanner);
+        return { ...saved, id: String(saved.id) };
     }
 
     // Delete a HeroBanner
     async remove(id: string | ObjectId) {
-        const _id = typeof id === 'string' ? new ObjectId(id) : id;
-        await this.heroBannerRepository.delete(_id);
+        let objectId: ObjectId;
+        if (typeof id === 'string') {
+            try {
+                objectId = new ObjectId(id);
+            } catch {
+                throw new NotFoundException('Invalid HeroBanner id');
+            }
+        } else {
+            objectId = id;
+        }
+        await this.heroBannerRepository.delete(objectId);
         return { success: true };
     }
 }

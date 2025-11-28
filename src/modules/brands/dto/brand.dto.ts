@@ -9,6 +9,11 @@ export class CreateBrandDto {
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
+  slug?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
   logo?: string;
 }
 
@@ -17,6 +22,11 @@ export class UpdateBrandDto {
   @IsOptional()
   @IsString()
   name?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  slug?: string;
 
   @ApiProperty({ required: false })
   @IsOptional()

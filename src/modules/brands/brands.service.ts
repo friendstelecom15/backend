@@ -23,14 +23,37 @@ export class BrandsService {
 
 
   async findAll() {
-    return this.brandRepository.find({ order: { name: 'ASC' } });
+    const brands = await this.brandRepository.find({ order: { name: 'ASC' } });
+    return brands.map(brand => ({
+      id: brand.id?.toString?.() ?? String(brand.id),
+      name: brand.name,
+      slug: brand.slug,
+      logo: brand.logo,
+      createdAt: brand.createdAt,
+      updatedAt: brand.updatedAt,
+    }));
   }
 
 
-  async findOne(slug: string) {
-    const brand = await this.brandRepository.findOne({ where: { slug } });
+  async findOne(idOrSlug: string) {
+    let brand;
+    try {
+      // Try to treat as ObjectId
+      const objectId = new ObjectId(idOrSlug);
+      brand = await this.brandRepository.findOne({ where: { _id: objectId } } as any);
+    } catch {
+      // Fallback to slug
+      brand = await this.brandRepository.findOne({ where: { slug: idOrSlug } });
+    }
     if (!brand) throw new NotFoundException('Brand not found');
-    return brand;
+    return {
+      id: brand.id?.toString?.() ?? String(brand.id),
+      name: brand.name,
+      slug: brand.slug,
+      logo: brand.logo,
+      createdAt: brand.createdAt,
+      updatedAt: brand.updatedAt,
+    };
   }
 
 
@@ -51,7 +74,16 @@ export class BrandsService {
       data.slug = dto.name.toLowerCase().replace(/\s+/g, '-');
     }
     await this.brandRepository.update(_id, data);
-    return this.brandRepository.findOne({ where: { id: _id } });
+    const brand = await this.brandRepository.findOne({ where: { _id } } as any);
+    if (!brand) throw new NotFoundException('Brand not found');
+    return {
+      id: brand.id?.toString?.() ?? String(brand.id),
+      name: brand.name,
+      slug: brand.slug,
+      logo: brand.logo,
+      createdAt: brand.createdAt,
+      updatedAt: brand.updatedAt,
+    };
   }
 
 
@@ -64,9 +96,17 @@ export class BrandsService {
 
 
   async getFeatured() {
-    return this.brandRepository.find({
+    const brands = await this.brandRepository.find({
       take: 12,
       order: { name: 'ASC' },
     });
+    return brands.map(brand => ({
+      id: brand.id?.toString?.() ?? String(brand.id),
+      name: brand.name,
+      slug: brand.slug,
+      logo: brand.logo,
+      createdAt: brand.createdAt,
+      updatedAt: brand.updatedAt,
+    }));
   }
 }

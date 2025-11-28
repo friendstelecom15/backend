@@ -1,10 +1,8 @@
-import { Entity, ObjectIdColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
+import { Entity, ObjectIdColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { ObjectId } from 'mongodb';
 
-import { Subcategory } from './subcategory.entity';
-
-@Entity('categories')
-export class Category {
+@Entity('subcategories')
+export class Subcategory {
     @ObjectIdColumn()
     id: ObjectId;
 
@@ -23,12 +21,8 @@ export class Category {
     @Column({ nullable: true })
     priority?: number;
 
-
     @Column({ nullable: true })
-    homeCategoryId?: string;
-
-    @OneToMany(() => Subcategory, subcategory => subcategory.categoryId)
-    subcategories?: Subcategory[];
+    categoryId?: string;
 
     @CreateDateColumn()
     createdAt: Date;

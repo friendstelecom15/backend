@@ -8,10 +8,14 @@ import {
   Delete,
   UseGuards,
   NotFoundException,
+  UploadedFiles,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { BrandsService } from './brands.service';
 import { CreateBrandDto, UpdateBrandDto } from './dto/brand.dto';
+import { FileFieldsUpload, UploadType } from '../../common/decorators/file-upload.decorator';
+import { CloudflareService } from '../../config/cloudflare-video.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -19,14 +23,40 @@ import { Roles } from '../../common/decorators/roles.decorator';
 @ApiTags('brands')
 @Controller('brands')
 export class BrandsController {
-  constructor(private readonly brandsService: BrandsService) { }
+  constructor(
+    private readonly brandsService: BrandsService,
+    private readonly cloudflareService: CloudflareService,
+  ) {}
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create brand (Admin only)' })
-  async create(@Body() dto: CreateBrandDto) {
+  @FileFieldsUpload(
+    [{ name: 'logo', maxCount: 1 }],
+    undefined,
+    UploadType.IMAGE,
+  )
+  async create(
+    @Body() dto: CreateBrandDto,
+    @UploadedFiles() files: { logo?: Express.Multer.File[] },
+  ) {
+    if (files?.logo?.length) {
+      const file = files.logo[0];
+      try {
+        const upload = await this.cloudflareService.uploadImage(
+          file.buffer,
+          file.originalname,
+        );
+        dto.logo = upload.variants?.[0] || upload.id || upload.filename || '';
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        throw new InternalServerErrorException(
+          `Cloudflare image upload failed: ${message}`,
+        );
+      }
+    }
     const brand = await this.brandsService.create(dto);
     return {
       ...brand,
@@ -70,7 +100,31 @@ export class BrandsController {
   @Roles('admin')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update brand (Admin only)' })
-  async update(@Param('id') id: string, @Body() dto: UpdateBrandDto) {
+  @FileFieldsUpload(
+    [{ name: 'logo', maxCount: 1 }],
+    undefined,
+    UploadType.IMAGE,
+  )
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdateBrandDto,
+    @UploadedFiles() files: { logo?: Express.Multer.File[] },
+  ) {
+    if (files?.logo?.length) {
+      const file = files.logo[0];
+      try {
+        const upload = await this.cloudflareService.uploadImage(
+          file.buffer,
+          file.originalname,
+        );
+        dto.logo = upload.variants?.[0] || upload.id || upload.filename || '';
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        throw new InternalServerErrorException(
+          `Cloudflare image upload failed: ${message}`,
+        );
+      }
+    }
     const brand = await this.brandsService.update(id, dto);
     if (!brand) {
       throw new NotFoundException('Brand not found');

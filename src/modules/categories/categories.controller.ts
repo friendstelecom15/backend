@@ -9,9 +9,12 @@ import {
   Query,
   UseGuards,
   NotFoundException,
+  UploadedFiles,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { CategoriesService } from './categories.service';
+import { FileFieldsUpload, UploadType } from '../../common/decorators/file-upload.decorator';
+import { CloudflareService } from '../../config/cloudflare-video.service';
 import {
   CreateCategoryDto,
   UpdateCategoryDto,
@@ -21,17 +24,44 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 
+
 @ApiTags('categories')
 @Controller('categories')
 export class CategoriesController {
-  constructor(private readonly categoriesService: CategoriesService) { }
+  constructor(
+    private readonly categoriesService: CategoriesService,
+    private readonly cloudflareService: CloudflareService,
+  ) {}
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create category (Admin only)' })
-  async create(@Body() dto: CreateCategoryDto) {
+  @FileFieldsUpload(
+    [
+      { name: 'banner', maxCount: 1 },
+    ],
+    undefined,
+    UploadType.IMAGE,
+  )
+  async create(
+    @Body() dto: CreateCategoryDto,
+    @UploadedFiles() files: { banner?: Express.Multer.File[] },
+  ) {
+    if (files?.banner?.length) {
+      const file = files.banner[0];
+      try {
+        const upload = await this.cloudflareService.uploadImage(
+          file.buffer,
+          file.originalname,
+        );
+        dto.banner = upload.variants?.[0] || upload.id || upload.filename || '';
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        throw new NotFoundException(`Cloudflare image upload failed: ${message}`);
+      }
+    }
     const category = await this.categoriesService.create(dto);
     return {
       ...category,
@@ -42,10 +72,11 @@ export class CategoriesController {
   @Get()
   @ApiOperation({ summary: 'Get all categories' })
   async findAll() {
-    const categories = await this.categoriesService.findAll();
+    const categories = await this.categoriesService.findAll({ relations: ['subcategories'] });
     return categories.map(category => ({
       ...category,
       id: category.id,
+      subcategories: category.subcategories ?? [],
     }));
   }
 
@@ -58,10 +89,11 @@ export class CategoriesController {
   @Get(':slug')
   @ApiOperation({ summary: 'Get category by slug' })
   async findOne(@Param('slug') slug: string) {
-    const category = await this.categoriesService.findOne(slug);
+    const category = await this.categoriesService.findOne(slug, { relations: ['subcategories'] });
     return {
       ...category,
       id: category.id,
+      subcategories: category.subcategories ?? [],
     };
   }
 
@@ -78,7 +110,31 @@ export class CategoriesController {
   @Roles('admin')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update category (Admin only)' })
-  async update(@Param('id') id: string, @Body() dto: UpdateCategoryDto) {
+  @FileFieldsUpload(
+    [
+      { name: 'banner', maxCount: 1 },
+    ],
+    undefined,
+    UploadType.IMAGE,
+  )
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdateCategoryDto,
+    @UploadedFiles() files: { banner?: Express.Multer.File[] },
+  ) {
+    if (files?.banner?.length) {
+      const file = files.banner[0];
+      try {
+        const upload = await this.cloudflareService.uploadImage(
+          file.buffer,
+          file.originalname,
+        );
+        dto.banner = upload.variants?.[0] || upload.id || upload.filename || '';
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        throw new NotFoundException(`Cloudflare image upload failed: ${message}`);
+      }
+    }
     const category = await this.categoriesService.update(id, dto);
     if (!category) {
       throw new NotFoundException('Category not found');
@@ -97,5 +153,44 @@ export class CategoriesController {
   @ApiOperation({ summary: 'Delete category (Admin only)' })
   remove(@Param('id') id: string) {
     return this.categoriesService.remove(id);
+  }
+
+  // SUBCATEGORY ENDPOINTS
+
+  @Post(':categoryId/subcategories')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Create subcategory (Admin only)' })
+  async createSubcategory(
+    @Param('categoryId') categoryId: string,
+    @Body() dto: any, // You should create a CreateSubcategoryDto for type safety
+  ) {
+    dto.categoryId = categoryId;
+    return this.categoriesService.createSubcategory(dto);
+  }
+
+  @Patch('subcategories/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update subcategory (Admin only)' })
+  async updateSubcategory(
+    @Param('id') id: string,
+    @Body() dto: any, // You should create an UpdateSubcategoryDto for type safety
+  ) {
+    return this.categoriesService.updateSubcategory(id, dto);
+  }
+
+  @Get(':categoryId/subcategories')
+  @ApiOperation({ summary: 'Get all subcategories for a category' })
+  async getSubcategoriesByCategory(@Param('categoryId') categoryId: string) {
+    return this.categoriesService.getSubcategoriesByCategory(categoryId);
+  }
+
+  @Get('subcategories/:id')
+  @ApiOperation({ summary: 'Get subcategory by id' })
+  async getSubcategory(@Param('id') id: string) {
+    return this.categoriesService.getSubcategory(id);
   }
 }

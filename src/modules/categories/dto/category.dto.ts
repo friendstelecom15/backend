@@ -16,10 +16,6 @@ export class CreateCategoryDto {
   @IsString()
   banner?: string;
 
-  @ApiProperty({ required: false })
-  @IsOptional()
-  @IsString()
-  icon?: string;
 
   @ApiProperty({ required: false })
   @IsOptional()
@@ -43,10 +39,6 @@ export class UpdateCategoryDto {
   @IsString()
   banner?: string;
 
-  @ApiProperty({ required: false })
-  @IsOptional()
-  @IsString()
-  icon?: string;
 
   @ApiProperty({ required: false })
   @IsOptional()

@@ -44,7 +44,6 @@ async function seed() {
             slug: faker.helpers.slugify(name).toLowerCase(),
             description: faker.lorem.sentence(),
             banner: faker.image.url(),
-            icon: faker.image.avatar(),
             priority: faker.number.int({ min: 1, max: 10 }),
         }));
     }

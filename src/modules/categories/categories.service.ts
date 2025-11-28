@@ -8,6 +8,7 @@ import {
   CategoryFilterDto,
 } from './dto/category.dto';
 import { Category } from './entities/category.entity';
+import { Subcategory } from './entities/subcategory.entity';
 import { ObjectId } from 'mongodb';
 
 @Injectable()
@@ -16,7 +17,34 @@ export class CategoriesService {
   constructor(
     @InjectRepository(Category)
     private readonly categoryRepository: Repository<Category>,
-  ) { }
+    @InjectRepository(Subcategory)
+    private readonly subcategoryRepository: Repository<Subcategory>,
+  ) {}
+  // SUBCATEGORY METHODS
+  async createSubcategory(dto: any) {
+    const slug = dto.name.toLowerCase().replace(/\s+/g, '-');
+    const subcategory = this.subcategoryRepository.create({ ...dto, slug });
+    return this.subcategoryRepository.save(subcategory);
+  }
+
+  async updateSubcategory(id: string, dto: any) {
+    const _id = typeof id === 'string' ? new ObjectId(id) : id;
+    const data: Record<string, unknown> = { ...dto };
+    if (dto.name) {
+      data.slug = dto.name.toLowerCase().replace(/\s+/g, '-');
+    }
+    await this.subcategoryRepository.update(_id, data);
+    return this.subcategoryRepository.findOne({ where: { _id } } as any);
+  }
+
+  async getSubcategoriesByCategory(categoryId: string) {
+    return this.subcategoryRepository.find({ where: { categoryId } });
+  }
+
+  async getSubcategory(id: string) {
+    const _id = typeof id === 'string' ? new ObjectId(id) : id;
+    return this.subcategoryRepository.findOne({ where: { _id } } as any);
+  }
 
 
   async create(dto: CreateCategoryDto) {
@@ -26,13 +54,19 @@ export class CategoriesService {
   }
 
 
-  async findAll() {
-    return this.categoryRepository.find({ order: { priority: 'ASC' } });
+  async findAll(options?: { relations?: string[] }) {
+    return this.categoryRepository.find({
+      order: { priority: 'ASC' },
+      ...(options?.relations ? { relations: options.relations } : {}),
+    });
   }
 
 
-  async findOne(slug: string) {
-    const category = await this.categoryRepository.findOne({ where: { slug } });
+  async findOne(slug: string, options?: { relations?: string[] }) {
+    const category = await this.categoryRepository.findOne({
+      where: { slug },
+      ...(options?.relations ? { relations: options.relations } : {}),
+    });
     if (!category) throw new NotFoundException('Category not found');
     return category;
   }
@@ -55,7 +89,7 @@ export class CategoriesService {
       data.slug = dto.name.toLowerCase().replace(/\s+/g, '-');
     }
     await this.categoryRepository.update(_id, data);
-    return this.categoryRepository.findOne({ where: { id: _id } });
+    return this.categoryRepository.findOne({ where: { _id } } as any);
   }
 
 

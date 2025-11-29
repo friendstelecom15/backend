@@ -1,7 +1,9 @@
 import { Entity, ObjectIdColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
+import { ProductCare } from '../../products/entities/product.care.entity';
 import { ObjectId } from 'mongodb';
 
 import { Subcategory } from './subcategory.entity';
+// import { HomeCategory } from '../../homecategory/entities/homecategory.entity';
 
 @Entity('categories')
 export class Category {
@@ -27,8 +29,15 @@ export class Category {
     @Column({ nullable: true })
     homeCategoryId?: string;
 
+
     @OneToMany(() => Subcategory, subcategory => subcategory.categoryId)
     subcategories?: Subcategory[];
+
+
+    // MongoDB: cares are referenced by categoryIds in ProductCare, not as a relation
+    // cares?: ProductCare[];
+
+
 
     @CreateDateColumn()
     createdAt: Date;

@@ -1,6 +1,5 @@
-import { Entity, ObjectIdColumn, Column, UpdateDateColumn } from 'typeorm';
+import { Entity, ObjectIdColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { ObjectId } from 'mongodb';
-import { v4 as uuidv4 } from 'uuid';
 
 @Entity('policypages')
 export class PolicyPage {
@@ -13,11 +12,21 @@ export class PolicyPage {
     @Column()
     title: string;
 
-    @Column({ nullable: true })
-    contentBn?: string;
+    @Column()
+    type: string;
+
+
+    @Column({ default: 0 })
+    orderIndex: number;
+
+    @Column({ default: false })
+    isPublished: boolean;
 
     @Column({ nullable: true })
-    contentEn?: string;
+    content?: string;
+
+    @CreateDateColumn()
+    createdAt: Date;
 
     @UpdateDateColumn()
     updatedAt: Date;

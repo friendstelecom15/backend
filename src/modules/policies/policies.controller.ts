@@ -37,29 +37,32 @@ export class PoliciesController {
     return policies.map(p => ({ ...p, id: p.id?.toString?.() ?? String(p.id) }));
   }
 
-  @Get(':slug')
-  @ApiOperation({ summary: 'Get policy by slug' })
-  async findOne(@Param('slug') slug: string) {
-    const policy = await this.policiesService.findOne(slug);
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get policy by id' })
+  async findOne(@Param('id') id: string) {
+    const policy = await this.policiesService.findOne(id);
     return { ...policy, id: policy.id?.toString?.() ?? String(policy.id) };
   }
 
-  @Patch(':slug')
+
+  @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update policy (Admin only)' })
-  async update(@Param('slug') slug: string, @Body() dto: UpdatePolicyDto) {
-    const policy = await this.policiesService.update(slug, dto);
+  async update(@Param('id') id: string, @Body() dto: UpdatePolicyDto) {
+    const policy = await this.policiesService.update(id, dto);
     return { ...policy, id: policy.id?.toString?.() ?? String(policy.id) };
   }
 
-  @Delete(':slug')
+
+  @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete policy (Admin only)' })
-  async remove(@Param('slug') slug: string) {
-    return await this.policiesService.remove(slug);
+  async remove(@Param('id') id: string) {
+    return await this.policiesService.remove(id);
   }
 }

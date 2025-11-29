@@ -12,8 +12,15 @@ export class FAQ {
     @Column()
     answer: string;
 
+
+    @Column({ type: 'array', nullable: true })
+    productIds?: string[];
+
+    @Column({ type: 'array', nullable: true })
+    categoryIds?: string[];
+
     @Column({ nullable: true })
-    productId?: string;
+    orderIndex?: number;
 
     @CreateDateColumn()
     createdAt: Date;

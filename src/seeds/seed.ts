@@ -160,14 +160,26 @@ async function seed() {
     }));
     await notificationRepo.save(notifications);
 
-    // FAQs
+    // FAQs (each FAQ can belong to multiple products)
     const faqRepo = AppDataSource.getMongoRepository(FAQ);
-    const faqs = Array.from({ length: 5 }, () => faqRepo.create({
-        question: faker.lorem.sentence(),
-        answer: faker.lorem.paragraph(),
-        productId: products[faker.number.int({ min: 0, max: products.length - 1 })].id.toString(),
-    }));
+    const faqs = Array.from({ length: 5 }, () => {
+        // Randomly assign 1-3 products to each FAQ
+        const numProducts = faker.number.int({ min: 1, max: 3 });
+        const productIndexes = Array.from({ length: numProducts }, () => faker.number.int({ min: 0, max: products.length - 1 }));
+        const uniqueProductIds = Array.from(new Set(productIndexes.map(idx => products[idx].id.toString())));
+        return faqRepo.create({
+            question: faker.lorem.sentence(),
+            answer: faker.lorem.paragraph(),
+            productIds: uniqueProductIds,
+        });
+    });
     await faqRepo.save(faqs);
+
+    // Optionally, update products to include faqIds
+    for (const product of products) {
+        product.faqIds = faqs.filter(faq => faq.productIds?.includes(product.id.toString())).map(faq => faq.id.toString());
+    }
+    await productRepo.save(products);
 
     // Giveaway Entries
     const giveawayEntryRepo = AppDataSource.getMongoRepository(GiveawayEntry);
@@ -190,11 +202,13 @@ async function seed() {
 
     // Policy Pages
     const policyRepo = AppDataSource.getMongoRepository(PolicyPage);
-    const policies = Array.from({ length: 3 }, () => policyRepo.create({
+    const policies = Array.from({ length: 3 }, (_, i) => policyRepo.create({
         slug: faker.helpers.slugify(faker.lorem.words(2)).toLowerCase(),
         title: faker.lorem.words(3),
-        contentBn: faker.lorem.paragraph(),
-        contentEn: faker.lorem.paragraph(),
+        orderIndex: i,
+        content: faker.lorem.paragraph(),
+        type: faker.helpers.arrayElement(['privacy', 'terms', 'refund']),
+        isPublished: faker.datatype.boolean(),
     }));
     await policyRepo.save(policies);
 

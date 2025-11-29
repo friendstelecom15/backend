@@ -10,15 +10,22 @@ export class CreatePolicyDto {
   @IsString()
   title: string;
 
-  @ApiProperty({ required: false })
-  @IsOptional()
+  @ApiProperty({ description: 'Type of policy (e.g., privacy, terms, refund)' })
   @IsString()
-  contentBn?: string;
+  type: string;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ required: false, description: 'Order index for custom sorting', default: 0 })
+  @IsOptional()
+  orderIndex?: number;
+
+  @ApiProperty({ required: false, description: 'Is the policy published?', default: false })
+  @IsOptional()
+  isPublished?: boolean;
+
+  @ApiProperty({ required: false, description: 'Policy content' })
   @IsOptional()
   @IsString()
-  contentEn?: string;
+  content?: string;
 }
 
 export class UpdatePolicyDto {
@@ -27,13 +34,21 @@ export class UpdatePolicyDto {
   @IsString()
   title?: string;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ required: false, description: 'Type of policy (e.g., privacy, terms, refund)' })
   @IsOptional()
   @IsString()
-  contentBn?: string;
+  type?: string;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ required: false, description: 'Order index for custom sorting' })
+  @IsOptional()
+  orderIndex?: number;
+
+  @ApiProperty({ required: false, description: 'Is the policy published?' })
+  @IsOptional()
+  isPublished?: boolean;
+
+  @ApiProperty({ required: false, description: 'Policy content' })
   @IsOptional()
   @IsString()
-  contentEn?: string;
+  content?: string;
 }

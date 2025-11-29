@@ -1,5 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsOptional } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsArray,
+  ArrayNotEmpty,
+  ArrayUnique,
+  IsNumber,
+} from 'class-validator';
 
 export class CreateFaqDto {
   @ApiProperty()
@@ -10,10 +17,37 @@ export class CreateFaqDto {
   @IsString()
   answer: string;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({
+    required: false,
+    description: 'Order index for custom sorting',
+  })
   @IsOptional()
-  @IsString()
-  productId?: string;
+  @IsNumber()
+  orderIndex?: number;
+
+  @ApiProperty({
+    required: false,
+    type: [String],
+    description: 'Array of product IDs this FAQ belongs to',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayUnique()
+  @IsString({ each: true })
+  productIds?: string[];
+
+  @ApiProperty({
+    required: false,
+    type: [String],
+    description: 'Array of category IDs this FAQ belongs to',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayUnique()
+  @IsString({ each: true })
+  categoryIds?: string[];
 }
 
 export class UpdateFaqDto {
@@ -22,8 +56,38 @@ export class UpdateFaqDto {
   @IsString()
   question?: string;
 
+  @ApiProperty({
+    required: false,
+    description: 'Order index for custom sorting',
+  })
+  @IsOptional()
+  @IsNumber()
+  orderIndex?: number;
+
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
   answer?: string;
+
+  @ApiProperty({
+    required: false,
+    type: [String],
+    description: 'Array of product IDs this FAQ belongs to',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsString({ each: true })
+  productIds?: string[];
+
+  @ApiProperty({
+    required: false,
+    type: [String],
+    description: 'Array of category IDs this FAQ belongs to',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsString({ each: true })
+  categoryIds?: string[];
 }

@@ -11,16 +11,110 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { ProductsService } from './products.service';
+import { ProductCare } from './entities/product.care.entity';
+import { CareCreateDto } from './dto/care-create.dto';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { NotifyProduct } from './entities/notifyproduct.entity';
 
 @ApiTags('products')
 @Controller('products')
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
+
+  // NotifyProduct Endpoints
+
+  @Post(':productId/notify')
+  @ApiOperation({ summary: 'Create notification request for a product (guest or user)' })
+  createNotify(@Param('productId') productId: string, @Body() dto: Partial<NotifyProduct>) {
+    return this.productsService.createNotify({ ...dto, productId });
+  }
+
+ @Get('cares')
+  @ApiOperation({ summary: 'Get all care plans (with product/category names)' })
+  async getAllCares() {
+    const cares = await this.productsService.getCares();
+    const productIds = cares.flatMap(c => c.productIds || []);
+    const categoryIds = cares.flatMap(c => c.categoryIds || []);
+    const uniqueProductIds = [...new Set(productIds)];
+    const uniqueCategoryIds = [...new Set(categoryIds)];
+    const products = uniqueProductIds.length ? await this.productsService['productRepository'].findByIds(uniqueProductIds) : [];
+    const categoryRepo = this.productsService['productRepository'].manager.getRepository('Category');
+    const categories = uniqueCategoryIds.length ? await categoryRepo.findByIds(uniqueCategoryIds) : [];
+    return cares.map(care => ({
+      ...care,
+      productNames: (care.productIds || []).map(pid => products.find(p => (p.id?.toString?.() === pid || (p as any)._id?.toString?.() === pid))?.name || pid),
+      categoryNames: (care.categoryIds || []).map(cid => categories.find(cat => (cat.id?.toString?.() === cid || (cat as any)._id?.toString?.() === cid))?.name || cid),
+    }));
+  }
+
+  @Patch('notify/:id')
+  @ApiOperation({ summary: 'Update notification request' })
+  updateNotify(@Param('id') id: string, @Body() dto: Partial<NotifyProduct>) {
+    return this.productsService.updateNotify(id, dto);
+  }
+
+  @Get(':productId/notify')
+  @ApiOperation({ summary: 'Get all notification requests for a product' })
+  getNotifies(@Param('productId') productId: string) {
+    return this.productsService.getNotifies(productId);
+  }
+
+  @Get('notify/:id')
+  @ApiOperation({ summary: 'Get notification request by id' })
+  getNotifyById(@Param('id') id: string) {
+    return this.productsService.getNotifyById(id);
+  }
+
+  @Delete('notify/:id')
+  @ApiOperation({ summary: 'Delete notification request' })
+  removeNotify(@Param('id') id: string) {
+    return this.productsService.removeNotify(id);
+  }
+
+  // Product Care Endpoints
+
+  @Post('cares')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'management')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Create care plan (Admin/Management only)' })
+  createCare(@Body() dto: CareCreateDto) {
+    return this.productsService.createCare(dto);
+  }
+
+  @Patch('cares/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'management')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update care plan (Admin/Management only)' })
+  updateCare(@Param('id') id: string, @Body() dto: Partial<ProductCare>) {
+    return this.productsService.updateCare(id, dto);
+  }
+
+  @Get(':productId/cares')
+  @ApiOperation({ summary: 'Get all care plans for a product' })
+  getCares(@Param('productId') productId: string) {
+    return this.productsService.getCares(productId);
+  }
+
+  @Get('cares/:id')
+  @ApiOperation({ summary: 'Get care plan by id' })
+  getCareById(@Param('id') id: string) {
+    return this.productsService.getCareById(id);
+  }
+
+  @Delete('cares/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'management')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Delete care plan (Admin/Management only)' })
+  removeCare(@Param('id') id: string) {
+    return this.productsService.removeCare(id);
+  }
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)

@@ -1,6 +1,11 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { ObjectId } from 'mongodb';
 import { PolicyPage } from './entities/policy.entity';
 import { CreatePolicyDto, UpdatePolicyDto } from './dto/policy.dto';
 
@@ -9,37 +14,44 @@ export class PoliciesService {
   constructor(
     @InjectRepository(PolicyPage)
     private readonly policyRepo: Repository<PolicyPage>,
-  ) { }
-
+  ) {}
   async create(dto: CreatePolicyDto) {
-    const exists = await this.policyRepo.findOne({ where: { slug: dto.slug } });
-    if (exists) throw new ConflictException('Policy with this slug already exists');
+    const existing = await this.policyRepo.findOne({
+      where: { type: dto.type },
+    });
+    if (existing) {
+      throw new ConflictException(`Policy of type ${dto.type} already exists.`);
+    }
     const policy = this.policyRepo.create(dto);
     return this.policyRepo.save(policy);
   }
 
   async findAll() {
-    const policies = await this.policyRepo.find();
-    return policies.map(p => ({ ...p, id: p.id?.toString?.() ?? String(p.id) }));
+    return this.policyRepo.find({ order: { orderIndex: 'ASC' } });
   }
-
-  async findOne(slug: string) {
-    const policy = await this.policyRepo.findOne({ where: { slug } });
+  async findOne(id: string) {
+    const policy = await this.policyRepo.findOne({
+      where: { _id: new ObjectId(id) } as any,
+    });
     if (!policy) throw new NotFoundException('Policy not found');
-    return { ...policy, id: policy.id?.toString?.() ?? String(policy.id) };
+    return policy;
   }
 
-  async update(slug: string, dto: UpdatePolicyDto) {
-    const policy = await this.policyRepo.findOne({ where: { slug } });
+  async update(id: string, dto: UpdatePolicyDto) {
+    const policy = await this.policyRepo.findOne({
+      where: { _id: new ObjectId(id) } as any,
+    });
     if (!policy) throw new NotFoundException('Policy not found');
     Object.assign(policy, dto);
     return this.policyRepo.save(policy);
   }
 
-  async remove(slug: string) {
-    const policy = await this.policyRepo.findOne({ where: { slug } });
+  async remove(id: string) {
+    const policy = await this.policyRepo.findOne({
+      where: { _id: new ObjectId(id) } as any,
+    });
     if (!policy) throw new NotFoundException('Policy not found');
-    await this.policyRepo.delete(policy.id);
-    return { success: true };
+    await this.policyRepo.delete(new ObjectId(id));
+    return { message: 'Policy deleted successfully' };
   }
 }

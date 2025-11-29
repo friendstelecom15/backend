@@ -1,5 +1,9 @@
-import { Entity, ObjectIdColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+
+import { Entity, ObjectIdColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany, ManyToOne, JoinColumn } from 'typeorm';
 import { ObjectId } from 'mongodb';
+import { ProductCare } from './product.care.entity';
+import { Category } from '../../categories/entities/category.entity';
+// import { HomeCategory } from '../../homecategory/entities/homecategory.entity';
 
 @Entity('products')
 export class Product {
@@ -39,8 +43,13 @@ export class Product {
   @Column({ nullable: true })
   sku?: string;
 
+
   @Column({ nullable: true })
   categoryId?: string;
+
+  @ManyToOne(() => Category, { nullable: true })
+  @JoinColumn({ name: 'categoryId' })
+  category?: Category;
 
   @Column({ nullable: true })
   productType?: string;
@@ -98,4 +107,12 @@ export class Product {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  @Column({ type: 'array', nullable: true })
+  faqIds?: string[];
+
+  // MongoDB: cares are referenced by productIds in ProductCare, not as a relation
+  // cares?: ProductCare[];
+
+
 }

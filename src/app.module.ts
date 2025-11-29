@@ -19,6 +19,7 @@ import { MarketingModule } from './modules/marketing/marketing.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { HomecategoryModule } from './modules/homecategory/homecategory.module';
 import { HerobannerModule } from './modules/herobanner/herobanner.module';
+import { EmiModule } from './modules/emi/emi.modul';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { HerobannerModule } from './modules/herobanner/herobanner.module';
     AdminModule,
     HomecategoryModule,
     HerobannerModule,
+    EmiModule,
   ],
   controllers: [AppController],
   providers: [AppService],

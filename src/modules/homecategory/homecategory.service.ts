@@ -52,8 +52,19 @@ export class HomecategoryService {
     categoryIds?: string[];
     productIds?: string[];
   }) {
-    const _id = typeof id === 'string' ? new ObjectId(id) : id;
-    const homeCategory = await this.homeCategoryRepository.findOne({ where: { id: _id } });
+    let _id: ObjectId;
+    if (typeof id === 'string' && id.length === 24) {
+      _id = new ObjectId(id);
+    } else if (id instanceof ObjectId) {
+      _id = id;
+    } else {
+      throw new NotFoundException('HomeCategory not found');
+    }
+    // Try both id and _id fields for MongoDB compatibility
+    let homeCategory = await this.homeCategoryRepository.findOne({ where: { id: _id } });
+    if (!homeCategory) {
+      homeCategory = await this.homeCategoryRepository.findOne({ where: { _id: _id } } as any);
+    }
     if (!homeCategory) throw new NotFoundException('HomeCategory not found');
     if (data.name !== undefined) homeCategory.name = data.name;
     if (data.priority !== undefined) homeCategory.priority = data.priority;
@@ -77,10 +88,21 @@ export class HomecategoryService {
 
   // Delete a HomeCategory
   async remove(id: string | ObjectId) {
-    const _id = typeof id === 'string' ? new ObjectId(id) : id;
-    const homeCategory = await this.homeCategoryRepository.findOne({ where: { id: _id } });
+    let _id: ObjectId;
+    if (typeof id === 'string' && id.length === 24) {
+      _id = new ObjectId(id);
+    } else if (id instanceof ObjectId) {
+      _id = id;
+    } else {
+      throw new NotFoundException('HomeCategory not found');
+    }
+    let homeCategory = await this.homeCategoryRepository.findOne({ where: { id: _id } });
+    if (!homeCategory) {
+      homeCategory = await this.homeCategoryRepository.findOne({ where: { _id: _id } } as any);
+    }
     if (!homeCategory) throw new NotFoundException('HomeCategory not found');
     await this.homeCategoryRepository.delete(_id);
-    return { success: true };
+    return { message: 'HomeCategory deleted successfully' };
   }
+
 }

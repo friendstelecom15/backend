@@ -45,6 +45,13 @@ export class PoliciesController {
     return { ...policy, id: policy.id?.toString?.() ?? String(policy.id) };
   }
 
+  @Get('slug/:slug')
+  @ApiOperation({ summary: 'Get policy by slug' })
+  async findOneBySlug(@Param('slug') slug: string) {
+    const policy = await this.policiesService.findOneBySlug(slug);
+    return { ...policy, id: policy.id?.toString?.() ?? String(policy.id) };
+  }
+
 
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)

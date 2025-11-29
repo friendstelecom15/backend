@@ -37,6 +37,14 @@ export class PoliciesService {
     return policy;
   }
 
+  async findOneBySlug(slug: string) {
+    const policy = await this.policyRepo.findOne({
+      where: { slug },
+    });
+    if (!policy) throw new NotFoundException('Policy not found');
+    return policy;
+  }
+
   async update(id: string, dto: UpdatePolicyDto) {
     const policy = await this.policyRepo.findOne({
       where: { _id: new ObjectId(id) } as any,

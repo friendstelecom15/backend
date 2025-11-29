@@ -1,9 +1,15 @@
-
-import { Entity, ObjectIdColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany, ManyToOne, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  ObjectIdColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  OneToMany,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 import { ObjectId } from 'mongodb';
-import { ProductCare } from './product.care.entity';
 import { Category } from '../../categories/entities/category.entity';
-// import { HomeCategory } from '../../homecategory/entities/homecategory.entity';
 
 @Entity('products')
 export class Product {
@@ -42,7 +48,6 @@ export class Product {
 
   @Column({ nullable: true })
   sku?: string;
-
 
   @Column({ nullable: true })
   categoryId?: string;
@@ -102,6 +107,42 @@ export class Product {
   @Column({ nullable: true })
   slug?: string;
 
+  @Column({ nullable: true })
+  video?: string;
+
+  @Column({ type: 'array', nullable: true })
+  images?: string[]; // alias for gallery if needed
+
+  @Column({ nullable: true })
+  stock?: number;
+
+  @Column({ nullable: true })
+  warranty?: string;
+
+  @Column({ nullable: true })
+  minBookingPrice?: number;
+
+  @Column({ nullable: true })
+  purchasePoints?: number;
+
+  @Column({ type: 'json', nullable: true })
+  campaigns?: any;
+
+  @Column({ nullable: true })
+  status?: string;
+
+  @Column({ nullable: true })
+  isActive?: boolean;
+
+  @Column({ nullable: true })
+  isOnline?: boolean;
+
+  @Column({ nullable: true })
+  freeShipping?: boolean;
+
+  @Column({ type: 'json', nullable: true })
+  meta?: any; // for meta fields like tags, badge, title, keywords, canonical, description, etc.
+
   @CreateDateColumn()
   createdAt: Date;
 
@@ -110,9 +151,4 @@ export class Product {
 
   @Column({ type: 'array', nullable: true })
   faqIds?: string[];
-
-  // MongoDB: cares are referenced by productIds in ProductCare, not as a relation
-  // cares?: ProductCare[];
-
-
 }

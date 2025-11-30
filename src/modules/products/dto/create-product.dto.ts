@@ -5,17 +5,52 @@ import {
   IsNumber,
   IsArray,
   IsBoolean,
-  IsEnum,
+  IsObject,
 } from 'class-validator';
 
-export enum ProductType {
-  GENERAL = 'GENERAL',
-  MACBOOK = 'MACBOOK',
-  LENDING = 'LENDING',
-  OTHER = 'OTHER',
-}
-
 export class CreateProductDto {
+  // Review/rating fields
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsNumber()
+  rating?: number;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsNumber()
+  reviewCount?: number;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsNumber()
+  averageRating?: number;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsNumber()
+  rewardsPoints?: number;
+
+  // Additional pricing fields
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsNumber()
+  price?: number;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsNumber()
+  minBookingPrice?: number;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsNumber()
+  purchasePoints?: number;
+
+  // Media
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  video?: string;
   @ApiProperty()
   @IsString()
   name: string;
@@ -38,12 +73,17 @@ export class CreateProductDto {
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
-  shortDescription?: string;
+  productCode?: string;
 
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
-  longDescription?: string;
+  description?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  categoryId?: string;
 
   @ApiProperty()
   @IsNumber()
@@ -64,45 +104,21 @@ export class CreateProductDto {
   @IsBoolean()
   isFeatured?: boolean;
 
+  // Status Flags
   @ApiProperty({ required: false })
   @IsOptional()
-  @IsArray()
-  tags?: string[];
-
-  @ApiProperty({ required: false })
-  @IsOptional()
-  @IsArray()
-  badges?: string[];
-
-  @ApiProperty({ required: false })
-  @IsOptional()
-  @IsString()
-  thumbnail?: string;
-
-  @ApiProperty({ required: false })
-  @IsOptional()
-  @IsArray()
-  gallery?: string[];
-
-  @ApiProperty({ required: false })
-  @IsOptional()
-  @IsString()
-  categoryId?: string;
-
-  @ApiProperty({ required: false, enum: ProductType })
-  @IsOptional()
-  @IsEnum(ProductType)
-  productType?: ProductType;
+  @IsBoolean()
+  isActive?: boolean;
 
   @ApiProperty({ required: false })
   @IsOptional()
   @IsBoolean()
-  isNew?: boolean;
+  isOnline?: boolean;
 
   @ApiProperty({ required: false })
   @IsOptional()
   @IsBoolean()
-  isHot?: boolean;
+  freeShipping?: boolean;
 
   @ApiProperty({ required: false })
   @IsOptional()
@@ -121,6 +137,66 @@ export class CreateProductDto {
 
   @ApiProperty({ required: false })
   @IsOptional()
+  @IsBoolean()
+  emiAvailable?: boolean;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  slug?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  warranty?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  productType?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsNumber()
+  stock?: number;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  thumbnail?: string;
+
+  @ApiProperty({ required: false, type: [String] })
+  @IsOptional()
+  @IsArray()
+  gallery?: string[];
+
+  @ApiProperty({ required: false, type: [String] })
+  @IsOptional()
+  @IsArray()
+  image?: string[];
+
+  @ApiProperty({ required: false, type: [String] })
+  @IsOptional()
+  @IsArray()
+  highlights?: string[];
+
+  @ApiProperty({ required: false, type: [String] })
+  @IsOptional()
+  @IsArray()
+  tags?: string[];
+
+  @ApiProperty({ required: false, type: [String] })
+  @IsOptional()
+  @IsArray()
+  badges?: string[];
+
+  @ApiProperty({ required: false, type: [String] })
+  @IsOptional()
+  @IsArray()
+  seoKeywords?: string[];
+
+  @ApiProperty({ required: false })
+  @IsOptional()
   @IsString()
   seoTitle?: string;
 
@@ -129,16 +205,85 @@ export class CreateProductDto {
   @IsString()
   seoDescription?: string;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ required: false, type: Object })
   @IsOptional()
-  @IsArray()
-  seoKeywords?: string[];
+  @IsObject()
+  priceObj?: any;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ required: false, type: Object })
   @IsOptional()
+  @IsObject()
   dynamicInputs?: any;
 
+  @ApiProperty({ required: false, type: Object })
+  @IsOptional()
+  @IsObject()
+  details?: any;
+
+  // Meta fields
   @ApiProperty({ required: false })
   @IsOptional()
-  details?: any;
+  @IsObject()
+  metaTitle?: any;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  metaDescription?: string;
+
+  @ApiProperty({ required: false, type: [String] })
+  @IsOptional()
+  @IsArray()
+  metaKeywords?: string[];
+
+  @ApiProperty({ required: false, type: Object })
+  @IsOptional()
+  @IsObject()
+  campaigns?: any;
+
+  // Arrays of objects
+  @ApiProperty({ required: false, type: Object })
+  @IsOptional()
+  @IsArray()
+  variants?: { name: string; price: string; stock: string }[];
+
+  @ApiProperty({ required: false, type: Object })
+  @IsOptional()
+  @IsArray()
+  regions?: { name: string; price: string; stock: string }[];
+
+  @ApiProperty({ required: false, type: Object })
+  @IsOptional()
+  @IsArray()
+  colors?: { name: string; code: string }[];
+
+  @ApiProperty({ required: false, type: [String] })
+  @IsOptional()
+  @IsArray()
+  networks?: string[];
+
+  @ApiProperty({ required: false, type: [String] })
+  @IsOptional()
+  @IsArray()
+  sizes?: string[];
+
+  @ApiProperty({ required: false, type: [String] })
+  @IsOptional()
+  @IsArray()
+  plugs?: string[];
+
+  @ApiProperty({ required: false, type: Object })
+  @IsOptional()
+  @IsArray()
+  specifications?: { key: string; value: string }[];
+
+  @ApiProperty({ required: false, type: [String] })
+  @IsOptional()
+  @IsArray()
+  faqIds?: string[];
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  status?: boolean;
 }

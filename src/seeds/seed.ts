@@ -72,8 +72,6 @@ async function seed() {
         categoryId: categories[faker.number.int({ min: 0, max: categories.length - 1 })].id.toString(),
         sku: faker.string.alphanumeric(8),
         isFeatured: faker.datatype.boolean(),
-        isNew: faker.datatype.boolean(),
-        isHot: faker.datatype.boolean(),
         isOfficial: faker.datatype.boolean(),
         isComing: faker.datatype.boolean(),
         isPreOrder: faker.datatype.boolean(),

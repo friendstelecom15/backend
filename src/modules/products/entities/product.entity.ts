@@ -4,7 +4,6 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
-  OneToMany,
   ManyToOne,
   JoinColumn,
 } from 'typeorm';
@@ -16,20 +15,59 @@ export class Product {
   @ObjectIdColumn()
   id: ObjectId;
 
+  // Basic Information
   @Column()
   name: string;
 
   @Column({ nullable: true })
   description?: string;
 
+  // Highlights (array of strings)
+  @Column({ type: 'array', nullable: true })
+  highlights?: string[];
+
+  // Category Relation
   @Column({ nullable: true })
-  shortDescription?: string;
+  categoryId?: string;
+
+  @ManyToOne(() => Category, { nullable: true })
+  @JoinColumn({ name: 'categoryId' })
+  category?: Category;
+
+  // Product Identification
+  @Column({ nullable: true })
+  brandId?: string;
+
+  // Brand object (for denormalized data)
+  @Column({ type: 'json', nullable: true })
+  brand?: any;
 
   @Column({ nullable: true })
-  longDescription?: string;
+  productCode?: string;
 
+  @Column({ nullable: true })
+  sku?: string;
+
+  // Review/rating fields
+  @Column({ nullable: true })
+  rating?: number;
+
+  @Column({ nullable: true })
+  reviewCount?: number;
+
+  @Column({ nullable: true })
+  averageRating?: number;
+
+  @Column({ nullable: true })
+  rewardsPoints?: number;
+
+  // Pricing Information
   @Column()
   basePrice: number;
+
+  // Flexible price object (for nested price info)
+  @Column({ type: 'json', nullable: true })
+  priceObj?: any;
 
   @Column({ nullable: true })
   discountPrice?: number;
@@ -41,54 +79,51 @@ export class Product {
   price?: number;
 
   @Column({ nullable: true })
-  brandId?: string;
+  minBookingPrice?: number;
+
+  @Column({ nullable: true })
+  purchasePoints?: number;
 
   @Column({ nullable: true })
   model?: string;
 
   @Column({ nullable: true })
-  sku?: string;
+  slug?: string;
 
-  @Column({ nullable: true })
-  categoryId?: string;
-
-  @ManyToOne(() => Category, { nullable: true })
-  @JoinColumn({ name: 'categoryId' })
-  category?: Category;
-
+  // Product Classification
   @Column({ nullable: true })
   productType?: string;
 
   @Column({ nullable: true })
+  warranty?: string;
+
+  // Status Flags
+  @Column({ default: false })
   isFeatured?: boolean;
 
-  @Column({ nullable: true })
-  isNew?: boolean;
-
-  @Column({ nullable: true })
-  isHot?: boolean;
-
-  @Column({ nullable: true })
+  @Column({ default: false })
   isOfficial?: boolean;
 
-  @Column({ nullable: true })
+  @Column({ default: false })
   isComing?: boolean;
 
-  @Column({ nullable: true })
+  @Column({ default: false })
   isPreOrder?: boolean;
 
-  @Column({ nullable: true })
-  seoTitle?: string;
+  @Column({ default: true })
+  isActive?: boolean;
 
-  @Column({ nullable: true })
-  seoDescription?: string;
+  @Column({ default: true })
+  isOnline?: boolean;
 
-  @Column({ type: 'array', nullable: true })
-  tags?: string[];
+  @Column({ default: false })
+  freeShipping?: boolean;
 
-  @Column({ type: 'array', nullable: true })
-  badges?: string[];
+  // Inventory
+  @Column({ default: 0 })
+  stock?: number;
 
+  // Media
   @Column({ nullable: true })
   thumbnail?: string;
 
@@ -96,59 +131,89 @@ export class Product {
   gallery?: string[];
 
   @Column({ type: 'array', nullable: true })
-  seoKeywords?: string[];
+  image?: string[];
 
-  @Column({ nullable: true })
-  dynamicInputs?: any;
+  // Variants (typed)
+  @Column({ type: 'json', nullable: true })
+  variants?: { name: string; price: string; stock: string }[];
 
-  @Column({ nullable: true })
-  details?: any;
+  // Regions (typed)
+  @Column({ type: 'json', nullable: true })
+  regions?: { name: string; price: string; stock: string }[];
 
-  @Column({ nullable: true })
-  slug?: string;
+  // Colors (typed)
+  @Column({ type: 'json', nullable: true })
+  colors?: { name: string; code: string }[];
+
+  // Networks, Sizes, Plugs
+  @Column({ type: 'array', nullable: true })
+  networks?: string[];
+
+  @Column({ type: 'array', nullable: true })
+  sizes?: string[];
+
+  @Column({ type: 'array', nullable: true })
+  plugs?: string[];
 
   @Column({ nullable: true })
   video?: string;
 
+  // EMI
+  @Column({ default: false })
+  emiAvailable?: boolean;
+
+  // SEO
+  @Column({ nullable: true })
+  seoTitle?: string;
+
+  @Column({ nullable: true })
+  seoDescription?: string;
+
   @Column({ type: 'array', nullable: true })
-  images?: string[]; // alias for gallery if needed
+  seoKeywords?: string[];
 
-  @Column({ nullable: true })
-  stock?: number;
+  // Tags & Badges
+  @Column({ type: 'array', nullable: true })
+  tags?: string[];
 
-  @Column({ nullable: true })
-  warranty?: string;
+  @Column({ type: 'array', nullable: true })
+  badges?: string[];
 
-  @Column({ nullable: true })
-  minBookingPrice?: number;
+  // Additional Data
+  @Column({ type: 'json', nullable: true })
+  dynamicInputs?: any;
 
-  @Column({ nullable: true })
-  purchasePoints?: number;
+  @Column({ type: 'json', nullable: true })
+  details?: any;
+
+  // Specifications (typed)
+  @Column({ type: 'json', nullable: true })
+  specifications?: { key: string; value: string }[];
 
   @Column({ type: 'json', nullable: true })
   campaigns?: any;
 
-  @Column({ nullable: true })
-  status?: string;
-
-  @Column({ nullable: true })
-  isActive?: boolean;
-
-  @Column({ nullable: true })
-  isOnline?: boolean;
-
-  @Column({ nullable: true })
-  freeShipping?: boolean;
-
   @Column({ type: 'json', nullable: true })
-  meta?: any; // for meta fields like tags, badge, title, keywords, canonical, description, etc.
+  metaTitle?: any;
 
+  @Column({ nullable: true })
+  metaDescription?: string;
+
+  @Column({ type: 'array', nullable: true })
+  metaKeywords?: string[];
+
+  // FAQ Relations
+  @Column({ type: 'array', nullable: true })
+  faqIds?: string[];
+
+  // Status
+  @Column({ default: true })
+  status?: boolean;
+
+  // Timestamps
   @CreateDateColumn()
   createdAt: Date;
 
   @UpdateDateColumn()
   updatedAt: Date;
-
-  @Column({ type: 'array', nullable: true })
-  faqIds?: string[];
 }

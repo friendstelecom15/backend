@@ -5,11 +5,12 @@ import { ProductsController } from './products.controller';
 import { Product } from './entities/product.entity';
 import { ProductCare } from './entities/product.care.entity';
 import { NotifyProduct } from './entities/notifyproduct.entity';
+import { CloudflareService } from 'src/config/cloudflare-video.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Product, ProductCare, NotifyProduct])],
   controllers: [ProductsController],
-  providers: [ProductsService],
+  providers: [ProductsService, CloudflareService],
   exports: [ProductsService],
 })
 export class ProductsModule { }

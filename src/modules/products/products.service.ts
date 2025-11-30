@@ -1,4 +1,3 @@
-
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like } from 'typeorm';
@@ -154,15 +153,64 @@ export class ProductsService {
   }
 
   async create(dto: CreateProductDto) {
-    const slug = dto.name.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now();
+    if (!dto || typeof dto !== 'object') {
+      throw new BadRequestException('Invalid product data');
+    }
+    if (!dto.name) {
+      throw new BadRequestException('Product name is required');
+    }
     const product = this.productRepository.create({
-      ...dto,
-      slug,
+      
+      name: dto.name,
+      slug: dto.slug,
+      description: dto.description,
+      categoryId: dto.categoryId,
+      brandId: dto.brandId,
+      productCode: dto.productCode,
+      sku: dto.sku,
+      // Review/rating fields
+      rating: dto.rating,
+      reviewCount: dto.reviewCount,
+      averageRating: dto.averageRating,
+      rewardsPoints: dto.rewardsPoints,
+      // Pricing
+      basePrice: dto.basePrice,
+      discountPrice: dto.discountPrice,
+      discountPercent: dto.discountPercent,
+      price: dto.price,
+      minBookingPrice: dto.minBookingPrice,
+      purchasePoints: dto.purchasePoints,
+      stock: dto.stock,
+      thumbnail: dto.thumbnail,
+      gallery: dto.gallery || [],
+      image: dto.image || [],
+      video: dto.video,
+      variants: dto.variants || [],
+      regions: dto.regions || [],
+      colors: dto.colors || [],
+      networks: dto.networks || [],
+      sizes: dto.sizes || [],
+      plugs: dto.plugs || [],
+      emiAvailable: dto.emiAvailable,
+      seoTitle: dto.seoTitle,
+      seoDescription: dto.seoDescription,
+      seoKeywords: dto.seoKeywords || [],
       tags: dto.tags || [],
       badges: dto.badges || [],
-      gallery: dto.gallery || [],
-      seoKeywords: dto.seoKeywords || [],
+      highlights: dto.highlights || [],
+      dynamicInputs: dto.dynamicInputs,
+      details: dto.details,
+      metaTitle: dto.metaTitle,
+      metaDescription: dto.metaDescription,
+      metaKeywords: dto.metaKeywords || [],
+      campaigns: dto.campaigns,
+      // Specifications
+      specifications: dto.specifications || [],
+      // FAQ
+      faqIds: dto.faqIds || [],
+      status: dto.status !== undefined ? dto.status : true,
     });
+    console.log('Creating product:', product);
     return this.productRepository.save(product);
   }
 
@@ -229,27 +277,13 @@ export class ProductsService {
     });
   }
 
-  async getNew() {
-    return this.productRepository.find({
-      where: { isNew: true },
-      take: 12,
-      order: { createdAt: 'DESC' },
-    });
-  }
 
-  async getHot() {
-    return this.productRepository.find({
-      where: { isHot: true },
-      take: 12,
-      order: { createdAt: 'DESC' },
-    });
-  }
 
   async search(query: string) {
     return this.productRepository.find({
       where: [
         { name: Like(`%${query}%`) },
-        { shortDescription: Like(`%${query}%`) },
+        { description: Like(`%${query}%`) },
         // tags: TypeORM does not support array search for MongoDB, so skip for now
       ],
       take: 20,

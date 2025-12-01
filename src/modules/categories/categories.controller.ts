@@ -1,3 +1,4 @@
+  
 import {
   Controller,
   Get,
@@ -32,6 +33,20 @@ export class CategoriesController {
     private readonly categoriesService: CategoriesService,
     private readonly cloudflareService: CloudflareService,
   ) {}
+
+    @Get('/:id')
+    @ApiOperation({ summary: 'Get category by ID' })
+    async getById(@Param('id') id: string) {
+      const category = await this.categoriesService.getById(id);
+      if (!category) {
+        throw new NotFoundException('Category not found');
+      }
+      return {
+        ...category,
+        id: category.id,
+        subcategories: category.subcategories ?? [],
+      };
+    }
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)

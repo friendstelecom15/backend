@@ -20,6 +20,12 @@ export class CategoriesService {
     @InjectRepository(Subcategory)
     private readonly subcategoryRepository: Repository<Subcategory>,
   ) {}
+
+  //getbyid
+  async getById(id: string): Promise<Category | null> {
+    const _id = typeof id === 'string' ? new ObjectId(id) : id;
+    return this.categoryRepository.findOne({ where: { _id } } as any);
+  }
   // SUBCATEGORY METHODS
   async createSubcategory(dto: any) {
     const slug = dto.name.toLowerCase().replace(/\s+/g, '-');

@@ -29,8 +29,8 @@ import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { User } from '../users/entities/user.entity';
 import { CloudflareService } from 'src/config/cloudflare-video.service';
 
-@UseGuards(JwtAuthGuard, RolesGuard)
-@ApiBearerAuth()
+// @UseGuards(JwtAuthGuard, RolesGuard)
+// @ApiBearerAuth()
 @Controller('herobanner')
 export class HerobannerController {
   constructor(

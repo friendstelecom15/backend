@@ -6,10 +6,10 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { InjectRepository } from '@nestjs/typeorm';
-import { MongoRepository, DeepPartial } from 'typeorm';
 import { User } from '../users/entities/user.entity';
 import { RegisterDto } from './dto/register.dto';
 import { SocialLoginDto } from './dto/social-login.dto';
+import { Repository, DeepPartial } from 'typeorm';
 
 interface AuthUser {
   id: string;
@@ -23,7 +23,7 @@ export class AuthService {
   constructor(
     private jwtService: JwtService,
     @InjectRepository(User)
-    private readonly userRepo: MongoRepository<User>,
+    private readonly userRepo: Repository<User>,
   ) { }
 
   async decodeAuthCode(token: string): Promise<any> {
@@ -41,17 +41,17 @@ export class AuthService {
     }
 
     const hashedPassword = await bcrypt.hash(dto.password, 10);
-    const user = this.userRepo.create({
+    const user: DeepPartial<User> = {
       email: dto.email,
       name: dto.name,
       password: hashedPassword,
       role: 'user',
       isAdmin: false,
-    } as DeepPartial<User>);
-    const savedUser = await this.userRepo.save(user);
+    };
+    const savedUser = await this.userRepo.save(this.userRepo.create(user));
 
     return this.login({
-      id: savedUser.id.toString(),
+      id: savedUser.id?.toString?.() ?? String(savedUser.id),
       email: savedUser.email,
       name: savedUser.name,
       role: savedUser.role,
@@ -66,16 +66,16 @@ export class AuthService {
     }
 
     const hashedPassword = await bcrypt.hash(dto.password, 10);
-    const user = this.userRepo.create({
+    const user: DeepPartial<User> = {
       email: dto.email,
       name: dto.name,
       password: hashedPassword,
       role: dto.role || 'admin',
       isAdmin: true,
-    } as DeepPartial<User>);
-    const savedUser = await this.userRepo.save(user);
+    };
+    const savedUser = await this.userRepo.save(this.userRepo.create(user));
     return this.login({
-      id: savedUser.id.toString(),
+      id: savedUser.id?.toString?.() ?? String(savedUser.id),
       email: savedUser.email,
       name: savedUser.name,
       role: savedUser.role,
@@ -96,11 +96,12 @@ export class AuthService {
   }
 
   async login(user: AuthUser) {
-    const payload = { sub: user.id, email: user.email, role: user.role };
+    const id = user.id?.toString?.() ?? String(user.id);
+    const payload = { sub: id, email: user.email, role: user.role };
     return {
       access_token: this.jwtService.sign(payload),
       user: {
-        id: user.id,
+        id,
         email: user.email,
         name: user.name,
         role: user.role,
@@ -120,19 +121,20 @@ export class AuthService {
     let user = await this.userRepo.findOne({ where: { email: dto.email } });
 
     if (!user) {
-      user = this.userRepo.create({
+      const newUser: DeepPartial<User> = {
         email: dto.email,
         name: dto.name,
         image: dto.avatar ?? undefined,
         role: 'user',
         isAdmin: false,
-        isVerified: true,
-      } as DeepPartial<User>);
-      user = await this.userRepo.save(user);
+      };
+      user = await this.userRepo.save(this.userRepo.create(newUser));
     }
 
+    if (!user) throw new UnauthorizedException('User creation failed');
+
     const authUser: AuthUser = {
-      id: user.id.toString(),
+      id: user.id?.toString?.() ?? String(user.id),
       email: user.email,
       name: user.name,
       role: user.role,

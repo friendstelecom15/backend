@@ -1,10 +1,11 @@
-import { Body, Controller, Post } from '@nestjs/common';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { Body, Controller, Param, Post, Query } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { SocialLoginDto } from './dto/social-login.dto';
 
+@ApiBearerAuth()
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
@@ -15,9 +16,9 @@ export class AuthController {
   async register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
   }
-  @Post('decode')
+  @Post('decode/:token')
   @ApiOperation({ summary: 'Decode and verify a JWT auth code (token)' })
-  async decode(@Body('token') token: string) {
+  async decode(@Param('token') token: string) {
     return this.authService.decodeAuthCode(token);
   }
 
@@ -38,4 +39,5 @@ export class AuthController {
   async socialLogin(@Body() dto: SocialLoginDto) {
     return this.authService.socialLogin(dto);
   }
+  
 }

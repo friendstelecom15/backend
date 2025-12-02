@@ -84,9 +84,22 @@ export class UsersService {
   }
 
 
-  async findOne(id: string | ObjectId): Promise<Omit<User, 'password'>> {
+  //get me
+  async getMe(id: string | ObjectId): Promise<User> {
     const _id = typeof id === 'string' ? new ObjectId(id) : id;
-    const user = await this.userRepository.findOne({ where: { id: _id } });
+      console.log('getMe called with userId:', id);
+      const user = await this.userRepository.findOne({ where: { id: _id } });
+
+    if (!user) throw new NotFoundException('User not found');
+    return user;
+  }
+
+  async findOne(id: string | ObjectId): Promise<Omit<User, 'password'>> {
+    console.log('Finding user with ID:', id);
+    const _id = typeof id === 'string' ? new ObjectId(id) : id;
+    // Use _id for MongoDB compatibility
+    const user = await this.userRepository.findOne({ where: { _id } } as any);
+    console.log('Found user:', user);
     if (!user) throw new NotFoundException('User not found');
     const { password, ...rest } = user as User & { password?: string };
     return rest;

@@ -11,16 +11,18 @@ import {
   UseGuards,
   BadRequestException,
 } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { CreateUserDto, UpdateUserDto, UserResponseDto } from './dto/user.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { User } from './entities/user.entity';
 
+@ApiBearerAuth()
 @ApiTags('users')
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) { }
+  constructor(private readonly usersService: UsersService) {}
 
   @Post()
   async create(@Body() dto: CreateUserDto): Promise<UserResponseDto> {
@@ -41,7 +43,9 @@ export class UsersController {
   @UseGuards(JwtAuthGuard)
   async all() {
     const users = await this.usersService.findAll();
-    return users.map(user => ({
+    console.log('findAll users:', users);
+
+    return users.map((user) => ({
       ...user,
       id: user.id?.toString?.() ?? String(user.id),
       roles: user.role ? [String(user.role)] : [],
@@ -52,7 +56,8 @@ export class UsersController {
   @UseGuards(JwtAuthGuard)
   async findAll() {
     const users = await this.usersService.findAll();
-    return users.map(user => ({
+    console.log('findAll users:', users);
+    return users.map((user) => ({
       ...user,
       id: user.id?.toString?.() ?? String(user.id),
       roles: user.role ? [String(user.role)] : [],
@@ -62,6 +67,9 @@ export class UsersController {
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   async findOne(@Param('id') id: string): Promise<UserResponseDto> {
+    if (!/^[0-9a-fA-F]{24}$/.test(id)) {
+      throw new BadRequestException('Invalid user ID');
+    }
     const user = await this.usersService.findOne(id);
     return {
       ...user,
@@ -149,17 +157,15 @@ export class UsersController {
     return this.usersService.getOrders(id);
   }
 
-@Get('me')
-@UseGuards(JwtAuthGuard)
-async getCurrentUser(@CurrentUser() user: any): Promise<UserResponseDto> {
-  return {
-    id: user.id?.toString?.() ?? String(user.id),
-    name: user.name,
-    email: user.email,
-    createdAt: user.createdAt,
-    updatedAt: user.updatedAt,
-    image: typeof user?.image === 'string' ? user.image : undefined,
-    roles: user.role ? [String(user.role)] : [],
-  };
-}
+  @Get('/me')
+  @UseGuards(JwtAuthGuard)
+  async getMe(@CurrentUser() user: User) {
+    console.log('getMe controller called, user:', user);
+    const foundUser = await this.usersService.findOne(user.id.toString());
+    return {
+      ...foundUser,
+      id: foundUser.id?.toString?.() ?? String(foundUser.id),
+      roles: foundUser.role ? [String(foundUser.role)] : [],
+    };
+  }
 }

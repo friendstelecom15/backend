@@ -15,11 +15,24 @@ export class BrandsService {
   ) { }
 
 
-  async create(dto: CreateBrandDto) {
-    const slug = dto.name.toLowerCase().replace(/\s+/g, '-');
-    const brand = this.brandRepository.create({ ...dto, slug });
-    return this.brandRepository.save(brand);
+ async create(dto: CreateBrandDto) {
+  const slug = dto.name.toLowerCase().replace(/\s+/g, '-');
+
+  // 🔍 Check if brand with same name OR slug already exists
+  const exists = await this.brandRepository.findOne({
+    where: [{ name: dto.name }, { slug }],
+  });
+
+  if (exists) {
+    throw new BadRequestException(
+      'This brand is already added. Please use another name.'
+    );
   }
+
+  const brand = this.brandRepository.create({ ...dto, slug });
+  return this.brandRepository.save(brand);
+}
+
 
 
   async findAll() {

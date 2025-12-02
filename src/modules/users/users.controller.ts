@@ -148,4 +148,18 @@ export class UsersController {
   async getOrders(@Param('id') id: string) {
     return this.usersService.getOrders(id);
   }
+
+@Get('me')
+@UseGuards(JwtAuthGuard)
+async getCurrentUser(@CurrentUser() user: any): Promise<UserResponseDto> {
+  return {
+    id: user.id?.toString?.() ?? String(user.id),
+    name: user.name,
+    email: user.email,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+    image: typeof user?.image === 'string' ? user.image : undefined,
+    roles: user.role ? [String(user.role)] : [],
+  };
+}
 }

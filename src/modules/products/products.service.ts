@@ -241,18 +241,57 @@ export class ProductsService {
     // For now, ignore tags filter or implement if needed
     const take = filters?.limit ? parseInt(filters.limit as any, 10) : 50;
     const skip = filters?.offset ? parseInt(filters.offset as any, 10) : 0;
-    return this.productRepository.find({
+    const products = await this.productRepository.find({
       where,
       order: { createdAt: 'DESC' },
       take,
       skip,
     });
+
+    // Fetch all unique categoryIds and brandIds
+    const categoryIds = Array.from(new Set(products.map(p => p.categoryId).filter(Boolean)));
+    const brandIds = Array.from(new Set(products.map(p => p.brandId).filter(Boolean)));
+
+    // Get repositories for Category and Brand
+    const categoryRepo = this.productRepository.manager.getRepository('Category');
+    const brandRepo = this.productRepository.manager.getRepository('Brand');
+
+    // Fetch all categories and brands in one go
+    const categories = categoryIds.length ? await categoryRepo.findByIds(categoryIds) : [];
+    const brands = brandIds.length ? await brandRepo.findByIds(brandIds) : [];
+
+    // Map for quick lookup
+    const categoryMap = new Map(categories.map((c: any) => [c.id?.toString(), c]));
+    const brandMap = new Map(brands.map((b: any) => [b.id?.toString(), b]));
+
+    // Attach full objects
+    return products.map(product => ({
+      ...product,
+      category: product.categoryId ? categoryMap.get(product.categoryId?.toString()) : null,
+      brand: product.brandId ? brandMap.get(product.brandId?.toString()) : null,
+    }));
   }
 
   async findOne(slug: string) {
     const product = await this.productRepository.findOne({ where: { slug } });
     if (!product) throw new NotFoundException('Product not found');
-    return product;
+
+    // Fetch category and brand
+    let category: any = null;
+    let brand: any = null;
+    if (product.categoryId) {
+      const categoryRepo = this.productRepository.manager.getRepository('Category');
+      category = await categoryRepo.findOne({ where: { id: product.categoryId } });
+    }
+    if (product.brandId) {
+      const brandRepo = this.productRepository.manager.getRepository('Brand');
+      brand = await brandRepo.findOne({ where: { id: product.brandId } });
+    }
+    return {
+      ...product,
+      category,
+      brand,
+    };
   }
 
 

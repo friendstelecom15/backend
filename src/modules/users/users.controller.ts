@@ -24,53 +24,16 @@ import { User } from './entities/user.entity';
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
-  @Post()
-  async create(@Body() dto: CreateUserDto): Promise<UserResponseDto> {
-    const user = await this.usersService.create(dto);
-    const result: UserResponseDto = {
-      id: user.id?.toString?.() ?? String(user.id),
-      name: user.name,
-      email: user.email,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
-      image: typeof user?.image === 'string' ? user.image : undefined,
-      roles: user.role ? [String(user.role)] : [],
-    };
-    return result;
-  }
-
-  @Get('all')
-  @UseGuards(JwtAuthGuard)
-  async all() {
-    const users = await this.usersService.findAll();
-    console.log('findAll users:', users);
-
-    return users.map((user) => ({
-      ...user,
-      id: user.id?.toString?.() ?? String(user.id),
-      roles: user.role ? [String(user.role)] : [],
-    }));
-  }
-
-  @Get()
-  @UseGuards(JwtAuthGuard)
-  async findAll() {
-    const users = await this.usersService.findAll();
-    console.log('findAll users:', users);
-    return users.map((user) => ({
-      ...user,
-      id: user.id?.toString?.() ?? String(user.id),
-      roles: user.role ? [String(user.role)] : [],
-    }));
-  }
-
-  @Get(':id')
-  @UseGuards(JwtAuthGuard)
-  async findOne(@Param('id') id: string): Promise<UserResponseDto> {
+  // =======================
+  // UTIL
+  // =======================
+  private validateMongoId(id: string) {
     if (!/^[0-9a-fA-F]{24}$/.test(id)) {
-      throw new BadRequestException('Invalid user ID');
+      throw new BadRequestException('Invalid ID');
     }
-    const user = await this.usersService.findOne(id);
+  }
+
+  private mapUser(user: any) {
     return {
       ...user,
       id: user.id?.toString?.() ?? String(user.id),
@@ -78,94 +41,135 @@ export class UsersController {
     };
   }
 
+  // =======================
+  // CREATE
+  // =======================
+  @Post()
+  async create(@Body() dto: CreateUserDto): Promise<UserResponseDto> {
+    const user = await this.usersService.create(dto);
+    return this.mapUser(user);
+  }
+
+  // =======================
+  // CURRENT USER
+  // =======================
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  async getMe(@CurrentUser() user: User) {
+    const foundUser = await this.usersService.findOne(user.id.toString());
+    return this.mapUser(foundUser);
+  }
+
+  // =======================
+  // GET ALL
+  // =======================
+  @Get()
+  @UseGuards(JwtAuthGuard)
+  async findAll() {
+    const users = await this.usersService.findAll();
+    return users.map(user => this.mapUser(user));
+  }
+
+  // =======================
+  // GET ONE
+  // =======================
+  @Get(':id')
+  @UseGuards(JwtAuthGuard)
+  async findOne(@Param('id') id: string): Promise<UserResponseDto> {
+    this.validateMongoId(id);
+    const user = await this.usersService.findOne(id);
+    return this.mapUser(user);
+  }
+
+  // =======================
+  // UPDATE
+  // =======================
   @Patch(':id')
   @UseGuards(JwtAuthGuard)
   async update(@Param('id') id: string, @Body() dto: UpdateUserDto) {
-    if (!/^[0-9a-fA-F]{24}$/.test(id)) {
-      throw new BadRequestException('Invalid user ID');
-    }
+    this.validateMongoId(id);
 
     const maybeRole = (dto as { role?: unknown }).role;
     if (typeof maybeRole === 'string') {
       return this.usersService.updateRole(id, maybeRole);
     }
 
-    return this.usersService.update(id, dto);
+    const updated = await this.usersService.update(id, dto);
+    return this.mapUser(updated);
   }
 
+  // =======================
+  // DELETE
+  // =======================
   @Delete(':id')
   @UseGuards(JwtAuthGuard)
-  @HttpCode(HttpStatus.NO_CONTENT)
+  @HttpCode(HttpStatus.OK)
   async remove(@Param('id') id: string) {
-    if (!/^[0-9a-fA-F]{24}$/.test(id)) {
-      throw new BadRequestException('Invalid user ID');
-    }
+    this.validateMongoId(id);
     await this.usersService.remove(id);
+    return { message: 'User deleted successfully' };
   }
 
-  @Get(':id/wishlist')
+  // =======================
+  // WISHLIST (USER ONLY)
+  // =======================
+  @Get('wishlist')
   @UseGuards(JwtAuthGuard)
-  async getWishlist(@Param('id') id: string) {
-    return this.usersService.getWishlist(id);
+  async getWishlist(@CurrentUser() user: User) {
+    return this.usersService.getWishlist(user.id.toString());
   }
 
-  @Post(':id/wishlist')
+  @Post('wishlist')
   @UseGuards(JwtAuthGuard)
   async addToWishlist(
-    @Param('id') id: string,
+    @CurrentUser() user: User,
     @Body('productId') productId: string,
   ) {
-    return this.usersService.addToWishlist(id, productId);
+    return this.usersService.addToWishlist(user.id.toString(), productId);
   }
 
-  @Delete(':id/wishlist/:productId')
+  @Delete('wishlist/:productId')
   @UseGuards(JwtAuthGuard)
   async removeFromWishlist(
-    @Param('id') id: string,
+    @CurrentUser() user: User,
     @Param('productId') productId: string,
   ) {
-    return this.usersService.removeFromWishlist(id, productId);
+    return this.usersService.removeFromWishlist(user.id.toString(), productId);
   }
 
-  @Get(':id/compare')
+  // =======================
+  // COMPARE (USER ONLY)
+  // =======================
+  @Get('compare')
   @UseGuards(JwtAuthGuard)
-  async getCompare(@Param('id') id: string) {
-    return this.usersService.getCompare(id);
+  async getCompare(@CurrentUser() user: User) {
+    return this.usersService.getCompare(user.id.toString());
   }
 
-  @Post(':id/compare')
+  @Post('compare')
   @UseGuards(JwtAuthGuard)
   async addToCompare(
-    @Param('id') id: string,
+    @CurrentUser() user: User,
     @Body('productId') productId: string,
   ) {
-    return this.usersService.addToCompare(id, productId);
+    return this.usersService.addToCompare(user.id.toString(), productId);
   }
 
-  @Delete(':id/compare/:productId')
+  @Delete('compare/:productId')
   @UseGuards(JwtAuthGuard)
   async removeFromCompare(
-    @Param('id') id: string,
+    @CurrentUser() user: User,
     @Param('productId') productId: string,
   ) {
-    return this.usersService.removeFromCompare(id, productId);
+    return this.usersService.removeFromCompare(user.id.toString(), productId);
   }
 
-  @Get(':id/orders')
+  // =======================
+  // ORDERS (USER ONLY)
+  // =======================
+  @Get('orders')
   @UseGuards(JwtAuthGuard)
-  async getOrders(@Param('id') id: string) {
-    return this.usersService.getOrders(id);
-  }
-
-  @Get('/me')
-  @UseGuards(JwtAuthGuard)
-  async getMe(@CurrentUser() user: User) {
-    console.log('getMe controller called, user:', user);
-    const foundUser = await this.usersService.findOne(user.id.toString());
-    return {
-      ...foundUser,
-      id: foundUser.id?.toString?.() ?? String(foundUser.id),
-      roles: foundUser.role ? [String(foundUser.role)] : [],
-    };
+  async getOrders(@CurrentUser() user: User) {
+    return this.usersService.getOrders(user.id.toString());
   }
 }

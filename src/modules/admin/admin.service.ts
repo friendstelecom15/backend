@@ -4,8 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Order } from '../orders/entities/order.entity';
 import { User } from '../users/entities/user.entity';
-import { Product } from '../products/entities/product.entity';
-
+import { Product } from '../products/entities/product-new.entity';
 @Injectable()
 export class AdminService {
 

@@ -2,10 +2,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull, In } from 'typeorm';
-import { Product } from '../products/entities/product.entity';
 import { CreateFaqDto, UpdateFaqDto } from './dto/faq.dto';
 import { FAQ } from './entities/faq.entity';
 import { ObjectId } from 'mongodb';
+import { Product } from '../products/entities/product-new.entity';
 
 @Injectable()
 export class FaqsService {
@@ -29,8 +29,9 @@ export class FaqsService {
           const product = await this.productRepository.findOne({ where: { id: new ObjectId(productId) } });
           if (product) {
             if (!product.faqIds) product.faqIds = [];
-            if (!product.faqIds.includes(savedFaq.id.toString())) {
-              product.faqIds.push(savedFaq.id.toString());
+            const savedFaqObjectId = typeof savedFaq.id === 'string' ? new ObjectId(savedFaq.id) : savedFaq.id;
+            if (!product.faqIds.some((fid: ObjectId) => fid.equals(savedFaqObjectId))) {
+              product.faqIds.push(savedFaqObjectId);
               await this.productRepository.save(product);
             }
           }
@@ -96,8 +97,8 @@ export class FaqsService {
       const allProducts = await this.productRepository.find();
       await Promise.all(
         allProducts.map(async (product) => {
-          if (product.faqIds && product.faqIds.includes(_id.toString())) {
-            product.faqIds = product.faqIds.filter(fid => fid !== _id.toString());
+          if (product.faqIds && product.faqIds.some((fid: ObjectId) => fid.equals(_id))) {
+            product.faqIds = product.faqIds.filter((fid: ObjectId) => !fid.equals(_id));
             await this.productRepository.save(product);
           }
         })
@@ -108,8 +109,8 @@ export class FaqsService {
           const product = await this.productRepository.findOne({ where: { id: new ObjectId(productId) } });
           if (product) {
             if (!product.faqIds) product.faqIds = [];
-            if (!product.faqIds.includes(_id.toString())) {
-              product.faqIds.push(_id.toString());
+            if (!product.faqIds.some((fid: ObjectId) => fid.equals(_id))) {
+              product.faqIds.push(_id);
               await this.productRepository.save(product);
             }
           }

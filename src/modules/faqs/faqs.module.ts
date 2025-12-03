@@ -3,8 +3,7 @@ import { FaqsService } from './faqs.service';
 import { FaqsController } from './faqs.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { FAQ } from './entities/faq.entity';
-import { Product } from '../products/entities/product.entity';
-
+import { Product } from '../products/entities/product-new.entity';
 @Module({
   imports: [TypeOrmModule.forFeature([FAQ, Product])],
   controllers: [FaqsController],

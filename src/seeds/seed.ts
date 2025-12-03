@@ -1,5 +1,4 @@
 
-import { Product } from '../modules/products/entities/product.entity';
 import { Category } from '../modules/categories/entities/category.entity';
 import { Brand } from '../modules/brands/entities/brand.entity';
 import { User } from '../modules/users/entities/user.entity';
@@ -14,10 +13,11 @@ import { PolicyPage } from '../modules/policies/entities/policy.entity';
 import { WarrantyRecord } from '../modules/warranty/entities/warrantyrecord.entity';
 import { HomeCategory } from '../modules/homecategory/entities/homecategory.entity';
 import { HeroBanner } from '../modules/herobanner/entities/herobanner.entity';
-import { ProductVariant } from '../modules/products/entities/productvariant.entity';
+import { ObjectId } from 'mongodb';
 
 import { faker } from '@faker-js/faker';
 import AppDataSource from '../config/data-source';
+import { Product } from 'src/modules/products/entities/product-new.entity';
 
 async function seed() {
     await AppDataSource.initialize();
@@ -62,48 +62,12 @@ async function seed() {
     }));
     await userRepo.save(users);
 
-    // Products
+    // Products (using old Product entity - skip for now as it's being replaced)
     const productRepo = AppDataSource.getMongoRepository(Product);
-    const products = Array.from({ length: 10 }, () => productRepo.create({
-        name: faker.commerce.productName(),
-        description: faker.commerce.productDescription(),
-        basePrice: faker.number.int({ min: 100, max: 1000 }),
-        brandId: brands[faker.number.int({ min: 0, max: brands.length - 1 })].id.toString(),
-        categoryId: categories[faker.number.int({ min: 0, max: categories.length - 1 })].id.toString(),
-        sku: faker.string.alphanumeric(8),
-        isFeatured: faker.datatype.boolean(),
-        isOfficial: faker.datatype.boolean(),
-        isComing: faker.datatype.boolean(),
-        isPreOrder: faker.datatype.boolean(),
-        seoTitle: faker.lorem.words(3),
-        seoDescription: faker.lorem.sentence(),
-        tags: [faker.commerce.productAdjective(), faker.commerce.productAdjective()],
-        badges: [faker.commerce.productMaterial()],
-        thumbnail: faker.image.url(),
-        gallery: [faker.image.url(), faker.image.url()],
-        seoKeywords: [faker.commerce.productAdjective()],
-        dynamicInputs: {},
-        details: {},
-        slug: faker.helpers.slugify(faker.commerce.productName()).toLowerCase(),
-    }));
-    await productRepo.save(products);
-
-    // Product Variants
-    const productVariantRepo = AppDataSource.getMongoRepository(ProductVariant);
-    const productVariants = Array.from({ length: 10 }, () => productVariantRepo.create({
-        color: faker.color.human(),
-        storage: `${faker.number.int({ min: 32, max: 512 })}GB`,
-        ram: `${faker.number.int({ min: 2, max: 16 })}GB`,
-        sim: faker.helpers.arrayElement(['Single', 'Dual']),
-        price: faker.number.int({ min: 100, max: 1000 }),
-        inStock: faker.datatype.boolean(),
-        sku: faker.string.alphanumeric(8),
-        productId: products[faker.number.int({ min: 0, max: products.length - 1 })].id.toString(),
-        seoTitle: faker.lorem.words(3),
-        seoDescription: faker.lorem.sentence(),
-        seoKeywords: [faker.commerce.productAdjective()],
-    }));
-    await productVariantRepo.save(productVariants);
+    const products: Product[] = [];
+    
+    console.log('Skipping product seeding - using new product architecture');
+    // Products will be created via the new API endpoints instead
 
     // Orders
     const orderRepo = AppDataSource.getMongoRepository(Order);
@@ -117,34 +81,38 @@ async function seed() {
     }));
     await orderRepo.save(orders);
 
-    // Order Items
-    const orderItemRepo = AppDataSource.getMongoRepository(OrderItem);
-    const orderItems = Array.from({ length: 10 }, () => orderItemRepo.create({
-        productName: faker.commerce.productName(),
-        price: faker.number.int({ min: 100, max: 1000 }),
-        quantity: faker.number.int({ min: 1, max: 5 }),
-        color: faker.color.human(),
-        storage: `${faker.number.int({ min: 32, max: 512 })}GB`,
-        RAM: `${faker.number.int({ min: 2, max: 16 })}GB`,
-        sim: faker.helpers.arrayElement(['Single', 'Dual']),
-        display: faker.lorem.word(),
-        region: faker.location.country(),
-        image: faker.image.url(),
-        dynamicInputs: {},
-        orderId: orders[faker.number.int({ min: 0, max: orders.length - 1 })].id.toString(),
-        productId: products[faker.number.int({ min: 0, max: products.length - 1 })].id.toString(),
-    }));
-    await orderItemRepo.save(orderItems);
+    // Order Items (skip if no products)
+    if (products.length > 0) {
+        const orderItemRepo = AppDataSource.getMongoRepository(OrderItem);
+        const orderItems = Array.from({ length: 10 }, () => orderItemRepo.create({
+            productName: faker.commerce.productName(),
+            price: faker.number.int({ min: 100, max: 1000 }),
+            quantity: faker.number.int({ min: 1, max: 5 }),
+            color: faker.color.human(),
+            storage: `${faker.number.int({ min: 32, max: 512 })}GB`,
+            RAM: `${faker.number.int({ min: 2, max: 16 })}GB`,
+            sim: faker.helpers.arrayElement(['Single', 'Dual']),
+            display: faker.lorem.word(),
+            region: faker.location.country(),
+            image: faker.image.url(),
+            dynamicInputs: {},
+            orderId: orders[faker.number.int({ min: 0, max: orders.length - 1 })].id.toString(),
+            productId: products[faker.number.int({ min: 0, max: products.length - 1 })].id.toString(),
+        }));
+        await orderItemRepo.save(orderItems);
+    }
 
-    // Reviews
-    const reviewRepo = AppDataSource.getMongoRepository(Review);
-    const reviews = Array.from({ length: 10 }, () => reviewRepo.create({
-        userId: users[faker.number.int({ min: 0, max: users.length - 1 })].id.toString(),
-        productId: products[faker.number.int({ min: 0, max: products.length - 1 })].id.toString(),
-        rating: faker.number.int({ min: 1, max: 5 }),
-        comment: faker.lorem.sentence(),
-    }));
-    await reviewRepo.save(reviews);
+    // Reviews (skip if no products)
+    if (products.length > 0) {
+        const reviewRepo = AppDataSource.getMongoRepository(Review);
+        const reviews = Array.from({ length: 10 }, () => reviewRepo.create({
+            userId: users[faker.number.int({ min: 0, max: users.length - 1 })].id.toString(),
+            productId: products[faker.number.int({ min: 0, max: products.length - 1 })].id.toString(),
+            rating: faker.number.int({ min: 1, max: 5 }),
+            comment: faker.lorem.sentence(),
+        }));
+        await reviewRepo.save(reviews);
+    }
 
     // Notifications
     const notificationRepo = AppDataSource.getMongoRepository(Notification);
@@ -161,10 +129,13 @@ async function seed() {
     // FAQs (each FAQ can belong to multiple products)
     const faqRepo = AppDataSource.getMongoRepository(FAQ);
     const faqs = Array.from({ length: 5 }, () => {
-        // Randomly assign 1-3 products to each FAQ
-        const numProducts = faker.number.int({ min: 1, max: 3 });
-        const productIndexes = Array.from({ length: numProducts }, () => faker.number.int({ min: 0, max: products.length - 1 }));
-        const uniqueProductIds = Array.from(new Set(productIndexes.map(idx => products[idx].id.toString())));
+        // Randomly assign 1-3 products to each FAQ (skip if no products)
+        const uniqueProductIds = products.length > 0 
+            ? Array.from(new Set(
+                Array.from({ length: faker.number.int({ min: 1, max: 3 }) })
+                    .map(() => products[faker.number.int({ min: 0, max: products.length - 1 })].id.toString())
+              ))
+            : [];
         return faqRepo.create({
             question: faker.lorem.sentence(),
             answer: faker.lorem.paragraph(),
@@ -173,11 +144,8 @@ async function seed() {
     });
     await faqRepo.save(faqs);
 
-    // Optionally, update products to include faqIds
-    for (const product of products) {
-        product.faqIds = faqs.filter(faq => faq.productIds?.includes(product.id.toString())).map(faq => faq.id.toString());
-    }
-    await productRepo.save(products);
+    // Optionally, update products to include faqIds (skip if no products)
+    // Note: This is skipped since we're using the new product architecture
 
     // Giveaway Entries
     const giveawayEntryRepo = AppDataSource.getMongoRepository(GiveawayEntry);
@@ -210,20 +178,22 @@ async function seed() {
     }));
     await policyRepo.save(policies);
 
-    // Warranty Records
-    const warrantyRepo = AppDataSource.getMongoRepository(WarrantyRecord);
-    const warrantyRecords = Array.from({ length: 5 }, () => warrantyRepo.create({
-        productId: products[faker.number.int({ min: 0, max: products.length - 1 })].id.toString(),
-        imei: faker.string.numeric(15),
-        serial: faker.string.alphanumeric(10),
-        phone: faker.phone.number(),
-        purchaseDate: faker.date.past(),
-        expiryDate: faker.date.future(),
-        status: faker.helpers.arrayElement(['active', 'expired', 'pending']),
-        activatedBy: users[faker.number.int({ min: 0, max: users.length - 1 })].id.toString(),
-        orderId: orders[faker.number.int({ min: 0, max: orders.length - 1 })].id.toString(),
-    }));
-    await warrantyRepo.save(warrantyRecords);
+    // Warranty Records (skip if no products)
+    if (products.length > 0) {
+        const warrantyRepo = AppDataSource.getMongoRepository(WarrantyRecord);
+        const warrantyRecords = Array.from({ length: 5 }, () => warrantyRepo.create({
+            productId: products[faker.number.int({ min: 0, max: products.length - 1 })].id.toString(),
+            imei: faker.string.numeric(15),
+            serial: faker.string.alphanumeric(10),
+            phone: faker.phone.number(),
+            purchaseDate: faker.date.past(),
+            expiryDate: faker.date.future(),
+            status: faker.helpers.arrayElement(['active', 'expired', 'pending']),
+            activatedBy: users[faker.number.int({ min: 0, max: users.length - 1 })].id.toString(),
+            orderId: orders[faker.number.int({ min: 0, max: orders.length - 1 })].id.toString(),
+        }));
+        await warrantyRepo.save(warrantyRecords);
+    }
 
     // Home Categories
     const homeCategoryRepo = AppDataSource.getMongoRepository(HomeCategory);
@@ -231,7 +201,7 @@ async function seed() {
         name: faker.commerce.department(),
         priority: faker.number.int({ min: 1, max: 10 }),
         categoryIds: [categories[faker.number.int({ min: 0, max: categories.length - 1 })].id.toString()],
-        productIds: [products[faker.number.int({ min: 0, max: products.length - 1 })].id.toString()],
+        productIds: products.length > 0 ? [products[faker.number.int({ min: 0, max: products.length - 1 })].id.toString()] : [],
     }));
     await homeCategoryRepo.save(homeCategories);
 

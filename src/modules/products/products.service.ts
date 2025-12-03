@@ -1,331 +1,546 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like } from 'typeorm';
-import { CreateProductDto } from './dto/create-product.dto';
-import { UpdateProductDto } from './dto/update-product.dto';
-import { CareCreateDto } from './dto/care-create.dto';
-import { Product } from './entities/product.entity';
-import { ProductCare } from './entities/product.care.entity';
-import { NotifyProduct } from './entities/notifyproduct.entity';
+import { Repository, DataSource, In } from 'typeorm';
 import { ObjectId } from 'mongodb';
+import { CreateProductNewDto } from './dto/create-product-new.dto';
+import { UpdateProductNewDto } from './dto/update-product-new.dto';
+import { Product } from './entities/product-new.entity';
+import { ProductRegion } from './entities/product-region.entity';
+import { ProductColor } from './entities/product-color.entity';
+import { ProductStorage } from './entities/product-storage.entity';
+import { ProductPrice } from './entities/product-price.entity';
+import { ProductImage } from './entities/product-image.entity';
+import { ProductVideo } from './entities/product-video.entity';
+import { SpecGroup } from './entities/spec-group.entity';
+import { ProductSpecification } from './entities/product-specification.entity';
 
 @Injectable()
-export class ProductsService {
-
+export class ProductService {
   constructor(
     @InjectRepository(Product)
     private readonly productRepository: Repository<Product>,
-    @InjectRepository(ProductCare)
-    private readonly productCareRepository: Repository<ProductCare>,
-    @InjectRepository(NotifyProduct)
-    private readonly notifyProductRepository: Repository<NotifyProduct>,
-  ) { }
-    // NotifyProduct CRUD
-    async createNotify(dto: Partial<NotifyProduct>) {
-      const notify = this.notifyProductRepository.create(dto);
-      return this.notifyProductRepository.save(notify);
-    }
+    @InjectRepository(SpecGroup)
+    private readonly specGroupRepository: Repository<SpecGroup>,
+    private readonly dataSource: DataSource,
+  ) {}
 
-    async updateNotify(id: string | ObjectId, dto: Partial<NotifyProduct>) {
-      const _id = typeof id === 'string' ? new ObjectId(id) : id;
-      await this.notifyProductRepository.update(_id, dto);
-      return this.notifyProductRepository.findOne({ where: { id: _id } });
-    }
-
-    async getNotifies(productId?: string) {
-      const where = productId ? { productId } : {};
-      return this.notifyProductRepository.find({ where });
-    }
-
-    async getNotifyById(id: string | ObjectId) {
-      const _id = typeof id === 'string' ? new ObjectId(id) : id;
-      const notify = await this.notifyProductRepository.findOne({ where: { id: _id } });
-      if (!notify) throw new NotFoundException('NotifyProduct not found');
-      return notify;
-    }
-
-    async removeNotify(id: string | ObjectId) {
-      const _id = typeof id === 'string' ? new ObjectId(id) : id;
-      await this.notifyProductRepository.delete(_id);
-      return { success: true };
-    }
-  // Product Care CRUD
   /**
-   * Create a ProductCare plan that can be assigned to multiple products and categories.
-   * But, a product/category can have only one care plan of this type.
+   * Create a complete product with all variants, pricing, images, specs in a single transaction
    */
-  async createCare(dto: CareCreateDto) {
-    const normalized: Partial<ProductCare> = { ...dto };
-    if (dto.productId) {
-      normalized.productIds = [dto.productId];
-    }
-    if (dto.categoryId) {
-      normalized.categoryIds = [dto.categoryId];
-    }
-    if (normalized.productIds && normalized.productIds.length > 0) {
-      for (const productId of normalized.productIds) {
-        const exists = await this.productCareRepository.findOne({ where: { productIds: productId } });
-        if (exists) {
-          let productName = productId;
-          try {
-            let product: Product | null = null;
-            if (typeof productId === 'string' && productId.length === 24) {
-              const lookupId = new ObjectId(productId);
-              product = await this.productRepository.findOne({ where: { id: lookupId } });
-              if (!product) {
-                product = await this.productRepository.findOne({ where: { _id: lookupId } } as any);
+  async create(dto: CreateProductNewDto): Promise<any> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // 1. Create Product
+      const product = queryRunner.manager.create(Product, {
+        name: dto.name,
+        slug: dto.slug,
+        description: dto.description,
+        categoryId: dto.categoryId ? new ObjectId(dto.categoryId) : undefined,
+        brandId: dto.brandId ? new ObjectId(dto.brandId) : undefined,
+        productCode: dto.productCode,
+        sku: dto.sku,
+        warranty: dto.warranty,
+        isActive: dto.isActive ?? true,
+        isOnline: dto.isOnline ?? true,
+        isPos: dto.isPos ?? true,
+        isPreOrder: dto.isPreOrder ?? false,
+        isOfficial: dto.isOfficial ?? false,
+        freeShipping: dto.freeShipping ?? false,
+        rewardPoints: dto.rewardPoints ?? 0,
+        minBookingPrice: dto.minBookingPrice ?? 0,
+        seoTitle: dto.seoTitle,
+        seoDescription: dto.seoDescription,
+        seoKeywords: dto.seoKeywords,
+        seoCanonical: dto.seoCanonical,
+        tags: dto.tags,
+      });
+
+      const savedProduct = await queryRunner.manager.save(Product, product);
+
+      // 2. Create Regions → Colors → Storages → Prices
+      if (dto.regions && dto.regions.length > 0) {
+        for (const regionDto of dto.regions) {
+          const region = queryRunner.manager.create(ProductRegion, {
+            productId: savedProduct.id,
+            regionName: regionDto.regionName,
+            isDefault: regionDto.isDefault ?? false,
+            displayOrder: regionDto.displayOrder ?? 0,
+          });
+          const savedRegion = await queryRunner.manager.save(ProductRegion, region);
+
+          if (regionDto.colors && regionDto.colors.length > 0) {
+            for (const colorDto of regionDto.colors) {
+              const color = queryRunner.manager.create(ProductColor, {
+                regionId: savedRegion.id,
+                colorName: colorDto.colorName,
+                colorCode: colorDto.colorCode,
+                displayOrder: colorDto.displayOrder ?? 0,
+              });
+              const savedColor = await queryRunner.manager.save(ProductColor, color);
+
+              if (colorDto.storages && colorDto.storages.length > 0) {
+                for (const storageDto of colorDto.storages) {
+                  const storage = queryRunner.manager.create(ProductStorage, {
+                    colorId: savedColor.id,
+                    storageSize: storageDto.storageSize,
+                    displayOrder: storageDto.displayOrder ?? 0,
+                  });
+                  const savedStorage = await queryRunner.manager.save(ProductStorage, storage);
+
+                  // Create Price for this storage
+                  const price = new ProductPrice();
+                  price.storageId = savedStorage.id;
+                  price.regularPrice = storageDto.price.regularPrice;
+                  price.comparePrice = storageDto.price.comparePrice;
+                  price.discountPrice = storageDto.price.discountPrice;
+                  price.discountPercent = storageDto.price.discountPercent;
+                  price.campaignPrice = storageDto.price.campaignPrice;
+                  price.campaignStart = storageDto.price.campaignStart
+                    ? new Date(storageDto.price.campaignStart)
+                    : undefined;
+                  price.campaignEnd = storageDto.price.campaignEnd
+                    ? new Date(storageDto.price.campaignEnd)
+                    : undefined;
+                  price.stockQuantity = storageDto.price.stockQuantity;
+                  price.lowStockAlert = storageDto.price.lowStockAlert ?? 5;
+                  await queryRunner.manager.save(ProductPrice, price);
+                }
               }
             }
-            if (product && product.name) productName = product.name;
-          } catch (e) { /* ignore */ }
-          throw new BadRequestException(`Product (${productName}) already has a care plan.`);
+          }
         }
       }
-    }
-    // Check for duplicate care for any category
-    if (normalized.categoryIds && normalized.categoryIds.length > 0) {
-      for (const categoryId of normalized.categoryIds) {
-        const exists = await this.productCareRepository.findOne({ where: { categoryIds: categoryId } });
-        if (exists) {
-          // Get category name for error
-          let categoryName = categoryId;
-          try {
-            // Try to find by id or _id
-            let category: any = null;
-            if (typeof categoryId === 'string' && categoryId.length === 24) {
-              const lookupId = new ObjectId(categoryId);
-              const categoryRepo = this.productRepository.manager.getRepository('Category');
-              category = await categoryRepo.findOne({ where: { id: lookupId } });
-              if (!category) {
-                category = await categoryRepo.findOne({ where: { _id: lookupId } } as any);
-              }
+
+      // 3. Create Images
+      if (dto.images && dto.images.length > 0) {
+        for (const imageDto of dto.images) {
+          const image = queryRunner.manager.create(ProductImage, {
+            productId: savedProduct.id,
+            imageUrl: imageDto.imageUrl,
+            isThumbnail: imageDto.isThumbnail ?? false,
+            altText: imageDto.altText,
+            displayOrder: imageDto.displayOrder ?? 0,
+          });
+          await queryRunner.manager.save(ProductImage, image);
+        }
+      }
+
+      // 4. Create Videos
+      if (dto.videos && dto.videos.length > 0) {
+        for (const videoDto of dto.videos) {
+          const video = queryRunner.manager.create(ProductVideo, {
+            productId: savedProduct.id,
+            videoUrl: videoDto.videoUrl,
+            videoType: videoDto.videoType,
+            displayOrder: videoDto.displayOrder ?? 0,
+          });
+          await queryRunner.manager.save(ProductVideo, video);
+        }
+      }
+
+      // 5. Create Specifications
+      if (dto.specifications && dto.specifications.length > 0) {
+        for (const specGroupDto of dto.specifications) {
+          // Find or create spec group
+          let specGroup = await queryRunner.manager.findOne(SpecGroup, {
+            where: { groupName: specGroupDto.groupName },
+          });
+
+          if (!specGroup) {
+            specGroup = queryRunner.manager.create(SpecGroup, {
+              groupName: specGroupDto.groupName,
+              displayOrder: specGroupDto.displayOrder ?? 0,
+              icon: specGroupDto.icon,
+            });
+            specGroup = await queryRunner.manager.save(SpecGroup, specGroup);
+          }
+
+          // Create specifications for this group
+          if (specGroupDto.specs && specGroupDto.specs.length > 0) {
+            for (const spec of specGroupDto.specs) {
+              const productSpec = queryRunner.manager.create(ProductSpecification, {
+                productId: savedProduct.id,
+                specGroupId: specGroup.id,
+                specKey: spec.specKey,
+                specValue: spec.specValue,
+                displayOrder: spec.displayOrder ?? 0,
+              });
+              await queryRunner.manager.save(ProductSpecification, productSpec);
             }
-            if (category && category.name) categoryName = category.name;
-          } catch (e) { /* ignore */ }
-          throw new BadRequestException(`Category (${categoryName}) already has a care plan.`);
+          }
         }
       }
+
+      await queryRunner.commitTransaction();
+
+      // Return complete product with all relations
+      return this.findOne(savedProduct.slug);
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw new InternalServerErrorException(
+        `Failed to create product: ${error.message}`,
+      );
+    } finally {
+      await queryRunner.release();
     }
-    const care = this.productCareRepository.create(normalized);
-    return this.productCareRepository.save(care);
   }
 
-  async updateCare(id: string | ObjectId, dto: Partial<ProductCare>) {
-    const _id = typeof id === 'string' ? new ObjectId(id) : id;
-    await this.productCareRepository.update(_id, dto);
-    const updated = await this.productCareRepository.findOne({ where: { id: _id } });
-    if (!updated) return updated;
-    // Attach product/category names like createCare
-    let productNames: string[] = [];
-    let categoryNames: string[] = [];
-    if (updated.productIds && updated.productIds.length > 0) {
-      const products = await this.productRepository.findByIds(updated.productIds);
-      productNames = products.map(p => p.name);
-    }
-    if (updated.categoryIds && updated.categoryIds.length > 0) {
-      const categories = await this.productRepository.manager.getRepository('Category').findByIds(updated.categoryIds);
-      categoryNames = categories.map((c: any) => c.name);
-    }
-    return {
-      ...updated,
-      productNames,
-      categoryNames,
-    };
-  }
-
-  async getCares(productId?: string) {
-    // If productId is provided, find all care plans where productIds array contains productId
-    const where = productId ? { productIds: productId } : {};
-    return this.productCareRepository.find({ where });
-  }
-
-  async getCareById(id: string | ObjectId) {
-    const _id = typeof id === 'string' ? new ObjectId(id) : id;
-    const care = await this.productCareRepository.findOne({ where: { id: _id } });
-    if (!care) throw new NotFoundException('Product care not found');
-    return care;
-  }
-
-  async removeCare(id: string | ObjectId) {
-    const _id = typeof id === 'string' ? new ObjectId(id) : id;
-    await this.productCareRepository.delete(_id);
-    return { success: true };
-  }
-
-  async create(dto: CreateProductDto) {
-    if (!dto || typeof dto !== 'object') {
-      throw new BadRequestException('Invalid product data');
-    }
-    if (!dto.name) {
-      throw new BadRequestException('Product name is required');
-    }
-    const product = this.productRepository.create({
-      
-      name: dto.name,
-      slug: dto.slug,
-      description: dto.description,
-      categoryId: dto.categoryId,
-      brandId: dto.brandId,
-      productCode: dto.productCode,
-      sku: dto.sku,
-      // Review/rating fields
-      rating: dto.rating,
-      reviewCount: dto.reviewCount,
-      averageRating: dto.averageRating,
-      rewardsPoints: dto.rewardsPoints,
-      // Pricing
-      basePrice: dto.basePrice,
-      discountPrice: dto.discountPrice,
-      discountPercent: dto.discountPercent,
-      price: dto.price,
-      minBookingPrice: dto.minBookingPrice,
-      purchasePoints: dto.purchasePoints,
-      stock: dto.stock,
-      thumbnail: dto.thumbnail,
-      gallery: dto.gallery || [],
-      image: dto.image || [],
-      video: dto.video,
-      variants: dto.variants || [],
-      regions: dto.regions || [],
-      colors: dto.colors || [],
-      networks: dto.networks || [],
-      sizes: dto.sizes || [],
-      plugs: dto.plugs || [],
-      emiAvailable: dto.emiAvailable,
-      seoTitle: dto.seoTitle,
-      seoDescription: dto.seoDescription,
-      seoKeywords: dto.seoKeywords || [],
-      tags: dto.tags || [],
-      badges: dto.badges || [],
-      highlights: dto.highlights || [],
-      dynamicInputs: dto.dynamicInputs,
-      details: dto.details,
-      metaTitle: dto.metaTitle,
-      metaDescription: dto.metaDescription,
-      metaKeywords: dto.metaKeywords || [],
-      campaigns: dto.campaigns,
-      // Specifications
-      specifications: dto.specifications || [],
-      // FAQ
-      faqIds: dto.faqIds || [],
-      status: dto.status !== undefined ? dto.status : true,
-    });
-    console.log('Creating product:', product);
-    return this.productRepository.save(product);
-  }
-
+  /**
+   * Get all products with filters and pagination
+   */
   async findAll(filters?: {
     categoryId?: string;
     brandId?: string;
-    isNew?: boolean;
-    isHot?: boolean;
-    isFeatured?: boolean;
+    isActive?: boolean;
+    isOnline?: boolean;
     minPrice?: number;
     maxPrice?: number;
-    tags?: string[];
+    search?: string;
     limit?: number;
     offset?: number;
   }) {
-    const where: any = {};
-    if (filters?.categoryId) where.categoryId = filters.categoryId;
-    if (filters?.brandId) where.brandId = filters.brandId;
-    if (filters?.isNew !== undefined) where.isNew = filters.isNew;
-    if (filters?.isHot !== undefined) where.isHot = filters.isHot;
-    if (filters?.isFeatured !== undefined) where.isFeatured = filters.isFeatured;
-    if (filters?.minPrice || filters?.maxPrice) {
-      where.basePrice = {};
-      if (filters?.minPrice) where.basePrice.$gte = filters.minPrice;
-      if (filters?.maxPrice) where.basePrice.$lte = filters.maxPrice;
+    const whereConditions: any = {};
+    
+    if (filters?.categoryId) {
+      whereConditions.categoryId = new ObjectId(filters.categoryId);
     }
-    // Note: TypeORM does not support array contains natively for MongoDB, so tags filter may need custom query
-    // For now, ignore tags filter or implement if needed
-    const take = filters?.limit ? parseInt(filters.limit as any, 10) : 50;
-    const skip = filters?.offset ? parseInt(filters.offset as any, 10) : 0;
+    if (filters?.brandId) {
+      whereConditions.brandId = new ObjectId(filters.brandId);
+    }
+    if (filters?.isActive !== undefined) {
+      whereConditions.isActive = filters.isActive;
+    }
+    if (filters?.isOnline !== undefined) {
+      whereConditions.isOnline = filters.isOnline;
+    }
+
     const products = await this.productRepository.find({
-      where,
+      where: whereConditions,
+      take: filters?.limit,
+      skip: filters?.offset,
       order: { createdAt: 'DESC' },
-      take,
-      skip,
     });
 
-    // Fetch all unique categoryIds and brandIds
-    const categoryIds = Array.from(new Set(products.map(p => p.categoryId).filter(Boolean)));
-    const brandIds = Array.from(new Set(products.map(p => p.brandId).filter(Boolean)));
+    // For MongoDB, we need to load relations separately
+    const productsWithRelations = await Promise.all(
+      products.map(async (product) => {
+        return this.productRepository.findOne({
+          where: { id: product.id } as any,
+          relations: ['images', 'videos', 'regions', 'specifications'],
+        });
+      }),
+    );
 
-    // Get repositories for Category and Brand
-    const categoryRepo = this.productRepository.manager.getRepository('Category');
-    const brandRepo = this.productRepository.manager.getRepository('Brand');
-
-    // Fetch all categories and brands in one go
-    const categories = categoryIds.length ? await categoryRepo.findByIds(categoryIds) : [];
-    const brands = brandIds.length ? await brandRepo.findByIds(brandIds) : [];
-
-    // Map for quick lookup
-    const categoryMap = new Map(categories.map((c: any) => [c.id?.toString(), c]));
-    const brandMap = new Map(brands.map((b: any) => [b.id?.toString(), b]));
-
-    // Attach full objects
-    return products.map(product => ({
-      ...product,
-      category: product.categoryId ? categoryMap.get(product.categoryId?.toString()) : null,
-      brand: product.brandId ? brandMap.get(product.brandId?.toString()) : null,
-    }));
+    return productsWithRelations.filter(p => p !== null).map((product) => this.formatProductResponse(product!));
   }
 
+  /**
+   * Get single product by slug with all details
+   */
   async findOne(slug: string) {
-    const product = await this.productRepository.findOne({ where: { slug } });
-    if (!product) throw new NotFoundException('Product not found');
+    const product = await this.productRepository.findOne({
+      where: { slug },
+      relations: ['images', 'videos', 'regions', 'specifications'],
+    });
 
-    // Fetch category and brand
-    let category: any = null;
-    let brand: any = null;
-    if (product.categoryId) {
-      const categoryRepo = this.productRepository.manager.getRepository('Category');
-      category = await categoryRepo.findOne({ where: { id: product.categoryId } });
+    if (!product) {
+      throw new NotFoundException('Product not found');
     }
-    if (product.brandId) {
-      const brandRepo = this.productRepository.manager.getRepository('Brand');
-      brand = await brandRepo.findOne({ where: { id: product.brandId } });
+
+    return this.formatProductResponse(product);
+  }
+
+  /**
+   * Get specific variant price
+   */
+  async getVariantPrice(
+    productId: string,
+    regionId?: string,
+    colorId?: string,
+    storageId?: string,
+  ) {
+    // For MongoDB, we need to manually query and filter
+    // This is a simplified version - you may need to implement more complex logic
+    const product = await this.productRepository.findOne({
+      where: { id: new ObjectId(productId) } as any,
+      relations: ['regions'],
+    });
+
+    if (!product || !product.regions || product.regions.length === 0) {
+      throw new NotFoundException('Product variant not found');
     }
+
+    // Extract the specific price
+    const region = product.regions[0];
+    const color = region?.colors?.[0];
+    const storage = color?.storages?.[0];
+    const price = storage?.price;
+
+    if (!price) {
+      throw new NotFoundException('Price not found for this variant');
+    }
+
     return {
-      ...product,
-      category,
-      brand,
+      region: { id: region.id, name: region.regionName },
+      color: { id: color.id, name: color.colorName, code: color.colorCode },
+      storage: { id: storage.id, size: storage.storageSize },
+      price: {
+        regular: price.regularPrice,
+        compare: price.comparePrice,
+        discount: price.discountPrice,
+        discountPercent: price.discountPercent,
+        campaign: price.campaignPrice,
+        campaignActive: this.isCampaignActive(price.campaignStart, price.campaignEnd),
+        final: this.calculateFinalPrice(price),
+      },
+      stock: {
+        quantity: price.stockQuantity,
+        lowStockAlert: price.lowStockAlert,
+        inStock: price.stockQuantity > 0,
+        isLowStock: price.stockQuantity <= price.lowStockAlert,
+      },
     };
   }
 
-
-  async update(id: string | ObjectId, dto: UpdateProductDto) {
-    const _id = typeof id === 'string' ? new ObjectId(id) : id;
-    await this.productRepository.update(_id, dto);
-    return this.productRepository.findOne({ where: { id: _id } });
-  }
-
-
-  async remove(id: string | ObjectId) {
-    const _id = typeof id === 'string' ? new ObjectId(id) : id;
-    await this.productRepository.delete(_id);
-    return { success: true };
-  }
-
-  async getFeatured() {
-    return this.productRepository.find({
-      where: { isFeatured: true },
-      take: 12,
-      order: { createdAt: 'DESC' },
+  /**
+   * Update product
+   */
+  async update(id: string, dto: UpdateProductNewDto) {
+    const product = await this.productRepository.findOne({ 
+      where: { id: new ObjectId(id) } as any 
     });
+
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+
+    // For simplicity, we'll update only the main product fields
+    // Updating nested relations would require a similar transaction approach
+    Object.assign(product, {
+      name: dto.name ?? product.name,
+      slug: dto.slug ?? product.slug,
+      description: dto.description ?? product.description,
+      categoryId: dto.categoryId ? new ObjectId(dto.categoryId) : product.categoryId,
+      brandId: dto.brandId ? new ObjectId(dto.brandId) : product.brandId,
+      productCode: dto.productCode ?? product.productCode,
+      sku: dto.sku ?? product.sku,
+      warranty: dto.warranty ?? product.warranty,
+      isActive: dto.isActive ?? product.isActive,
+      isOnline: dto.isOnline ?? product.isOnline,
+      isPos: dto.isPos ?? product.isPos,
+      isPreOrder: dto.isPreOrder ?? product.isPreOrder,
+      isOfficial: dto.isOfficial ?? product.isOfficial,
+      freeShipping: dto.freeShipping ?? product.freeShipping,
+      rewardPoints: dto.rewardPoints ?? product.rewardPoints,
+      minBookingPrice: dto.minBookingPrice ?? product.minBookingPrice,
+      seoTitle: dto.seoTitle ?? product.seoTitle,
+      seoDescription: dto.seoDescription ?? product.seoDescription,
+      seoKeywords: dto.seoKeywords ?? product.seoKeywords,
+      seoCanonical: dto.seoCanonical ?? product.seoCanonical,
+      tags: dto.tags ?? product.tags,
+    });
+
+    await this.productRepository.save(product);
+
+    return this.findOne(product.slug);
   }
 
+  /**
+   * Soft delete product
+   */
+  async remove(id: string) {
+    const product = await this.productRepository.findOne({ 
+      where: { id: new ObjectId(id) } as any 
+    });
 
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
 
+    await this.productRepository.softDelete(id);
+
+    return { success: true, message: 'Product deleted successfully' };
+  }
+
+  /**
+   * Search products
+   */
   async search(query: string) {
-    return this.productRepository.find({
-      where: [
-        { name: Like(`%${query}%`) },
-        { description: Like(`%${query}%`) },
-        // tags: TypeORM does not support array search for MongoDB, so skip for now
-      ],
-      take: 20,
+    return this.findAll({ search: query, limit: 20 });
+  }
+
+  // ============ Helper Methods ============
+
+  private formatProductResponse(product: Product) {
+    const prices = this.extractAllPrices(product);
+    const totalStock = this.calculateTotalStock(product);
+
+    return {
+      id: product.id,
+      name: product.name,
+      slug: product.slug,
+      description: product.description,
+      categoryId: product.categoryId,
+      brandId: product.brandId,
+      productCode: product.productCode,
+      sku: product.sku,
+      warranty: product.warranty,
+      isActive: product.isActive,
+      isOnline: product.isOnline,
+      isPos: product.isPos,
+      isPreOrder: product.isPreOrder,
+      isOfficial: product.isOfficial,
+      freeShipping: product.freeShipping,
+      rewardPoints: product.rewardPoints,
+      minBookingPrice: product.minBookingPrice,
+      seo: {
+        title: product.seoTitle,
+        description: product.seoDescription,
+        keywords: product.seoKeywords,
+        canonical: product.seoCanonical,
+      },
+      tags: product.tags,
+      priceRange: {
+        min: Math.min(...prices),
+        max: Math.max(...prices),
+        currency: 'USD',
+      },
+      totalStock,
+      images: product.images?.map((img) => ({
+        id: img.id,
+        url: img.imageUrl,
+        isThumbnail: img.isThumbnail,
+        altText: img.altText,
+      })),
+      videos: product.videos?.map((vid) => ({
+        id: vid.id,
+        url: vid.videoUrl,
+        type: vid.videoType,
+      })),
+      regions: product.regions?.map((region) => ({
+        id: region.id,
+        name: region.regionName,
+        isDefault: region.isDefault,
+        colors: region.colors?.map((color) => ({
+          id: color.id,
+          name: color.colorName,
+          code: color.colorCode,
+          storages: color.storages?.map((storage) => ({
+            id: storage.id,
+            size: storage.storageSize,
+            price: {
+              regular: storage.price?.regularPrice,
+              compare: storage.price?.comparePrice,
+              discount: storage.price?.discountPrice,
+              discountPercent: storage.price?.discountPercent,
+              campaign: storage.price?.campaignPrice,
+              campaignActive: this.isCampaignActive(
+                storage.price?.campaignStart,
+                storage.price?.campaignEnd,
+              ),
+              final: this.calculateFinalPrice(storage.price),
+            },
+            stock: storage.price?.stockQuantity,
+            inStock: (storage.price?.stockQuantity ?? 0) > 0,
+          })),
+        })),
+      })),
+      specifications: this.groupSpecifications(product.specifications),
+      createdAt: product.createdAt,
+      updatedAt: product.updatedAt,
+    };
+  }
+
+  private extractAllPrices(product: Product): number[] {
+    const prices: number[] = [];
+
+    product.regions?.forEach((region) => {
+      region.colors?.forEach((color) => {
+        color.storages?.forEach((storage) => {
+          if (storage.price) {
+            const finalPrice = this.calculateFinalPrice(storage.price);
+            prices.push(finalPrice);
+          }
+        });
+      });
     });
+
+    return prices.length > 0 ? prices : [0];
+  }
+
+  private calculateTotalStock(product: Product): number {
+    let total = 0;
+
+    product.regions?.forEach((region) => {
+      region.colors?.forEach((color) => {
+        color.storages?.forEach((storage) => {
+          total += storage.price?.stockQuantity ?? 0;
+        });
+      });
+    });
+
+    return total;
+  }
+
+  private calculateFinalPrice(price: ProductPrice | undefined): number {
+    if (!price) return 0;
+
+    // Check if campaign is active
+    if (
+      price.campaignPrice &&
+      this.isCampaignActive(price.campaignStart, price.campaignEnd)
+    ) {
+      return price.campaignPrice;
+    }
+
+    // Check discount price
+    if (price.discountPrice) {
+      return price.discountPrice;
+    }
+
+    // Return regular price
+    return price.regularPrice;
+  }
+
+  private isCampaignActive(start?: Date, end?: Date): boolean {
+    if (!start || !end) return false;
+
+    const now = new Date();
+    return now >= new Date(start) && now <= new Date(end);
+  }
+
+  private groupSpecifications(specs?: ProductSpecification[]) {
+    if (!specs || specs.length === 0) return [];
+
+    const grouped = new Map<string, any>();
+
+    specs.forEach((spec) => {
+      const groupName = spec.specGroup?.groupName;
+      if (!groupName) return;
+
+      if (!grouped.has(groupName)) {
+        grouped.set(groupName, {
+          group: groupName,
+          icon: spec.specGroup?.icon,
+          displayOrder: spec.specGroup?.displayOrder,
+          specs: [],
+        });
+      }
+
+      grouped.get(groupName).specs.push({
+        key: spec.specKey,
+        value: spec.specValue,
+      });
+    });
+
+    return Array.from(grouped.values()).sort((a, b) => a.displayOrder - b.displayOrder);
   }
 }

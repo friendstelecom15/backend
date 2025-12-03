@@ -21,7 +21,6 @@ export class CategoriesService {
     private readonly subcategoryRepository: Repository<Subcategory>,
   ) {}
 
-  //getbyid
   async getById(id: string): Promise<Category | null> {
     const _id = typeof id === 'string' ? new ObjectId(id) : id;
     return this.categoryRepository.findOne({ where: { _id } } as any);

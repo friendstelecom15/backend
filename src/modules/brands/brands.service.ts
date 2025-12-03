@@ -20,7 +20,9 @@ export class BrandsService {
 
   // 🔍 Check if brand with same name OR slug already exists
   const exists = await this.brandRepository.findOne({
-    where: [{ name: dto.name }, { slug }],
+    where: {
+      $or: [{ name: dto.name }, { slug }],
+    } as any,
   });
 
   if (exists) {

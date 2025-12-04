@@ -24,7 +24,7 @@ export class Product {
   @Column()
   name: string;
 
-  @Column()
+  @Column({ unique: true })
   slug: string;
 
   @Column({ nullable: true })
@@ -36,10 +36,10 @@ export class Product {
   @Column({ nullable: true })
   brandId?: ObjectId;
 
-  @Column({ nullable: true })
+  @Column({ nullable: true, unique: true })
   productCode?: string;
 
-  @Column({ nullable: true })
+  @Column({ nullable: true, unique: true })
   sku?: string;
 
   @Column({ nullable: true })

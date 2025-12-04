@@ -6,12 +6,14 @@ import {
   ManyToOne,
   OneToOne,
   JoinColumn,
+  Index,
 } from 'typeorm';
 import { ObjectId } from 'mongodb';
 import { ProductColor } from './product-color.entity';
 import { ProductPrice } from './product-price.entity';
 
 @Entity('product_storages')
+@Index(['colorId', 'storageSize'], { unique: true, sparse: true })
 export class ProductStorage {
   @ObjectIdColumn()
   id: ObjectId;

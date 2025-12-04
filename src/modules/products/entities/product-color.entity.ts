@@ -6,12 +6,16 @@ import {
   ManyToOne,
   OneToMany,
   JoinColumn,
+  Index,
 } from 'typeorm';
 import { ObjectId } from 'mongodb';
 import { Product } from './product-new.entity';
 import { ProductRegion } from './product-region.entity';
 import { ProductStorage } from './product-storage.entity';
+
 @Entity('product_colors')
+@Index(['productId', 'colorName'], { unique: true, sparse: true }) // Unique per product
+@Index(['regionId', 'colorName'], { unique: true, sparse: true })  // Unique per region
 export class ProductColor {
   @ObjectIdColumn()
   id: ObjectId;

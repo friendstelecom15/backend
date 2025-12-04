@@ -245,6 +245,15 @@ export class ProductService {
       return this.findOne(savedProduct.slug);
     } catch (error) {
       await queryRunner.rollbackTransaction();
+      
+      // Handle duplicate key errors
+      if (error.code === 11000 || error.message?.includes('duplicate key')) {
+        const duplicateField = this.extractDuplicateField(error);
+        throw new BadRequestException(
+          `${duplicateField} already exists. Please use a different value.`,
+        );
+      }
+      
       throw new InternalServerErrorException(
         `Failed to create product: ${error.message}`,
       );
@@ -691,5 +700,58 @@ export class ProductService {
     });
 
     return Array.from(grouped.values()).sort((a, b) => a.displayOrder - b.displayOrder);
+  }
+
+  private extractDuplicateField(error: any): string {
+    const errorMessage = error.message || '';
+    
+    // Check for slug duplicate
+    if (errorMessage.includes('slug') || errorMessage.includes('UQ_') && errorMessage.includes('slug')) {
+      return 'Product slug';
+    }
+    
+    // Check for productCode duplicate
+    if (errorMessage.includes('productCode')) {
+      return 'Product code';
+    }
+    
+    // Check for sku duplicate
+    if (errorMessage.includes('sku')) {
+      return 'SKU';
+    }
+    
+    // Check for region name duplicate
+    if (errorMessage.includes('regionName') || errorMessage.includes('productId_1_regionName')) {
+      return 'Region name (duplicate region name for this product)';
+    }
+    
+    // Check for color name duplicate
+    if (errorMessage.includes('colorName')) {
+      if (errorMessage.includes('productId')) {
+        return 'Color name (duplicate color name for this product)';
+      }
+      if (errorMessage.includes('regionId')) {
+        return 'Color name (duplicate color name for this region)';
+      }
+      return 'Color name';
+    }
+    
+    // Check for storage size duplicate
+    if (errorMessage.includes('storageSize') || errorMessage.includes('colorId_1_storageSize')) {
+      return 'Storage size (duplicate storage size for this color)';
+    }
+    
+    // Check for specification duplicate
+    if (errorMessage.includes('specKey') || errorMessage.includes('productId_1_specGroupId_1_specKey')) {
+      return 'Specification key (duplicate specification for this product and group)';
+    }
+    
+    // Check for spec group name duplicate
+    if (errorMessage.includes('groupName')) {
+      return 'Specification group name';
+    }
+    
+    // Default message
+    return 'Value';
   }
 }

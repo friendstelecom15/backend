@@ -6,11 +6,13 @@ import {
   ManyToOne,
   OneToMany,
   JoinColumn,
+  Index,
 } from 'typeorm';
 import { ObjectId } from 'mongodb';
 import { Product } from './product-new.entity';
 import { ProductColor } from './product-color.entity';
 @Entity('product_regions')
+@Index(['productId', 'regionName'], { unique: true, sparse: true })
 export class ProductRegion {
   @ObjectIdColumn()
   id: ObjectId;

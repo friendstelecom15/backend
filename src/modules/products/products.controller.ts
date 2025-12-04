@@ -9,6 +9,8 @@ import {
   Query,
   UseGuards,
   ParseUUIDPipe,
+  UploadedFiles,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -22,12 +24,17 @@ import { UpdateProductNewDto } from './dto/update-product-new.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { FileFieldsUpload, UploadType } from '../../common/decorators/file-upload.decorator';
+import { CloudflareService } from '../../config/cloudflare-video.service';
 import { ProductService } from './products.service';
 
 @ApiTags('Products (New Architecture)')
 @Controller('products-new')
 export class ProductsController {
-  constructor(private readonly productsService: ProductService) {}
+  constructor(
+    private readonly productsService: ProductService,
+    private readonly cloudflareService: CloudflareService,
+  ) {}
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -46,7 +53,90 @@ export class ProductsController {
     status: 400,
     description: 'Invalid input data',
   })
-  create(@Body() createProductDto: CreateProductNewDto) {
+  @FileFieldsUpload(
+    [
+      { name: 'images', maxCount: 15 },
+      { name: 'colorImages', maxCount: 30 },
+    ],
+    undefined,
+    UploadType.IMAGE,
+  )
+  async create(
+    @Body() createProductDto: CreateProductNewDto,
+    @UploadedFiles()
+    files: {
+      images?: Express.Multer.File[];
+      colorImages?: Express.Multer.File[];
+    },
+  ) {
+    // Upload product images to Cloudflare
+    if (files?.images?.length) {
+      try {
+        const uploadedImages = await Promise.all(
+          files.images.map(async (file, index) => {
+            const upload = await this.cloudflareService.uploadImage(
+              file.buffer,
+              file.originalname,
+            );
+            return {
+              imageUrl: upload.variants?.[0] || upload.id || '',
+              isThumbnail: index === 0,
+              altText: file.originalname,
+              displayOrder: index,
+            };
+          }),
+        );
+        createProductDto.images = uploadedImages;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        throw new InternalServerErrorException(
+          `Product image upload failed: ${message}`,
+        );
+      }
+    }
+
+    // Upload color images to Cloudflare
+    if (files?.colorImages?.length) {
+      try {
+        const uploadedColorImages = await Promise.all(
+          files.colorImages.map(async (file) => {
+            const upload = await this.cloudflareService.uploadImage(
+              file.buffer,
+              file.originalname,
+            );
+            return upload.variants?.[0] || upload.id || '';
+          }),
+        );
+
+        // Assign color images to directColors or region colors
+        let colorImageIndex = 0;
+        if (createProductDto.directColors?.length) {
+          createProductDto.directColors.forEach((color) => {
+            if (colorImageIndex < uploadedColorImages.length) {
+              color.colorImage = uploadedColorImages[colorImageIndex];
+              colorImageIndex++;
+            }
+          });
+        }
+
+        if (createProductDto.regions?.length) {
+          createProductDto.regions.forEach((region) => {
+            region.colors?.forEach((color) => {
+              if (colorImageIndex < uploadedColorImages.length) {
+                color.colorImage = uploadedColorImages[colorImageIndex];
+                colorImageIndex++;
+              }
+            });
+          });
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        throw new InternalServerErrorException(
+          `Color image upload failed: ${message}`,
+        );
+      }
+    }
+
     return this.productsService.create(createProductDto);
   }
 
@@ -150,10 +240,91 @@ export class ProductsController {
     status: 404,
     description: 'Product not found',
   })
-  update(
+  @FileFieldsUpload(
+    [
+      { name: 'images', maxCount: 15 },
+      { name: 'colorImages', maxCount: 30 },
+    ],
+    undefined,
+    UploadType.IMAGE,
+  )
+  async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateProductDto: UpdateProductNewDto,
+    @UploadedFiles()
+    files: {
+      images?: Express.Multer.File[];
+      colorImages?: Express.Multer.File[];
+    },
   ) {
+    // Upload new product images if provided
+    if (files?.images?.length) {
+      try {
+        const uploadedImages = await Promise.all(
+          files.images.map(async (file, index) => {
+            const upload = await this.cloudflareService.uploadImage(
+              file.buffer,
+              file.originalname,
+            );
+            return {
+              imageUrl: upload.variants?.[0] || upload.id || '',
+              isThumbnail: index === 0,
+              altText: file.originalname,
+              displayOrder: index,
+            };
+          }),
+        );
+        updateProductDto.images = uploadedImages;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        throw new InternalServerErrorException(
+          `Product image upload failed: ${message}`,
+        );
+      }
+    }
+
+    // Upload new color images if provided
+    if (files?.colorImages?.length) {
+      try {
+        const uploadedColorImages = await Promise.all(
+          files.colorImages.map(async (file) => {
+            const upload = await this.cloudflareService.uploadImage(
+              file.buffer,
+              file.originalname,
+            );
+            return upload.variants?.[0] || upload.id || '';
+          }),
+        );
+
+        // Assign color images to directColors or region colors
+        let colorImageIndex = 0;
+        if (updateProductDto.directColors?.length) {
+          updateProductDto.directColors.forEach((color) => {
+            if (colorImageIndex < uploadedColorImages.length) {
+              color.colorImage = uploadedColorImages[colorImageIndex];
+              colorImageIndex++;
+            }
+          });
+        }
+
+        if (updateProductDto.regions?.length) {
+          updateProductDto.regions.forEach((region) => {
+            region.colors?.forEach((color) => {
+              if (colorImageIndex < uploadedColorImages.length) {
+                color.colorImage = uploadedColorImages[colorImageIndex];
+                colorImageIndex++;
+              }
+            });
+          });
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        throw new InternalServerErrorException(
+          `Color image upload failed: ${message}`,
+        );
+      }
+    }
+
     return this.productsService.update(id, updateProductDto);
   }
 

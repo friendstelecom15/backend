@@ -48,6 +48,11 @@ export class ProductService {
         productCode: dto.productCode,
         sku: dto.sku,
         warranty: dto.warranty,
+        // Simple product fields
+        price: dto.price,
+        comparePrice: dto.comparePrice,
+        stockQuantity: dto.stockQuantity,
+        lowStockAlert: dto.lowStockAlert,
         isActive: dto.isActive ?? true,
         isOnline: dto.isOnline ?? true,
         isPos: dto.isPos ?? true,
@@ -61,11 +66,60 @@ export class ProductService {
         seoKeywords: dto.seoKeywords,
         seoCanonical: dto.seoCanonical,
         tags: dto.tags,
+        faqIds: dto.faqIds ? dto.faqIds.map(id => new ObjectId(id)) : undefined,
       });
 
       const savedProduct = await queryRunner.manager.save(Product, product);
 
-      // 2. Create Regions → Colors → Storages → Prices
+      // 2. Create Direct Colors (for products without regions)
+      if (dto.directColors && dto.directColors.length > 0) {
+        for (const colorDto of dto.directColors) {
+          const color = queryRunner.manager.create(ProductColor, {
+            productId: savedProduct.id,
+            colorName: colorDto.colorName,
+            colorImage: colorDto.colorImage,
+            hasStorage: colorDto.hasStorage ?? true,
+            singlePrice: colorDto.singlePrice,
+            singleComparePrice: colorDto.singleComparePrice,
+            singleStockQuantity: colorDto.singleStockQuantity,
+            features: colorDto.features,
+            displayOrder: colorDto.displayOrder ?? 0,
+          });
+          const savedColor = await queryRunner.manager.save(ProductColor, color);
+
+          // Create storages if hasStorage = true
+          if (colorDto.hasStorage && colorDto.storages && colorDto.storages.length > 0) {
+            for (const storageDto of colorDto.storages) {
+              const storage = queryRunner.manager.create(ProductStorage, {
+                colorId: savedColor.id,
+                storageSize: storageDto.storageSize,
+                displayOrder: storageDto.displayOrder ?? 0,
+              });
+              const savedStorage = await queryRunner.manager.save(ProductStorage, storage);
+
+              // Create Price for this storage
+              const price = new ProductPrice();
+              price.storageId = savedStorage.id;
+              price.regularPrice = storageDto.price.regularPrice;
+              price.comparePrice = storageDto.price.comparePrice;
+              price.discountPrice = storageDto.price.discountPrice;
+              price.discountPercent = storageDto.price.discountPercent;
+              price.campaignPrice = storageDto.price.campaignPrice;
+              price.campaignStart = storageDto.price.campaignStart
+                ? new Date(storageDto.price.campaignStart)
+                : undefined;
+              price.campaignEnd = storageDto.price.campaignEnd
+                ? new Date(storageDto.price.campaignEnd)
+                : undefined;
+              price.stockQuantity = storageDto.price.stockQuantity;
+              price.lowStockAlert = storageDto.price.lowStockAlert ?? 5;
+              await queryRunner.manager.save(ProductPrice, price);
+            }
+          }
+        }
+      }
+
+      // 3. Create Regions → Colors → Storages → Prices (for region-based products)
       if (dto.regions && dto.regions.length > 0) {
         for (const regionDto of dto.regions) {
           const region = queryRunner.manager.create(ProductRegion, {
@@ -81,12 +135,18 @@ export class ProductService {
               const color = queryRunner.manager.create(ProductColor, {
                 regionId: savedRegion.id,
                 colorName: colorDto.colorName,
-                colorCode: colorDto.colorCode,
+                colorImage: colorDto.colorImage,
+                hasStorage: colorDto.hasStorage ?? true,
+                singlePrice: colorDto.singlePrice,
+                singleComparePrice: colorDto.singleComparePrice,
+                singleStockQuantity: colorDto.singleStockQuantity,
+                features: colorDto.features,
                 displayOrder: colorDto.displayOrder ?? 0,
               });
               const savedColor = await queryRunner.manager.save(ProductColor, color);
 
-              if (colorDto.storages && colorDto.storages.length > 0) {
+              // Create storages only if hasStorage = true
+              if (colorDto.hasStorage && colorDto.storages && colorDto.storages.length > 0) {
                 for (const storageDto of colorDto.storages) {
                   const storage = queryRunner.manager.create(ProductStorage, {
                     colorId: savedColor.id,
@@ -119,7 +179,7 @@ export class ProductService {
         }
       }
 
-      // 3. Create Images
+      // 4. Create Images
       if (dto.images && dto.images.length > 0) {
         for (const imageDto of dto.images) {
           const image = queryRunner.manager.create(ProductImage, {
@@ -133,7 +193,7 @@ export class ProductService {
         }
       }
 
-      // 4. Create Videos
+      // 5. Create Videos
       if (dto.videos && dto.videos.length > 0) {
         for (const videoDto of dto.videos) {
           const video = queryRunner.manager.create(ProductVideo, {
@@ -146,7 +206,7 @@ export class ProductService {
         }
       }
 
-      // 5. Create Specifications
+      // 6. Create Specifications
       if (dto.specifications && dto.specifications.length > 0) {
         for (const specGroupDto of dto.specifications) {
           // Find or create spec group
@@ -234,7 +294,7 @@ export class ProductService {
       products.map(async (product) => {
         return this.productRepository.findOne({
           where: { id: product.id } as any,
-          relations: ['images', 'videos', 'regions', 'specifications'],
+          relations: ['images', 'videos', 'regions', 'directColors', 'specifications'],
         });
       }),
     );
@@ -248,7 +308,7 @@ export class ProductService {
   async findOne(slug: string) {
     const product = await this.productRepository.findOne({
       where: { slug },
-      relations: ['images', 'videos', 'regions', 'specifications'],
+      relations: ['images', 'videos', 'regions', 'directColors', 'specifications'],
     });
 
     if (!product) {
@@ -290,7 +350,7 @@ export class ProductService {
 
     return {
       region: { id: region.id, name: region.regionName },
-      color: { id: color.id, name: color.colorName, code: color.colorCode },
+      color: { id: color.id, name: color.colorName, image: color.colorImage },
       storage: { id: storage.id, size: storage.storageSize },
       price: {
         regular: price.regularPrice,
@@ -346,6 +406,7 @@ export class ProductService {
       seoKeywords: dto.seoKeywords ?? product.seoKeywords,
       seoCanonical: dto.seoCanonical ?? product.seoCanonical,
       tags: dto.tags ?? product.tags,
+      faqIds: dto.faqIds ? dto.faqIds.map(id => new ObjectId(id)) : product.faqIds,
     });
 
     await this.productRepository.save(product);
@@ -393,6 +454,11 @@ export class ProductService {
       productCode: product.productCode,
       sku: product.sku,
       warranty: product.warranty,
+      // Simple product fields
+      price: product.price,
+      comparePrice: product.comparePrice,
+      stockQuantity: product.stockQuantity,
+      lowStockAlert: product.lowStockAlert,
       isActive: product.isActive,
       isOnline: product.isOnline,
       isPos: product.isPos,
@@ -408,10 +474,11 @@ export class ProductService {
         canonical: product.seoCanonical,
       },
       tags: product.tags,
+      faqIds: product.faqIds,
       priceRange: {
         min: Math.min(...prices),
         max: Math.max(...prices),
-        currency: 'USD',
+        currency: 'BDT',
       },
       totalStock,
       images: product.images?.map((img) => ({
@@ -425,6 +492,34 @@ export class ProductService {
         url: vid.videoUrl,
         type: vid.videoType,
       })),
+      directColors: product.directColors?.map((color) => ({
+        id: color.id,
+        name: color.colorName,
+        image: color.colorImage,
+        hasStorage: color.hasStorage,
+        singlePrice: color.singlePrice,
+        singleComparePrice: color.singleComparePrice,
+        singleStockQuantity: color.singleStockQuantity,
+        features: color.features,
+        storages: color.hasStorage ? color.storages?.map((storage) => ({
+          id: storage.id,
+          size: storage.storageSize,
+          price: {
+            regular: storage.price?.regularPrice,
+            compare: storage.price?.comparePrice,
+            discount: storage.price?.discountPrice,
+            discountPercent: storage.price?.discountPercent,
+            campaign: storage.price?.campaignPrice,
+            campaignActive: this.isCampaignActive(
+              storage.price?.campaignStart,
+              storage.price?.campaignEnd,
+            ),
+            final: this.calculateFinalPrice(storage.price),
+          },
+          stock: storage.price?.stockQuantity,
+          inStock: (storage.price?.stockQuantity ?? 0) > 0,
+        })) : undefined,
+      })),
       regions: product.regions?.map((region) => ({
         id: region.id,
         name: region.regionName,
@@ -432,8 +527,13 @@ export class ProductService {
         colors: region.colors?.map((color) => ({
           id: color.id,
           name: color.colorName,
-          code: color.colorCode,
-          storages: color.storages?.map((storage) => ({
+          image: color.colorImage,
+          hasStorage: color.hasStorage,
+          singlePrice: color.singlePrice,
+          singleComparePrice: color.singleComparePrice,
+          singleStockQuantity: color.singleStockQuantity,
+          features: color.features,
+          storages: color.hasStorage ? color.storages?.map((storage) => ({
             id: storage.id,
             size: storage.storageSize,
             price: {
@@ -450,7 +550,7 @@ export class ProductService {
             },
             stock: storage.price?.stockQuantity,
             inStock: (storage.price?.stockQuantity ?? 0) > 0,
-          })),
+          })) : undefined,
         })),
       })),
       specifications: this.groupSpecifications(product.specifications),
@@ -462,14 +562,40 @@ export class ProductService {
   private extractAllPrices(product: Product): number[] {
     const prices: number[] = [];
 
-    product.regions?.forEach((region) => {
-      region.colors?.forEach((color) => {
+    // Simple product price
+    if (product.price) {
+      prices.push(product.price);
+    }
+
+    // Direct colors prices
+    product.directColors?.forEach((color) => {
+      if (color.singlePrice) {
+        prices.push(color.singlePrice);
+      }
+      if (color.hasStorage) {
         color.storages?.forEach((storage) => {
           if (storage.price) {
             const finalPrice = this.calculateFinalPrice(storage.price);
             prices.push(finalPrice);
           }
         });
+      }
+    });
+
+    // Region-based prices
+    product.regions?.forEach((region) => {
+      region.colors?.forEach((color) => {
+        if (color.singlePrice) {
+          prices.push(color.singlePrice);
+        }
+        if (color.hasStorage) {
+          color.storages?.forEach((storage) => {
+            if (storage.price) {
+              const finalPrice = this.calculateFinalPrice(storage.price);
+              prices.push(finalPrice);
+            }
+          });
+        }
       });
     });
 
@@ -479,11 +605,34 @@ export class ProductService {
   private calculateTotalStock(product: Product): number {
     let total = 0;
 
-    product.regions?.forEach((region) => {
-      region.colors?.forEach((color) => {
+    // Simple product stock
+    if (product.stockQuantity) {
+      total += product.stockQuantity;
+    }
+
+    // Direct colors stock
+    product.directColors?.forEach((color) => {
+      if (color.singleStockQuantity) {
+        total += color.singleStockQuantity;
+      }
+      if (color.hasStorage) {
         color.storages?.forEach((storage) => {
           total += storage.price?.stockQuantity ?? 0;
         });
+      }
+    });
+
+    // Region-based stock
+    product.regions?.forEach((region) => {
+      region.colors?.forEach((color) => {
+        if (color.singleStockQuantity) {
+          total += color.singleStockQuantity;
+        }
+        if (color.hasStorage) {
+          color.storages?.forEach((storage) => {
+            total += storage.price?.stockQuantity ?? 0;
+          });
+        }
       });
     });
 

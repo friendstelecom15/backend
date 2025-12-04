@@ -92,10 +92,39 @@ export class CreateProductColorDto {
   @IsNotEmpty()
   colorName: string;
 
-  @ApiProperty({ description: 'Color hex code', example: '#8D8D8D' })
+  @ApiPropertyOptional({ description: 'Color image URL', example: 'https://cdn.example.com/natural-titanium.jpg' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  colorCode: string;
+  colorImage?: string;
+
+  @ApiPropertyOptional({ description: 'Has storage variants?', example: true })
+  @IsOptional()
+  @IsBoolean()
+  hasStorage?: boolean;
+
+  @ApiPropertyOptional({ description: 'Price for color-only products (when hasStorage=false)', example: 2990 })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  singlePrice?: number;
+
+  @ApiPropertyOptional({ description: 'Compare price for color-only products', example: 3990 })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  singleComparePrice?: number;
+
+  @ApiPropertyOptional({ description: 'Stock quantity for color-only products', example: 50 })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  singleStockQuantity?: number;
+
+  @ApiPropertyOptional({ description: 'Color-specific features', example: ['Wireless Charging', 'iPhone 17'] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  features?: string[];
 
   @ApiPropertyOptional({ description: 'Display order', example: 1 })
   @IsOptional()
@@ -103,12 +132,12 @@ export class CreateProductColorDto {
   @Min(0)
   displayOrder?: number;
 
-  @ApiProperty({ description: 'Storage variants for this color', type: [CreateProductStorageDto] })
+  @ApiPropertyOptional({ description: 'Storage variants for this color (when hasStorage=true)', type: [CreateProductStorageDto] })
+  @IsOptional()
   @IsArray()
-  @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => CreateProductStorageDto)
-  storages: CreateProductStorageDto[];
+  storages?: CreateProductStorageDto[];
 }
 
 // ==================== Region DTO ====================
@@ -129,12 +158,12 @@ export class CreateProductRegionDto {
   @Min(0)
   displayOrder?: number;
 
-  @ApiProperty({ description: 'Color variants for this region', type: [CreateProductColorDto] })
+  @ApiPropertyOptional({ description: 'Color variants for this region', type: [CreateProductColorDto] })
+  @IsOptional()
   @IsArray()
-  @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => CreateProductColorDto)
-  colors: CreateProductColorDto[];
+  colors?: CreateProductColorDto[];
 }
 
 // ==================== Image DTO ====================
@@ -338,13 +367,45 @@ export class CreateProductNewDto {
   @IsString({ each: true })
   tags?: string[];
 
+  // Simple Product Fields (for products without variants)
+  @ApiPropertyOptional({ description: 'Direct price (for simple products)', example: 2990 })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  price?: number;
+
+  @ApiPropertyOptional({ description: 'Direct compare price', example: 3990 })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  comparePrice?: number;
+
+  @ApiPropertyOptional({ description: 'Direct stock quantity', example: 50 })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  stockQuantity?: number;
+
+  @ApiPropertyOptional({ description: 'Low stock alert', example: 5 })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  lowStockAlert?: number;
+
   // Nested Relations
-  @ApiProperty({ description: 'Product regions with variants', type: [CreateProductRegionDto] })
+  @ApiPropertyOptional({ description: 'Product regions with variants (for region-based products)', type: [CreateProductRegionDto] })
+  @IsOptional()
   @IsArray()
-  @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => CreateProductRegionDto)
-  regions: CreateProductRegionDto[];
+  regions?: CreateProductRegionDto[];
+
+  @ApiPropertyOptional({ description: 'Direct color variants (for products without regions)', type: [CreateProductColorDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateProductColorDto)
+  directColors?: CreateProductColorDto[];
 
   @ApiPropertyOptional({ description: 'Product images', type: [CreateProductImageDto] })
   @IsOptional()
@@ -366,4 +427,10 @@ export class CreateProductNewDto {
   @ValidateNested({ each: true })
   @Type(() => CreateProductSpecificationDto)
   specifications?: CreateProductSpecificationDto[];
+
+  @ApiPropertyOptional({ description: 'FAQ IDs associated with this product', example: ['507f1f77bcf86cd799439011'] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  faqIds?: string[];
 }

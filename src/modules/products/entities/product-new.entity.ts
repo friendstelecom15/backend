@@ -5,15 +5,16 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   DeleteDateColumn,
-  ManyToOne,
   OneToMany,
-  JoinColumn,
+  Index,
 } from 'typeorm';
 import { ObjectId } from 'mongodb';
+import { ProductRegion } from './product-region.entity';
+import { ProductColor } from './product-color.entity';
 import { ProductImage } from './product-image.entity';
 import { ProductVideo } from './product-video.entity';
 import { ProductSpecification } from './product-specification.entity';
-import { ProductRegion } from './product-region.entity';
+
 
 @Entity('products')
 export class Product {
@@ -23,7 +24,7 @@ export class Product {
   @Column()
   name: string;
 
-  @Column({ unique: true })
+  @Column()
   slug: string;
 
   @Column({ nullable: true })
@@ -44,7 +45,6 @@ export class Product {
   @Column({ nullable: true })
   warranty?: string;
 
-  // Status Flags
   @Column({ default: true })
   isActive: boolean;
 
@@ -63,43 +63,56 @@ export class Product {
   @Column({ default: false })
   freeShipping: boolean;
 
-  // Reward & Booking
   @Column({ default: 0 })
   rewardPoints: number;
 
   @Column({ default: 0 })
   minBookingPrice: number;
 
-  // SEO Fields
+  // Direct price fields (for simple products without variants)
+  @Column({ nullable: true })
+  price?: number;
+
+  @Column({ nullable: true })
+  comparePrice?: number;
+
+  @Column({ nullable: true })
+  stockQuantity?: number;
+
+  @Column({ nullable: true })
+  lowStockAlert?: number;
+
   @Column({ nullable: true })
   seoTitle?: string;
 
   @Column({ nullable: true })
   seoDescription?: string;
 
-  @Column({ type: 'array', nullable: true })
+  // For Mongo just use normal arrays
+  @Column({ nullable: true })
   seoKeywords?: string[];
 
   @Column({ nullable: true })
   seoCanonical?: string;
 
-  @Column({ type: 'array', nullable: true })
+  @Column({ nullable: true })
   tags?: string[];
 
-  // Relations
-  @OneToMany(() => ProductRegion, (region) => region.product, { cascade: true })
-  regions: ProductRegion[];
+  @OneToMany(() => ProductRegion, (r) => r.product, { cascade: ['insert','update'] })
+  regions: ProductRegion[]; // Optional: For region-based variants
 
-  @OneToMany(() => ProductImage, (image) => image.product, { cascade: true })
+  @OneToMany(() => ProductColor, (c) => c.product, { cascade: ['insert','update'] })
+  directColors: ProductColor[]; // Optional: For direct color variants
+
+  @OneToMany(() => ProductImage, (i) => i.product, { cascade: ['insert','update'] })
   images: ProductImage[];
 
-  @OneToMany(() => ProductVideo, (video) => video.product, { cascade: true })
+  @OneToMany(() => ProductVideo, (v) => v.product, { cascade: ['insert','update'] })
   videos: ProductVideo[];
 
-  @OneToMany(() => ProductSpecification, (spec) => spec.product, { cascade: true })
+  @OneToMany(() => ProductSpecification, (s) => s.product, { cascade: ['insert','update'] })
   specifications: ProductSpecification[];
 
-  // Timestamps
   @CreateDateColumn()
   createdAt: Date;
 
@@ -109,6 +122,6 @@ export class Product {
   @DeleteDateColumn()
   deletedAt?: Date;
 
-  @Column({ type: 'array', nullable: true })
+  @Column({ nullable: true })
   faqIds?: ObjectId[];
 }

@@ -14,6 +14,7 @@ import { ProductColor } from './product-color.entity';
 import { ProductImage } from './product-image.entity';
 import { ProductVideo } from './product-video.entity';
 import { ProductSpecification } from './product-specification.entity';
+import { ProductNetwork } from './product-network.entity';
 
 
 @Entity('products')
@@ -26,6 +27,9 @@ export class Product {
 
   @Column({ unique: true })
   slug: string;
+
+  @Column({ nullable: true })
+  shortDescription?: string;
 
   @Column({ nullable: true })
   description?: string;
@@ -62,6 +66,9 @@ export class Product {
 
   @Column({ default: false })
   freeShipping: boolean;
+
+  @Column({ default: false })
+  isEmi: boolean;
 
   @Column({ default: 0 })
   rewardPoints: number;
@@ -100,6 +107,9 @@ export class Product {
 
   @OneToMany(() => ProductRegion, (r) => r.product, { cascade: ['insert','update'] })
   regions: ProductRegion[]; // Optional: For region-based variants
+
+  @OneToMany(() => ProductNetwork, (n) => n.product, { cascade: ['insert','update'] })
+  networks: ProductNetwork[]; // Optional: For network-based variants (WiFi, WiFi+Cellular)
 
   @OneToMany(() => ProductColor, (c) => c.product, { cascade: ['insert','update'] })
   directColors: ProductColor[]; // Optional: For direct color variants

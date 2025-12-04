@@ -11,7 +11,6 @@ import { ProductStorage } from './entities/product-storage.entity';
 import { ProductPrice } from './entities/product-price.entity';
 import { ProductImage } from './entities/product-image.entity';
 import { ProductVideo } from './entities/product-video.entity';
-import { SpecGroup } from './entities/spec-group.entity';
 import { ProductSpecification } from './entities/product-specification.entity';
 import { ProductService } from './products.service';
 import { ProductsController } from './products.controller';
@@ -28,7 +27,6 @@ import { ProductsController } from './products.controller';
       ProductPrice,
       ProductImage,
       ProductVideo,
-      SpecGroup,
       ProductSpecification,
     ]),
   ],

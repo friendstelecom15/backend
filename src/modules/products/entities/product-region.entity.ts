@@ -11,12 +11,12 @@ import {
 import { ObjectId } from 'mongodb';
 import { Product } from './product-new.entity';
 import { ProductColor } from './product-color.entity';
+import { ProductStorage } from './product-storage.entity';
 @Entity('product_regions')
 @Index(['productId', 'regionName'], { unique: true, sparse: true })
 export class ProductRegion {
   @ObjectIdColumn()
   id: ObjectId;
-
   @Column()
   productId: ObjectId;
 
@@ -35,6 +35,9 @@ export class ProductRegion {
 
   @OneToMany(() => ProductColor, (color) => color.region, { cascade: true })
   colors: ProductColor[];
+
+  @OneToMany(() => ProductStorage, (storage) => storage.region, { cascade: true })
+  defaultStorages: ProductStorage[]; // Shared storages for all colors in this region
 
   @CreateDateColumn()
   createdAt: Date;

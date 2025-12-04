@@ -114,11 +114,29 @@ export class CreateProductColorDto {
   @Min(0)
   singleComparePrice?: number;
 
+  @ApiPropertyOptional({ description: 'Discount percent for color-only products', example: 10 })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  singleDiscountPercent?: number;
+
+  @ApiPropertyOptional({ description: 'Discount price for color-only products', example: 2691 })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  singleDiscountPrice?: number;
+
   @ApiPropertyOptional({ description: 'Stock quantity for color-only products', example: 50 })
   @IsOptional()
   @IsNumber()
   @Min(0)
   singleStockQuantity?: number;
+
+  @ApiPropertyOptional({ description: 'Low stock alert for color-only products', example: 5 })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  singleLowStockAlert?: number;
 
   @ApiPropertyOptional({ description: 'Color-specific features', example: ['Wireless Charging', 'iPhone 17'] })
   @IsOptional()
@@ -132,7 +150,12 @@ export class CreateProductColorDto {
   @Min(0)
   displayOrder?: number;
 
-  @ApiPropertyOptional({ description: 'Storage variants for this color (when hasStorage=true)', type: [CreateProductStorageDto] })
+  @ApiPropertyOptional({ description: 'Use region default storages? (default: true). Set false to use custom storages for this color', example: true })
+  @IsOptional()
+  @IsBoolean()
+  useDefaultStorages?: boolean;
+
+  @ApiPropertyOptional({ description: 'Custom storage variants for this color (only if useDefaultStorages=false)', type: [CreateProductStorageDto] })
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
@@ -158,7 +181,45 @@ export class CreateProductRegionDto {
   @Min(0)
   displayOrder?: number;
 
+  @ApiPropertyOptional({ description: 'Default storages shared by all colors (unless color has custom storages)', type: [CreateProductStorageDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateProductStorageDto)
+  defaultStorages?: CreateProductStorageDto[];
+
   @ApiPropertyOptional({ description: 'Color variants for this region', type: [CreateProductColorDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateProductColorDto)
+  colors?: CreateProductColorDto[];
+}
+
+// ==================== Network DTO ====================
+export class CreateProductNetworkDto {
+  @ApiProperty({ description: 'Network type', example: 'WiFi+ Cellular' })
+  @IsString()
+  @IsNotEmpty()
+  networkType: string;
+
+  @ApiPropertyOptional({ description: 'Is this the default network?', example: false })
+  @IsOptional()
+  @IsBoolean()
+  isDefault?: boolean;
+
+  @ApiPropertyOptional({ description: 'Display order', example: 2 })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  displayOrder?: number;
+
+  @ApiPropertyOptional({ description: 'Price adjustment for this network type (can be positive or negative)', example: 5000 })
+  @IsOptional()
+  @IsNumber()
+  priceAdjustment?: number;
+
+  @ApiPropertyOptional({ description: 'Color variants for this network type', type: [CreateProductColorDto] })
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
@@ -210,13 +271,13 @@ export class CreateProductVideoDto {
 }
 
 // ==================== Specification DTO ====================
-export class CreateProductSpecDto {
-  @ApiProperty({ description: 'Specification key', example: 'Screen Size' })
+export class CreateProductSpecificationDto {
+  @ApiProperty({ description: 'Specification key/title', example: 'Brand' })
   @IsString()
   @IsNotEmpty()
   specKey: string;
 
-  @ApiProperty({ description: 'Specification value', example: '6.7 inches' })
+  @ApiProperty({ description: 'Specification value', example: 'Apple' })
   @IsString()
   @IsNotEmpty()
   specValue: string;
@@ -226,31 +287,6 @@ export class CreateProductSpecDto {
   @IsNumber()
   @Min(0)
   displayOrder?: number;
-}
-
-export class CreateProductSpecificationDto {
-  @ApiProperty({ description: 'Specification group name', example: 'Display' })
-  @IsString()
-  @IsNotEmpty()
-  groupName: string;
-
-  @ApiPropertyOptional({ description: 'Display order', example: 1 })
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  displayOrder?: number;
-
-  @ApiPropertyOptional({ description: 'Icon for this group', example: 'display-icon' })
-  @IsOptional()
-  @IsString()
-  icon?: string;
-
-  @ApiProperty({ description: 'Specifications in this group', type: [CreateProductSpecDto] })
-  @IsArray()
-  @ArrayMinSize(1)
-  @ValidateNested({ each: true })
-  @Type(() => CreateProductSpecDto)
-  specs: CreateProductSpecDto[];
 }
 
 // ==================== Main Product DTO ====================
@@ -264,6 +300,11 @@ export class CreateProductNewDto {
   @IsString()
   @IsNotEmpty()
   slug: string;
+
+  @ApiPropertyOptional({ description: 'Short product description', example: 'Powerful A17 Pro chip with titanium design' })
+  @IsOptional()
+  @IsString()
+  shortDescription?: string;
 
   @ApiPropertyOptional({ description: 'Product description', example: 'Latest flagship phone' })
   @IsOptional()
@@ -325,6 +366,11 @@ export class CreateProductNewDto {
   @IsOptional()
   @IsBoolean()
   freeShipping?: boolean;
+
+  @ApiPropertyOptional({ description: 'EMI available?', example: false })
+  @IsOptional()
+  @IsBoolean()
+  isEmi?: boolean;
 
   // Reward & Booking
   @ApiPropertyOptional({ description: 'Reward points', example: 1500 })
@@ -399,6 +445,13 @@ export class CreateProductNewDto {
   @ValidateNested({ each: true })
   @Type(() => CreateProductRegionDto)
   regions?: CreateProductRegionDto[];
+
+  @ApiPropertyOptional({ description: 'Product networks with variants (for network-based products like iPads)', type: [CreateProductNetworkDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateProductNetworkDto)
+  networks?: CreateProductNetworkDto[];
 
   @ApiPropertyOptional({ description: 'Direct color variants (for products without regions)', type: [CreateProductColorDto] })
   @IsOptional()

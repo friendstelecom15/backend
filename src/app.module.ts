@@ -28,7 +28,7 @@ import { EmiModule } from './modules/emi/emi.modul';
       url: process.env.DATABASE_URL,
       // extra: {},
       entities: [__dirname + '/**/*.entity{.ts,.js}'],
-      synchronize: true, // Disable in production!
+      synchronize: false, // Disabled to prevent index conflicts with manual partialFilterExpression indexes
     }),
     AuthModule,
     UsersModule,

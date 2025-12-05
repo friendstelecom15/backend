@@ -7,6 +7,8 @@ import {
   OneToOne,
   JoinColumn,
   Index,
+  BeforeInsert,
+  BeforeUpdate,
 } from 'typeorm';
 import { ObjectId } from 'mongodb';
 import { ProductColor } from './product-color.entity';
@@ -15,8 +17,21 @@ import { ProductNetwork } from './product-network.entity';
 import { ProductPrice } from './product-price.entity';
 
 @Entity('product_storages')
-@Index(['colorId', 'storageSize'], { unique: true, sparse: true })
-@Index(['colorId', 'networkId', 'storageSize'], { unique: true, sparse: true })
+@Index('IDX_product_storage_color_unique', ['colorId', 'storageSize'], {
+  unique: true,
+  sparse: true,
+  background: true,
+})
+@Index('IDX_product_storage_region_unique', ['regionId', 'storageSize'], {
+  unique: true,
+  sparse: true,
+  background: true,
+})
+@Index('IDX_product_storage_network_unique', ['networkId', 'storageSize'], {
+  unique: true,
+  sparse: true,
+  background: true,
+})
 export class ProductStorage {
   @ObjectIdColumn()
   id: ObjectId;
@@ -51,4 +66,12 @@ export class ProductStorage {
 
   @CreateDateColumn()
   createdAt: Date;
+
+  @BeforeInsert()
+  @BeforeUpdate()
+  removeNulls() {
+    if (!this.colorId) delete this.colorId;
+    if (!this.regionId) delete this.regionId;
+    if (!this.networkId) delete this.networkId;
+  }
 }

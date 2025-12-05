@@ -7,8 +7,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, In } from 'typeorm';
 import { ObjectId } from 'mongodb';
-import { CreateProductNewDto } from './dto/create-product-new.dto';
-import { UpdateProductNewDto } from './dto/update-product-new.dto';
+import { CreateBasicProductDto, CreateNetworkProductDto, CreateRegionProductDto } from './dto/create-product-new.dto';
 import { Product } from './entities/product-new.entity';
 import { ProductRegion } from './entities/product-region.entity';
 import { ProductNetwork } from './entities/product-network.entity';
@@ -28,381 +27,433 @@ export class ProductService {
   ) {}
 
   /**
-   * Create a complete product with all variants, pricing, images, specs in a single transaction
+   * Create Basic Product
    */
-  async create(dto: CreateProductNewDto): Promise<any> {
-    // Check if product with same slug already exists
-    const existingProduct = await this.productRepository.findOne({
-      where: { slug: dto.slug },
-    });
-
-    if (existingProduct) {
-      throw new BadRequestException(`Product with slug "${dto.slug}" already exists`);
-    }
-
-    // Check for duplicate productCode
-    if (dto.productCode) {
-      const existingCode = await this.productRepository.findOne({
-        where: { productCode: dto.productCode },
-      });
-      if (existingCode) {
-        throw new BadRequestException(`Product code "${dto.productCode}" already exists`);
-      }
-    }
-
-    // Check for duplicate SKU
-    if (dto.sku) {
-      const existingSku = await this.productRepository.findOne({
-        where: { sku: dto.sku },
-      });
-      if (existingSku) {
-        throw new BadRequestException(`SKU "${dto.sku}" already exists`);
-      }
-    }
-
+  async createBasicProduct(createProductDto: CreateBasicProductDto) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
-    let savedProduct: Product | null = null;
-
     try {
       // 1. Create Product
-      const product = queryRunner.manager.create(Product, {
-        name: dto.name,
-        slug: dto.slug,
-        shortDescription: dto.shortDescription,
-        description: dto.description,
-        categoryId: dto.categoryId ? new ObjectId(dto.categoryId) : undefined,
-        brandId: dto.brandId ? new ObjectId(dto.brandId) : undefined,
-        productCode: dto.productCode,
-        sku: dto.sku,
-        warranty: dto.warranty,
-        // Simple product fields
-        price: dto.price,
-        comparePrice: dto.comparePrice,
-        stockQuantity: dto.stockQuantity,
-        lowStockAlert: dto.lowStockAlert,
-        isActive: dto.isActive ?? true,
-        isOnline: dto.isOnline ?? true,
-        isPos: dto.isPos ?? true,
-        isPreOrder: dto.isPreOrder ?? false,
-        isOfficial: dto.isOfficial ?? false,
-        freeShipping: dto.freeShipping ?? false,
-        isEmi: dto.isEmi ?? false,
-        rewardPoints: dto.rewardPoints ?? 0,
-        minBookingPrice: dto.minBookingPrice ?? 0,
-        seoTitle: dto.seoTitle,
-        seoDescription: dto.seoDescription,
-        seoKeywords: dto.seoKeywords,
-        seoCanonical: dto.seoCanonical,
-        tags: dto.tags,
-        faqIds: dto.faqIds ? dto.faqIds.map(id => new ObjectId(id)) : undefined,
-      });
+      const product = new Product();
+      Object.assign(product, createProductDto);
+      
+      // Remove relations from product object to save them separately
+      delete (product as any).colors;
+      delete (product as any).images;
+      delete (product as any).videos;
+      delete (product as any).specifications;
 
-      savedProduct = await queryRunner.manager.save(Product, product);
+      const savedProduct = await queryRunner.manager.save(Product, product);
 
-      // 2. Create Direct Colors (for products without regions)
-      if (dto.directColors && dto.directColors.length > 0) {
-        for (const colorDto of dto.directColors) {
-          const color = queryRunner.manager.create(ProductColor, {
-            productId: savedProduct.id,
-            colorName: colorDto.colorName,
-            colorImage: colorDto.colorImage,
-            hasStorage: colorDto.hasStorage ?? false, // Default false for simple products
-            singlePrice: colorDto.singlePrice,
-            singleComparePrice: colorDto.singleComparePrice,
-            singleDiscountPercent: colorDto.singleDiscountPercent,
-            singleDiscountPrice: colorDto.singleDiscountPrice,
-            singleStockQuantity: colorDto.singleStockQuantity,
-            singleLowStockAlert: colorDto.singleLowStockAlert ?? 5,
-            features: colorDto.features,
-            displayOrder: colorDto.displayOrder ?? 0,
-          });
+      // 2. Save Images
+      if ((createProductDto as any).images) {
+        const images = (createProductDto as any).images.map((img: any) => {
+          const image = new ProductImage();
+          image.productId = savedProduct.id;
+          image.imageUrl = img.url;
+          image.isThumbnail = img.isThumbnail;
+          image.altText = img.altText;
+          image.displayOrder = img.displayOrder;
+          return image;
+        });
+        await queryRunner.manager.save(ProductImage, images);
+      }
+
+      // 3. Save Videos
+      if ((createProductDto as any).videos) {
+        const videos = (createProductDto as any).videos.map((vid: any) => {
+          const video = new ProductVideo();
+          video.productId = savedProduct.id;
+          video.videoUrl = vid.videoUrl;
+          video.videoType = vid.videoType;
+          video.displayOrder = vid.displayOrder;
+          return video;
+        });
+        await queryRunner.manager.save(ProductVideo, videos);
+      }
+
+      // 4. Save Specifications
+      if ((createProductDto as any).specifications) {
+        const specs = (createProductDto as any).specifications.map((s: any) => {
+          const spec = new ProductSpecification();
+          spec.productId = savedProduct.id;
+          spec.specKey = s.specKey;
+          spec.specValue = s.specValue;
+          spec.displayOrder = s.displayOrder;
+          return spec;
+        });
+        await queryRunner.manager.save(ProductSpecification, specs);
+      }
+
+      // 5. Save Direct Colors (Basic Product Variants)
+      if ((createProductDto as any).colors) {
+        for (const c of (createProductDto as any).colors) {
+          const color = new ProductColor();
+          color.productId = savedProduct.id;
+          color.colorName = c.colorName;
+          color.colorImage = c.colorImage;
+          color.hasStorage = c.hasStorage ?? false;
+          color.singlePrice = c.singlePrice;
+          color.singleComparePrice = c.singleComparePrice;
+          color.singleStockQuantity = c.singleStockQuantity;
+          // Map new fields
+          color.regularPrice = c.regularPrice ?? c.singlePrice;
+          color.discountPrice = c.discountPrice ?? c.singleDiscountPrice;
+          color.stockQuantity = c.stockQuantity ?? c.singleStockQuantity;
+          
+          color.displayOrder = c.displayOrder ?? 0;
+          
           const savedColor = await queryRunner.manager.save(ProductColor, color);
 
-          // Create storages if hasStorage = true
-          if (colorDto.hasStorage && colorDto.storages && colorDto.storages.length > 0) {
-            for (const storageDto of colorDto.storages) {
-              const storage = queryRunner.manager.create(ProductStorage, {
-                colorId: savedColor.id,
-                storageSize: storageDto.storageSize,
-                displayOrder: storageDto.displayOrder ?? 0,
-              });
-              const savedStorage = await queryRunner.manager.save(ProductStorage, storage);
-
-              // Create Price for this storage
-              const price = new ProductPrice();
-              price.storageId = savedStorage.id;
-              price.regularPrice = storageDto.price.regularPrice;
-              price.comparePrice = storageDto.price.comparePrice;
-              price.discountPrice = storageDto.price.discountPrice;
-              price.discountPercent = storageDto.price.discountPercent;
-              price.campaignPrice = storageDto.price.campaignPrice;
-              price.campaignStart = storageDto.price.campaignStart
-                ? new Date(storageDto.price.campaignStart)
-                : undefined;
-              price.campaignEnd = storageDto.price.campaignEnd
-                ? new Date(storageDto.price.campaignEnd)
-                : undefined;
-              price.stockQuantity = storageDto.price.stockQuantity;
-              price.lowStockAlert = storageDto.price.lowStockAlert ?? 5;
-              await queryRunner.manager.save(ProductPrice, price);
-            }
-          }
-        }
-      }
-
-      // 3. Create Networks → Colors → Storages (for network-based products like phones with carrier variants)
-      if (dto.networks && dto.networks.length > 0) {
-        for (const networkDto of dto.networks) {
-          const network = queryRunner.manager.create(ProductNetwork, {
-            productId: savedProduct.id,
-            networkType: networkDto.networkType,
-            priceAdjustment: networkDto.priceAdjustment ?? 0,
-            isDefault: networkDto.isDefault ?? false,
-            displayOrder: networkDto.displayOrder ?? 0,
-          });
-          const savedNetwork = await queryRunner.manager.save(ProductNetwork, network);
-
-          // Create colors within this network
-          if (networkDto.colors && networkDto.colors.length > 0) {
-            for (const colorDto of networkDto.colors) {
-              const color = queryRunner.manager.create(ProductColor, {
-                networkId: savedNetwork.id,
-                colorName: colorDto.colorName,
-                colorImage: colorDto.colorImage,
-                hasStorage: colorDto.hasStorage ?? true,
-                singlePrice: colorDto.singlePrice,
-                singleComparePrice: colorDto.singleComparePrice,
-                singleStockQuantity: colorDto.singleStockQuantity,
-                features: colorDto.features,
-                displayOrder: colorDto.displayOrder ?? 0,
-              });
-              const savedColor = await queryRunner.manager.save(ProductColor, color);
-
-              // Create storages if hasStorage = true
-              if (colorDto.hasStorage && colorDto.storages && colorDto.storages.length > 0) {
-                for (const storageDto of colorDto.storages) {
-                  const storage = queryRunner.manager.create(ProductStorage, {
-                    colorId: savedColor.id,
-                    storageSize: storageDto.storageSize,
-                    displayOrder: storageDto.displayOrder ?? 0,
-                  });
-                  const savedStorage = await queryRunner.manager.save(ProductStorage, storage);
-
-                  // Create Price for this storage
-                  const price = new ProductPrice();
-                  price.storageId = savedStorage.id;
-                  price.regularPrice = storageDto.price.regularPrice;
-                  price.comparePrice = storageDto.price.comparePrice;
-                  price.discountPrice = storageDto.price.discountPrice;
-                  price.discountPercent = storageDto.price.discountPercent;
-                  price.campaignPrice = storageDto.price.campaignPrice;
-                  price.campaignStart = storageDto.price.campaignStart
-                    ? new Date(storageDto.price.campaignStart)
-                    : undefined;
-                  price.campaignEnd = storageDto.price.campaignEnd
-                    ? new Date(storageDto.price.campaignEnd)
-                    : undefined;
-                  price.stockQuantity = storageDto.price.stockQuantity;
-                  price.lowStockAlert = storageDto.price.lowStockAlert ?? 5;
-                  await queryRunner.manager.save(ProductPrice, price);
-                }
-              }
-            }
-          }
-        }
-      }
-
-      // 4. Create Regions → Default Storages + Colors (for region-based products)
-      if (dto.regions && dto.regions.length > 0) {
-        for (const regionDto of dto.regions) {
-          const region = queryRunner.manager.create(ProductRegion, {
-            productId: savedProduct.id,
-            regionName: regionDto.regionName,
-            isDefault: regionDto.isDefault ?? false,
-            displayOrder: regionDto.displayOrder ?? 0,
-          });
-          const savedRegion = await queryRunner.manager.save(ProductRegion, region);
-
-          // 4a. Create default storages for this region (shared by all colors)
-          if (regionDto.defaultStorages && regionDto.defaultStorages.length > 0) {
-            for (const storageDto of regionDto.defaultStorages) {
-              const storage = queryRunner.manager.create(ProductStorage, {
-                regionId: savedRegion.id,
-                storageSize: storageDto.storageSize,
-                displayOrder: storageDto.displayOrder ?? 0,
-              });
-              const savedStorage = await queryRunner.manager.save(ProductStorage, storage);
-
-              // Create Price for this default storage
-              const price = new ProductPrice();
-              price.storageId = savedStorage.id;
-              price.regularPrice = storageDto.price.regularPrice;
-              price.comparePrice = storageDto.price.comparePrice;
-              price.discountPrice = storageDto.price.discountPrice;
-              price.discountPercent = storageDto.price.discountPercent;
-              price.campaignPrice = storageDto.price.campaignPrice;
-              price.campaignStart = storageDto.price.campaignStart
-                ? new Date(storageDto.price.campaignStart)
-                : undefined;
-              price.campaignEnd = storageDto.price.campaignEnd
-                ? new Date(storageDto.price.campaignEnd)
-                : undefined;
-              price.stockQuantity = storageDto.price.stockQuantity;
-              price.lowStockAlert = storageDto.price.lowStockAlert ?? 5;
-              await queryRunner.manager.save(ProductPrice, price);
-            }
-          }
-
-          // 4b. Create colors (which may use default storages or have custom storages)
-          if (regionDto.colors && regionDto.colors.length > 0) {
-            for (const colorDto of regionDto.colors) {
-              const useDefaultStorages = colorDto.useDefaultStorages ?? true;
+          // Save Storages for this Color
+          if (c.storages && c.storages.length > 0) {
+            for (const s of c.storages) {
+              const storage = new ProductStorage();
+              storage.colorId = savedColor.id;
+              storage.storageSize = s.storageSize;
+              storage.displayOrder = s.displayOrder ?? 0;
               
-              const color = queryRunner.manager.create(ProductColor, {
-                regionId: savedRegion.id,
-                colorName: colorDto.colorName,
-                colorImage: colorDto.colorImage,
-                hasStorage: colorDto.hasStorage ?? true,
-                useDefaultStorages: useDefaultStorages,
-                singlePrice: colorDto.singlePrice,
-                singleComparePrice: colorDto.singleComparePrice,
-                singleStockQuantity: colorDto.singleStockQuantity,
-                features: colorDto.features,
-                displayOrder: colorDto.displayOrder ?? 0,
-              });
-              const savedColor = await queryRunner.manager.save(ProductColor, color);
+              const savedStorage = await queryRunner.manager.save(ProductStorage, storage);
 
-              // Create custom storages only if useDefaultStorages = false
-              if (colorDto.hasStorage && !useDefaultStorages && colorDto.storages && colorDto.storages.length > 0) {
-                for (const storageDto of colorDto.storages) {
-                  const storage = queryRunner.manager.create(ProductStorage, {
-                    colorId: savedColor.id,
-                    storageSize: storageDto.storageSize,
-                    displayOrder: storageDto.displayOrder ?? 0,
-                  });
-                  const savedStorage = await queryRunner.manager.save(ProductStorage, storage);
-
-                  // Create Price for this custom storage
-                  const price = new ProductPrice();
-                  price.storageId = savedStorage.id;
-                  price.regularPrice = storageDto.price.regularPrice;
-                  price.comparePrice = storageDto.price.comparePrice;
-                  price.discountPrice = storageDto.price.discountPrice;
-                  price.discountPercent = storageDto.price.discountPercent;
-                  price.campaignPrice = storageDto.price.campaignPrice;
-                  price.campaignStart = storageDto.price.campaignStart
-                    ? new Date(storageDto.price.campaignStart)
-                    : undefined;
-                  price.campaignEnd = storageDto.price.campaignEnd
-                    ? new Date(storageDto.price.campaignEnd)
-                    : undefined;
-                  price.stockQuantity = storageDto.price.stockQuantity;
-                  price.lowStockAlert = storageDto.price.lowStockAlert ?? 5;
-                  await queryRunner.manager.save(ProductPrice, price);
-                }
-              }
+              // Save Price for this Storage
+              const price = new ProductPrice();
+              price.storageId = savedStorage.id;
+              price.regularPrice = s.regularPrice ?? 0;
+              price.comparePrice = s.comparePrice;
+              price.discountPrice = s.discountPrice;
+              price.discountPercent = s.discountPercent;
+              price.stockQuantity = s.stockQuantity ?? 0;
+              price.lowStockAlert = s.lowStockAlert ?? 0;
+              
+              await queryRunner.manager.save(ProductPrice, price);
             }
           }
-        }
-      }
-
-      // 5. Create Images
-      if (dto.images && dto.images.length > 0) {
-        for (const imageDto of dto.images) {
-          const image = queryRunner.manager.create(ProductImage, {
-            productId: savedProduct.id,
-            imageUrl: imageDto.imageUrl,
-            isThumbnail: imageDto.isThumbnail ?? false,
-            altText: imageDto.altText,
-            displayOrder: imageDto.displayOrder ?? 0,
-          });
-          await queryRunner.manager.save(ProductImage, image);
-        }
-      }
-
-      // 6. Create Videos
-      if (dto.videos && dto.videos.length > 0) {
-        for (const videoDto of dto.videos) {
-          const video = queryRunner.manager.create(ProductVideo, {
-            productId: savedProduct.id,
-            videoUrl: videoDto.videoUrl,
-            videoType: videoDto.videoType,
-            displayOrder: videoDto.displayOrder ?? 0,
-          });
-          await queryRunner.manager.save(ProductVideo, video);
-        }
-      }
-
-      // 7. Create Specifications
-      if (dto.specifications && dto.specifications.length > 0) {
-        for (const spec of dto.specifications) {
-          const productSpec = queryRunner.manager.create(ProductSpecification, {
-            productId: savedProduct.id,
-            specKey: spec.specKey,
-            specValue: spec.specValue,
-            displayOrder: spec.displayOrder ?? 0,
-          });
-          await queryRunner.manager.save(ProductSpecification, productSpec);
         }
       }
 
       await queryRunner.commitTransaction();
-
-      // Return complete product with all relations
       return this.findOne(savedProduct.slug);
-    } catch (error) {
+    } catch (err) {
       await queryRunner.rollbackTransaction();
-      
-      // Log the full error for debugging
-      console.error('Product creation error:', {
-        code: error.code,
-        message: error.message,
-        stack: error.stack,
-      });
-
-      // Manual cleanup for MongoDB (since transactions don't work properly without replica set)
-      try {
-        if (error.code === 11000 || error.message?.includes('duplicate key') || error.message?.includes('E11000')) {
-          console.log('Attempting manual cleanup due to duplicate key error...');
-          
-          // Check if it's a null regionName error
-          if (error.message?.includes('regionName: null')) {
-            // Delete regions with null regionName for this product
-            await this.dataSource.manager.delete('ProductRegion', { 
-              productId: savedProduct?.id, 
-              regionName: null as any 
-            });
-            console.log('Cleaned up regions with null regionName');
-          }
-          
-          const duplicateField = this.extractDuplicateField(error);
-          throw new BadRequestException(
-            `${duplicateField} already exists. Please use a different value. Database has been cleaned up, please try again.`,
-          );
-        }
-      } catch (cleanupError) {
-        console.error('Cleanup error:', cleanupError);
+      if (err.code === 11000) {
+        throw new BadRequestException(this.extractDuplicateField(err));
       }
-      
-      // Handle validation errors
-      if (error.name === 'ValidationError') {
-        throw new BadRequestException(`Validation error: ${error.message}`);
-      }
-      
-      throw new InternalServerErrorException(
-        `Failed to create product: ${error.message}`,
-      );
+      throw new InternalServerErrorException(err.message);
     } finally {
       await queryRunner.release();
     }
   }
 
   /**
-   * Get all products with filters and pagination
+   * Create Network Product
    */
+  async createNetworkProduct(createProductDto: CreateNetworkProductDto) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // 1. Create Product
+      const product = new Product();
+      Object.assign(product, createProductDto);
+      
+      delete (product as any).networks;
+      delete (product as any).images;
+      delete (product as any).videos;
+      delete (product as any).specifications;
+
+      const savedProduct = await queryRunner.manager.save(Product, product);
+
+      // 2. Save Images, Videos, Specs (Same as Basic)
+      if ((createProductDto as any).images) {
+        const images = (createProductDto as any).images.map((img: any) => {
+          const image = new ProductImage();
+          image.productId = savedProduct.id;
+          image.imageUrl = img.url;
+          image.isThumbnail = img.isThumbnail;
+          image.altText = img.altText;
+          image.displayOrder = img.displayOrder;
+          return image;
+        });
+        await queryRunner.manager.save(ProductImage, images);
+      }
+
+      if ((createProductDto as any).videos) {
+        const videos = (createProductDto as any).videos.map((vid: any) => {
+          const video = new ProductVideo();
+          video.productId = savedProduct.id;
+          video.videoUrl = vid.videoUrl;
+          video.videoType = vid.videoType;
+          video.displayOrder = vid.displayOrder;
+          return video;
+        });
+        await queryRunner.manager.save(ProductVideo, videos);
+      }
+
+      if ((createProductDto as any).specifications) {
+        const specs = (createProductDto as any).specifications.map((s: any) => {
+          const spec = new ProductSpecification();
+          spec.productId = savedProduct.id;
+          spec.specKey = s.specKey;
+          spec.specValue = s.specValue;
+          spec.displayOrder = s.displayOrder;
+          return spec;
+        });
+        await queryRunner.manager.save(ProductSpecification, specs);
+      }
+
+      // 3. Save Networks
+      if (createProductDto.networks) {
+        for (const n of createProductDto.networks) {
+          const network = new ProductNetwork();
+          network.productId = savedProduct.id;
+          network.networkType = n.networkName || n.name; // Handle both naming conventions
+          network.priceAdjustment = n.priceAdjustment;
+          network.isDefault = n.isDefault ?? false;
+          network.displayOrder = n.displayOrder ?? 0;
+
+          const savedNetwork = await queryRunner.manager.save(ProductNetwork, network);
+
+          // Save Default Storages for Network
+          if (n.defaultStorages) {
+            for (const ds of n.defaultStorages) {
+              const storage = new ProductStorage();
+              storage.networkId = savedNetwork.id; // Linked to network directly
+              storage.storageSize = ds.storageSize;
+              storage.displayOrder = ds.displayOrder ?? 0;
+              
+              const savedStorage = await queryRunner.manager.save(ProductStorage, storage);
+
+              const price = new ProductPrice();
+              price.storageId = savedStorage.id;
+              price.regularPrice = ds.regularPrice ?? 0;
+              price.comparePrice = ds.comparePrice;
+              price.discountPrice = ds.discountPrice;
+              price.discountPercent = (ds as any).discountPercent;
+              price.stockQuantity = ds.stockQuantity ?? 0;
+              price.lowStockAlert = ds.lowStockAlert ?? 0;
+              
+              await queryRunner.manager.save(ProductPrice, price);
+            }
+          }
+
+          // Save Colors for Network
+          if (n.colors) {
+            for (const c of n.colors) {
+              const color = new ProductColor();
+              color.networkId = savedNetwork.id;
+              color.colorName = c.colorName;
+              color.colorImage = c.colorImage;
+              color.hasStorage = (c as any).hasStorage ?? true;
+              color.useDefaultStorages = (c as any).useDefaultStorages ?? true;
+              color.singlePrice = c.regularPrice; // Map regularPrice to singlePrice if no storage
+              color.singleComparePrice = c.comparePrice;
+              color.singleStockQuantity = c.stockQuantity;
+              // Map new fields
+              color.regularPrice = c.regularPrice;
+              color.discountPrice = c.discountPrice;
+              color.stockQuantity = c.stockQuantity;
+              
+              color.displayOrder = c.displayOrder ?? 0;
+
+              const savedColor = await queryRunner.manager.save(ProductColor, color);
+
+              // Save Custom Storages if not using defaults
+              if (c.storages && !color.useDefaultStorages) {
+                for (const s of c.storages) {
+                  const storage = new ProductStorage();
+                  storage.colorId = savedColor.id;
+                  storage.storageSize = s.storageSize;
+                  storage.displayOrder = s.displayOrder ?? 0;
+                  
+                  const savedStorage = await queryRunner.manager.save(ProductStorage, storage);
+
+                  const price = new ProductPrice();
+                  price.storageId = savedStorage.id;
+                  price.regularPrice = s.regularPrice ?? 0;
+                  price.comparePrice = s.comparePrice;
+                  price.discountPrice = s.discountPrice;
+                  price.discountPercent = (s as any).discountPercent;
+                  price.stockQuantity = s.stockQuantity ?? 0;
+                  price.lowStockAlert = s.lowStockAlert ?? 0;
+                  
+                  await queryRunner.manager.save(ProductPrice, price);
+                }
+              }
+            }
+          }
+        }
+      }
+
+      await queryRunner.commitTransaction();
+      return this.findOne(savedProduct.slug);
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      if (err.code === 11000) {
+        throw new BadRequestException(this.extractDuplicateField(err));
+      }
+      throw new InternalServerErrorException(err.message);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  /**
+   * Create Region Product
+   */
+  async createRegionProduct(createProductDto: CreateRegionProductDto) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // 1. Create Product
+      const product = new Product();
+      Object.assign(product, createProductDto);
+      
+      delete (product as any).regions;
+      delete (product as any).images;
+      delete (product as any).videos;
+      delete (product as any).specifications;
+
+      const savedProduct = await queryRunner.manager.save(Product, product);
+
+      // 2. Save Images, Videos, Specs
+      if ((createProductDto as any).images) {
+        const images = (createProductDto as any).images.map((img: any) => {
+          const image = new ProductImage();
+          image.productId = savedProduct.id;
+          image.imageUrl = img.url;
+          image.isThumbnail = img.isThumbnail;
+          image.altText = img.altText;
+          image.displayOrder = img.displayOrder;
+          return image;
+        });
+        await queryRunner.manager.save(ProductImage, images);
+      }
+
+      if ((createProductDto as any).videos) {
+        const videos = (createProductDto as any).videos.map((vid: any) => {
+          const video = new ProductVideo();
+          video.productId = savedProduct.id;
+          video.videoUrl = vid.videoUrl;
+          video.videoType = vid.videoType;
+          video.displayOrder = vid.displayOrder;
+          return video;
+        });
+        await queryRunner.manager.save(ProductVideo, videos);
+      }
+
+      if ((createProductDto as any).specifications) {
+        const specs = (createProductDto as any).specifications.map((s: any) => {
+          const spec = new ProductSpecification();
+          spec.productId = savedProduct.id;
+          spec.specKey = s.specKey;
+          spec.specValue = s.specValue;
+          spec.displayOrder = s.displayOrder;
+          return spec;
+        });
+        await queryRunner.manager.save(ProductSpecification, specs);
+      }
+
+      // 3. Save Regions
+      if (createProductDto.regions) {
+        for (const r of createProductDto.regions) {
+          const region = new ProductRegion();
+          region.productId = savedProduct.id;
+          region.regionName = r.regionName || r.name;
+          region.isDefault = r.isDefault ?? false;
+          region.displayOrder = r.displayOrder ?? 0;
+
+          const savedRegion = await queryRunner.manager.save(ProductRegion, region);
+
+          // Save Default Storages for Region
+          // Note: DTO might have defaultStorages as strings or objects depending on FE. 
+          // Based on FE code: defaultStorages is array of objects with prices.
+          if ((r as any).defaultStorages) {
+            for (const ds of (r as any).defaultStorages) {
+              const storage = new ProductStorage();
+              storage.regionId = savedRegion.id;
+              storage.storageSize = ds.storageSize;
+              storage.displayOrder = ds.displayOrder ?? 0;
+              
+              const savedStorage = await queryRunner.manager.save(ProductStorage, storage);
+
+              const price = new ProductPrice();
+              price.storageId = savedStorage.id;
+              price.regularPrice = ds.regularPrice ?? 0;
+              price.comparePrice = ds.comparePrice;
+              price.discountPrice = ds.discountPrice;
+              price.discountPercent = ds.discountPercent;
+              price.stockQuantity = ds.stockQuantity ?? 0;
+              price.lowStockAlert = ds.lowStockAlert ?? 0;
+              
+              await queryRunner.manager.save(ProductPrice, price);
+            }
+          }
+
+          // Save Colors for Region
+          if ((r as any).colors) {
+            for (const c of (r as any).colors) {
+              const color = new ProductColor();
+              color.regionId = savedRegion.id;
+              color.colorName = c.colorName;
+              color.colorImage = c.colorImage;
+              color.hasStorage = c.hasStorage ?? true;
+              color.useDefaultStorages = c.useDefaultStorages ?? true;
+              color.singlePrice = c.singlePrice;
+              color.singleComparePrice = c.singleComparePrice;
+              color.singleStockQuantity = c.singleStockQuantity;
+              // Map new fields
+              color.regularPrice = c.regularPrice ?? c.singlePrice;
+              color.discountPrice = c.discountPrice ?? c.singleDiscountPrice;
+              color.stockQuantity = c.stockQuantity ?? c.singleStockQuantity;
+              
+              color.displayOrder = c.displayOrder ?? 0;
+
+              const savedColor = await queryRunner.manager.save(ProductColor, color);
+
+              // Save Custom Storages if not using defaults
+              if (c.storages && !color.useDefaultStorages) {
+                for (const s of c.storages) {
+                  const storage = new ProductStorage();
+                  storage.colorId = savedColor.id;
+                  storage.storageSize = s.storageSize;
+                  storage.displayOrder = s.displayOrder ?? 0;
+                  
+                  const savedStorage = await queryRunner.manager.save(ProductStorage, storage);
+
+                  const price = new ProductPrice();
+                  price.storageId = savedStorage.id;
+                  price.regularPrice = s.regularPrice ?? 0;
+                  price.comparePrice = s.comparePrice;
+                  price.discountPrice = s.discountPrice;
+                  price.discountPercent = s.discountPercent;
+                  price.stockQuantity = s.stockQuantity ?? 0;
+                  price.lowStockAlert = s.lowStockAlert ?? 0;
+                  
+                  await queryRunner.manager.save(ProductPrice, price);
+                }
+              }
+            }
+          }
+        }
+      }
+
+      await queryRunner.commitTransaction();
+      return this.findOne(savedProduct.slug);
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      if (err.code === 11000) {
+        throw new BadRequestException(this.extractDuplicateField(err));
+      }
+      throw new InternalServerErrorException(err.message);
+    } finally {
+      await queryRunner.release();
+    }
+  }
   async findAll(filters?: {
     categoryId?: string;
     brandId?: string;
@@ -415,7 +466,7 @@ export class ProductService {
     offset?: number;
   }) {
     const whereConditions: any = {};
-    
+
     if (filters?.categoryId) {
       whereConditions.categoryId = new ObjectId(filters.categoryId);
     }
@@ -431,22 +482,123 @@ export class ProductService {
 
     const products = await this.productRepository.find({
       where: whereConditions,
-      take: filters?.limit,
-      skip: filters?.offset,
+      take: filters?.limit || 50,
+      skip: filters?.offset || 0,
       order: { createdAt: 'DESC' },
+      relations: ['images', 'videos', 'specifications'],
     });
 
-    // For MongoDB, we need to load relations separately
-    const productsWithRelations = await Promise.all(
+    if (products.length === 0) {
+      return [];
+    }
+
+    // Load nested relations for each product
+    const productsWithFullRelations = await Promise.all(
       products.map(async (product) => {
-        return this.productRepository.findOne({
-          where: { id: product.id } as any,
-          relations: ['images', 'videos', 'regions', 'networks', 'directColors', 'specifications'],
-        });
+        // Load networks with colors and storages
+        if (product.networks && product.networks.length > 0) {
+          for (const network of product.networks) {
+            const colors = await this.dataSource
+              .getMongoRepository(ProductColor)
+              .find({
+                where: { networkId: network.id } as any,
+              });
+
+            for (const color of colors) {
+              const storages = await this.dataSource
+                .getMongoRepository(ProductStorage)
+                .find({
+                  where: { colorId: color.id } as any,
+                });
+
+              for (const storage of storages) {
+                const price = await this.dataSource
+                  .getMongoRepository(ProductPrice)
+                  .findOne({
+                    where: { storageId: storage.id } as any,
+                  });
+                (storage as any).price = price;
+              }
+              (color as any).storages = storages;
+            }
+            (network as any).colors = colors;
+          }
+        }
+
+        // Load regions with defaultStorages and colors
+        if (product.regions && product.regions.length > 0) {
+          for (const region of product.regions) {
+            const defaultStorages = await this.dataSource
+              .getMongoRepository(ProductStorage)
+              .find({
+                where: { regionId: region.id } as any,
+              });
+
+            for (const storage of defaultStorages) {
+              const price = await this.dataSource
+                .getMongoRepository(ProductPrice)
+                .findOne({
+                  where: { storageId: storage.id } as any,
+                });
+              (storage as any).price = price;
+            }
+            (region as any).defaultStorages = defaultStorages;
+
+            const colors = await this.dataSource
+              .getMongoRepository(ProductColor)
+              .find({
+                where: { regionId: region.id } as any,
+              });
+
+            for (const color of colors) {
+              const storages = await this.dataSource
+                .getMongoRepository(ProductStorage)
+                .find({
+                  where: { colorId: color.id } as any,
+                });
+
+              for (const storage of storages) {
+                const price = await this.dataSource
+                  .getMongoRepository(ProductPrice)
+                  .findOne({
+                    where: { storageId: storage.id } as any,
+                  });
+                (storage as any).price = price;
+              }
+              (color as any).storages = storages;
+            }
+            (region as any).colors = colors;
+          }
+        }
+
+        // Load storages for directColors
+        if (product.directColors && product.directColors.length > 0) {
+          for (const color of product.directColors) {
+            const storages = await this.dataSource
+              .getMongoRepository(ProductStorage)
+              .find({
+                where: { colorId: color.id } as any,
+              });
+
+            for (const storage of storages) {
+              const price = await this.dataSource
+                .getMongoRepository(ProductPrice)
+                .findOne({
+                  where: { storageId: storage.id } as any,
+                });
+              (storage as any).price = price;
+            }
+            (color as any).storages = storages;
+          }
+        }
+
+        return product;
       }),
     );
 
-    return productsWithRelations.filter(p => p !== null).map((product) => this.formatProductResponse(product!));
+    return productsWithFullRelations.map((product) =>
+      this.formatProductResponse(product),
+    );
   }
 
   /**
@@ -455,7 +607,14 @@ export class ProductService {
   async findOne(slug: string) {
     const product = await this.productRepository.findOne({
       where: { slug },
-      relations: ['images', 'videos', 'regions', 'networks', 'directColors', 'specifications'],
+      relations: [
+        'images',
+        'videos',
+        'regions',
+        'networks',
+        'directColors',
+        'specifications',
+      ],
     });
 
     if (!product) {
@@ -466,21 +625,27 @@ export class ProductService {
     if (product.networks && product.networks.length > 0) {
       for (const network of product.networks) {
         // Load colors for this network
-        const colors = await this.dataSource.getMongoRepository(ProductColor).find({
-          where: { networkId: network.id } as any,
-        });
-        
+        const colors = await this.dataSource
+          .getMongoRepository(ProductColor)
+          .find({
+            where: { networkId: network.id } as any,
+          });
+
         for (const color of colors) {
           // Load storages for this color
-          const storages = await this.dataSource.getMongoRepository(ProductStorage).find({
-            where: { colorId: color.id } as any,
-          });
-          
+          const storages = await this.dataSource
+            .getMongoRepository(ProductStorage)
+            .find({
+              where: { colorId: color.id } as any,
+            });
+
           // Load prices for storages
           for (const storage of storages) {
-            const price = await this.dataSource.getMongoRepository(ProductPrice).findOne({
-              where: { storageId: storage.id } as any,
-            });
+            const price = await this.dataSource
+              .getMongoRepository(ProductPrice)
+              .findOne({
+                where: { storageId: storage.id } as any,
+              });
             (storage as any).price = price;
           }
           (color as any).storages = storages;
@@ -493,41 +658,53 @@ export class ProductService {
     if (product.regions && product.regions.length > 0) {
       for (const region of product.regions) {
         // Load defaultStorages with prices
-        const regionWithDefaults = await this.dataSource.getMongoRepository(ProductRegion).findOne({
-          where: { _id: region.id } as any,
-        });
-        
+        const regionWithDefaults = await this.dataSource
+          .getMongoRepository(ProductRegion)
+          .findOne({
+            where: { _id: region.id } as any,
+          });
+
         if (regionWithDefaults) {
           // Load default storages
-          const defaultStorages = await this.dataSource.getMongoRepository(ProductStorage).find({
-            where: { regionId: region.id } as any,
-          });
-          
+          const defaultStorages = await this.dataSource
+            .getMongoRepository(ProductStorage)
+            .find({
+              where: { regionId: region.id } as any,
+            });
+
           // Load prices for default storages
           for (const storage of defaultStorages) {
-            const price = await this.dataSource.getMongoRepository(ProductPrice).findOne({
-              where: { storageId: storage.id } as any,
-            });
+            const price = await this.dataSource
+              .getMongoRepository(ProductPrice)
+              .findOne({
+                where: { storageId: storage.id } as any,
+              });
             (storage as any).price = price;
           }
           (region as any).defaultStorages = defaultStorages;
 
           // Load colors with their custom storages
-          const colors = await this.dataSource.getMongoRepository(ProductColor).find({
-            where: { regionId: region.id } as any,
-          });
-          
+          const colors = await this.dataSource
+            .getMongoRepository(ProductColor)
+            .find({
+              where: { regionId: region.id } as any,
+            });
+
           for (const color of colors) {
             // Load custom storages for this color
-            const storages = await this.dataSource.getMongoRepository(ProductStorage).find({
-              where: { colorId: color.id } as any,
-            });
-            
+            const storages = await this.dataSource
+              .getMongoRepository(ProductStorage)
+              .find({
+                where: { colorId: color.id } as any,
+              });
+
             // Load prices for custom storages
             for (const storage of storages) {
-              const price = await this.dataSource.getMongoRepository(ProductPrice).findOne({
-                where: { storageId: storage.id } as any,
-              });
+              const price = await this.dataSource
+                .getMongoRepository(ProductPrice)
+                .findOne({
+                  where: { storageId: storage.id } as any,
+                });
               (storage as any).price = price;
             }
             (color as any).storages = storages;
@@ -540,14 +717,18 @@ export class ProductService {
     // Load storages for directColors
     if (product.directColors && product.directColors.length > 0) {
       for (const color of product.directColors) {
-        const storages = await this.dataSource.getMongoRepository(ProductStorage).find({
-          where: { colorId: color.id } as any,
-        });
-        
-        for (const storage of storages) {
-          const price = await this.dataSource.getMongoRepository(ProductPrice).findOne({
-            where: { storageId: storage.id } as any,
+        const storages = await this.dataSource
+          .getMongoRepository(ProductStorage)
+          .find({
+            where: { colorId: color.id } as any,
           });
+
+        for (const storage of storages) {
+          const price = await this.dataSource
+            .getMongoRepository(ProductPrice)
+            .findOne({
+              where: { storageId: storage.id } as any,
+            });
           (storage as any).price = price;
         }
         (color as any).storages = storages;
@@ -597,7 +778,10 @@ export class ProductService {
         discount: price.discountPrice,
         discountPercent: price.discountPercent,
         campaign: price.campaignPrice,
-        campaignActive: this.isCampaignActive(price.campaignStart, price.campaignEnd),
+        campaignActive: this.isCampaignActive(
+          price.campaignStart,
+          price.campaignEnd,
+        ),
         final: this.calculateFinalPrice(price),
       },
       stock: {
@@ -609,58 +793,13 @@ export class ProductService {
     };
   }
 
-  /**
-   * Update product
-   */
-  async update(id: string, dto: UpdateProductNewDto) {
-    const product = await this.productRepository.findOne({ 
-      where: { id: new ObjectId(id) } as any 
-    });
-
-    if (!product) {
-      throw new NotFoundException('Product not found');
-    }
-
-    // For simplicity, we'll update only the main product fields
-    // Updating nested relations would require a similar transaction approach
-    Object.assign(product, {
-      name: dto.name ?? product.name,
-      slug: dto.slug ?? product.slug,
-      shortDescription: dto.shortDescription ?? product.shortDescription,
-      description: dto.description ?? product.description,
-      categoryId: dto.categoryId ? new ObjectId(dto.categoryId) : product.categoryId,
-      brandId: dto.brandId ? new ObjectId(dto.brandId) : product.brandId,
-      productCode: dto.productCode ?? product.productCode,
-      sku: dto.sku ?? product.sku,
-      warranty: dto.warranty ?? product.warranty,
-      isActive: dto.isActive ?? product.isActive,
-      isOnline: dto.isOnline ?? product.isOnline,
-      isPos: dto.isPos ?? product.isPos,
-      isPreOrder: dto.isPreOrder ?? product.isPreOrder,
-      isOfficial: dto.isOfficial ?? product.isOfficial,
-      freeShipping: dto.freeShipping ?? product.freeShipping,
-      isEmi: dto.isEmi ?? product.isEmi,
-      rewardPoints: dto.rewardPoints ?? product.rewardPoints,
-      minBookingPrice: dto.minBookingPrice ?? product.minBookingPrice,
-      seoTitle: dto.seoTitle ?? product.seoTitle,
-      seoDescription: dto.seoDescription ?? product.seoDescription,
-      seoKeywords: dto.seoKeywords ?? product.seoKeywords,
-      seoCanonical: dto.seoCanonical ?? product.seoCanonical,
-      tags: dto.tags ?? product.tags,
-      faqIds: dto.faqIds ? dto.faqIds.map(id => new ObjectId(id)) : product.faqIds,
-    });
-
-    await this.productRepository.save(product);
-
-    return this.findOne(product.slug);
-  }
 
   /**
    * Soft delete product
    */
   async remove(id: string) {
-    const product = await this.productRepository.findOne({ 
-      where: { id: new ObjectId(id) } as any 
+    const product = await this.productRepository.findOne({
+      where: { id: new ObjectId(id) } as any,
     });
 
     if (!product) {
@@ -745,25 +884,32 @@ export class ProductService {
         singleDiscountPrice: color.singleDiscountPrice,
         singleStockQuantity: color.singleStockQuantity,
         singleLowStockAlert: color.singleLowStockAlert,
+        // New fields
+        regularPrice: color.regularPrice,
+        discountPrice: color.discountPrice,
+        stockQuantity: color.stockQuantity,
+        
         features: color.features,
-        storages: color.hasStorage ? color.storages?.map((storage) => ({
-          id: storage.id,
-          size: storage.storageSize,
-          price: {
-            regular: storage.price?.regularPrice,
-            compare: storage.price?.comparePrice,
-            discount: storage.price?.discountPrice,
-            discountPercent: storage.price?.discountPercent,
-            campaign: storage.price?.campaignPrice,
-            campaignActive: this.isCampaignActive(
-              storage.price?.campaignStart,
-              storage.price?.campaignEnd,
-            ),
-            final: this.calculateFinalPrice(storage.price),
-          },
-          stock: storage.price?.stockQuantity,
-          inStock: (storage.price?.stockQuantity ?? 0) > 0,
-        })) : undefined,
+        storages: color.hasStorage
+          ? color.storages?.map((storage) => ({
+              id: storage.id,
+              size: storage.storageSize,
+              price: {
+                regular: storage.price?.regularPrice,
+                compare: storage.price?.comparePrice,
+                discount: storage.price?.discountPrice,
+                discountPercent: storage.price?.discountPercent,
+                campaign: storage.price?.campaignPrice,
+                campaignActive: this.isCampaignActive(
+                  storage.price?.campaignStart,
+                  storage.price?.campaignEnd,
+                ),
+                final: this.calculateFinalPrice(storage.price),
+              },
+              stock: storage.price?.stockQuantity,
+              inStock: (storage.price?.stockQuantity ?? 0) > 0,
+            }))
+          : undefined,
       })),
       networks: product.networks?.map((network: any) => ({
         id: network.id,
@@ -778,25 +924,32 @@ export class ProductService {
           singlePrice: color.singlePrice,
           singleComparePrice: color.singleComparePrice,
           singleStockQuantity: color.singleStockQuantity,
+          // New fields
+          regularPrice: color.regularPrice,
+          discountPrice: color.discountPrice,
+          stockQuantity: color.stockQuantity,
+
           features: color.features,
-          storages: color.hasStorage ? color.storages?.map((storage: any) => ({
-            id: storage.id,
-            size: storage.storageSize,
-            price: {
-              regular: storage.price?.regularPrice,
-              compare: storage.price?.comparePrice,
-              discount: storage.price?.discountPrice,
-              discountPercent: storage.price?.discountPercent,
-              campaign: storage.price?.campaignPrice,
-              campaignActive: this.isCampaignActive(
-                storage.price?.campaignStart,
-                storage.price?.campaignEnd,
-              ),
-              final: this.calculateFinalPrice(storage.price),
-            },
-            stock: storage.price?.stockQuantity,
-            inStock: (storage.price?.stockQuantity ?? 0) > 0,
-          })) : undefined,
+          storages: color.hasStorage
+            ? color.storages?.map((storage: any) => ({
+                id: storage.id,
+                size: storage.storageSize,
+                price: {
+                  regular: storage.price?.regularPrice,
+                  compare: storage.price?.comparePrice,
+                  discount: storage.price?.discountPrice,
+                  discountPercent: storage.price?.discountPercent,
+                  campaign: storage.price?.campaignPrice,
+                  campaignActive: this.isCampaignActive(
+                    storage.price?.campaignStart,
+                    storage.price?.campaignEnd,
+                  ),
+                  final: this.calculateFinalPrice(storage.price),
+                },
+                stock: storage.price?.stockQuantity,
+                inStock: (storage.price?.stockQuantity ?? 0) > 0,
+              }))
+            : undefined,
         })),
       })),
       regions: product.regions?.map((region: any) => ({
@@ -830,26 +983,34 @@ export class ProductService {
           singlePrice: color.singlePrice,
           singleComparePrice: color.singleComparePrice,
           singleStockQuantity: color.singleStockQuantity,
+          // New fields
+          regularPrice: color.regularPrice,
+          discountPrice: color.discountPrice,
+          stockQuantity: color.stockQuantity,
+
           features: color.features,
           // Include custom storages only if useDefaultStorages = false
-          customStorages: color.hasStorage && !color.useDefaultStorages ? color.storages?.map((storage: any) => ({
-            id: storage.id,
-            size: storage.storageSize,
-            price: {
-              regular: storage.price?.regularPrice,
-              compare: storage.price?.comparePrice,
-              discount: storage.price?.discountPrice,
-              discountPercent: storage.price?.discountPercent,
-              campaign: storage.price?.campaignPrice,
-              campaignActive: this.isCampaignActive(
-                storage.price?.campaignStart,
-                storage.price?.campaignEnd,
-              ),
-              final: this.calculateFinalPrice(storage.price),
-            },
-            stock: storage.price?.stockQuantity,
-            inStock: (storage.price?.stockQuantity ?? 0) > 0,
-          })) : undefined,
+          customStorages:
+            color.hasStorage && !color.useDefaultStorages
+              ? color.storages?.map((storage: any) => ({
+                  id: storage.id,
+                  size: storage.storageSize,
+                  price: {
+                    regular: storage.price?.regularPrice,
+                    compare: storage.price?.comparePrice,
+                    discount: storage.price?.discountPrice,
+                    discountPercent: storage.price?.discountPercent,
+                    campaign: storage.price?.campaignPrice,
+                    campaignActive: this.isCampaignActive(
+                      storage.price?.campaignStart,
+                      storage.price?.campaignEnd,
+                    ),
+                    final: this.calculateFinalPrice(storage.price),
+                  },
+                  stock: storage.price?.stockQuantity,
+                  inStock: (storage.price?.stockQuantity ?? 0) > 0,
+                }))
+              : undefined,
         })),
       })),
       specifications: this.groupSpecifications(product.specifications),
@@ -1009,32 +1170,43 @@ export class ProductService {
       .sort((a, b) => a.displayOrder - b.displayOrder);
   }
 
+
+
+
+  
+
   private extractDuplicateField(error: any): string {
     const errorMessage = error.message || '';
     const errorString = JSON.stringify(error);
-    
+
     console.log('Duplicate error details:', { errorMessage, errorString });
-    
+
     // Check for slug duplicate
-    if (errorMessage.includes('slug') || errorMessage.includes('UQ_') && errorMessage.includes('slug')) {
+    if (
+      errorMessage.includes('slug') ||
+      (errorMessage.includes('UQ_') && errorMessage.includes('slug'))
+    ) {
       return 'Product slug';
     }
-    
+
     // Check for productCode duplicate
     if (errorMessage.includes('productCode')) {
       return 'Product code';
     }
-    
+
     // Check for sku duplicate
     if (errorMessage.includes('sku')) {
       return 'SKU';
     }
-    
+
     // Check for region name duplicate
-    if (errorMessage.includes('regionName') || errorMessage.includes('productId_1_regionName')) {
+    if (
+      errorMessage.includes('regionName') ||
+      errorMessage.includes('productId_1_regionName')
+    ) {
       return 'Region name (duplicate region name for this product)';
     }
-    
+
     // Check for color name duplicate
     if (errorMessage.includes('colorName')) {
       if (errorMessage.includes('productId')) {
@@ -1045,18 +1217,18 @@ export class ProductService {
       }
       return 'Color name';
     }
-    
+
     // Check for storage size duplicate
-    if (errorMessage.includes('storageSize') || errorMessage.includes('colorId_1_storageSize')) {
-      return 'Storage size (duplicate storage size for this color)';
+    if (errorMessage.includes('storageSize')) {
+      if (errorMessage.includes('productId')) {
+        return 'Storage size (duplicate storage size for this product)';
+      }
+      if (errorMessage.includes('regionId')) {
+        return 'Storage size (duplicate storage size for this region)';
+      }
+      return 'Storage size';
     }
-    
-    // Check for specification duplicate
-    if (errorMessage.includes('specKey') || errorMessage.includes('productId_1_specKey')) {
-      return 'Specification key (duplicate specification for this product)';
-    }
-    
-    // Default message
-    return 'Value';
+
+    return 'Duplicate value';
   }
 }

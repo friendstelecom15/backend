@@ -11,6 +11,7 @@ import {
   ParseUUIDPipe,
   UploadedFiles,
   InternalServerErrorException,
+  BadRequestException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -19,8 +20,11 @@ import {
   ApiResponse,
   ApiQuery,
 } from '@nestjs/swagger';
-import { CreateProductNewDto } from './dto/create-product-new.dto';
-import { UpdateProductNewDto } from './dto/update-product-new.dto';
+import { 
+  CreateBasicProductDto, 
+  CreateNetworkProductDto, 
+  CreateRegionProductDto 
+} from './dto/create-product-new.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -36,155 +40,170 @@ export class ProductsController {
     private readonly cloudflareService: CloudflareService,
   ) {}
 
-  @Post()
+  @Post('basic')
   // @UseGuards(JwtAuthGuard, RolesGuard)
   // @Roles('admin', 'management')
   // @ApiBearerAuth()
   @ApiOperation({
-    summary: 'Create complete product with variants, pricing, images, and specs',
-    description:
-      'Single API call to create product with all related data in a transaction',
+    summary: 'Create basic product with variants, pricing, images, and specs',
+    description: 'Create a simple product with direct color variants',
   })
-  @ApiResponse({
-    status: 201,
-    description: 'Product created successfully',
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'Invalid input data',
-  })
+  @ApiResponse({ status: 201, description: 'Product created successfully' })
   @FileFieldsUpload(
     [
       { name: 'thumbnail', maxCount: 1 },
       { name: 'galleryImages', maxCount: 20 },
+      // Allow dynamic color images (up to 20 colors)
+      ...Array.from({ length: 20 }, (_, i) => ({ name: `colors[${i}][colorImage]`, maxCount: 1 })),
     ],
     undefined,
     UploadType.IMAGE,
   )
-  async create(
-    @Body() createProductDto: CreateProductNewDto,
-    @UploadedFiles()
-    files: {
-      thumbnail?: Express.Multer.File[];
-      galleryImages?: Express.Multer.File[];
-    },
+  async createBasic(
+    @Body() createProductDto: CreateBasicProductDto,
+    @UploadedFiles() files: any,
   ) {
-    // Parse stringified JSON fields (when sent as multipart/form-data)
-    if (typeof createProductDto.regions === 'string') {
-      try {
-        createProductDto.regions = JSON.parse(createProductDto.regions as any);
-      } catch (error) {
-        throw new InternalServerErrorException('Invalid regions format. Must be valid JSON.');
-      }
-    }
-    if (typeof createProductDto.networks === 'string') {
-      try {
-        createProductDto.networks = JSON.parse(createProductDto.networks as any);
-      } catch (error) {
-        throw new InternalServerErrorException('Invalid networks format. Must be valid JSON.');
-      }
-    }
-    if (typeof createProductDto.specifications === 'string') {
-      try {
-        createProductDto.specifications = JSON.parse(createProductDto.specifications as any);
-      } catch (error) {
-        throw new InternalServerErrorException('Invalid specifications format. Must be valid JSON.');
-      }
-    }
-    if (typeof createProductDto.seoKeywords === 'string') {
-      try {
-        createProductDto.seoKeywords = JSON.parse(createProductDto.seoKeywords as any);
-      } catch (error) {
-        throw new InternalServerErrorException('Invalid seoKeywords format. Must be valid JSON array.');
-      }
-    }
-    if (typeof createProductDto.directColors === 'string') {
-      try {
-        createProductDto.directColors = JSON.parse(createProductDto.directColors as any);
-      } catch (error) {
-        throw new InternalServerErrorException('Invalid directColors format. Must be valid JSON.');
-      }
-    }
-    if (typeof createProductDto.videos === 'string') {
-      try {
-        createProductDto.videos = JSON.parse(createProductDto.videos as any);
-      } catch (error) {
-        throw new InternalServerErrorException('Invalid videos format. Must be valid JSON.');
-      }
-    }
-    if (typeof createProductDto.tags === 'string') {
-      try {
-        createProductDto.tags = JSON.parse(createProductDto.tags as any);
-      } catch (error) {
-        throw new InternalServerErrorException('Invalid tags format. Must be valid JSON array.');
-      }
-    }
-    if (typeof createProductDto.faqIds === 'string') {
-      try {
-        createProductDto.faqIds = JSON.parse(createProductDto.faqIds as any);
-      } catch (error) {
-        throw new InternalServerErrorException('Invalid faqIds format. Must be valid JSON array.');
+    const processedDto = await this.processFileUploads(createProductDto, files);
+    return this.productsService.createBasicProduct(processedDto);
+  }
+
+  @Post('network')
+  // @UseGuards(JwtAuthGuard, RolesGuard)
+  // @Roles('admin', 'management')
+  // @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Create network-based product',
+    description: 'Create a product with network variants (e.g. WiFi, Cellular)',
+  })
+  @ApiResponse({ status: 201, description: 'Product created successfully' })
+  @FileFieldsUpload(
+    [
+      { name: 'thumbnail', maxCount: 1 },
+      { name: 'galleryImages', maxCount: 20 },
+      // Allow dynamic color images for networks (simplified max count)
+      ...Array.from({ length: 50 }, (_, i) => ({ name: `network_color_image_${i}`, maxCount: 1 })),
+    ],
+    undefined,
+    UploadType.IMAGE,
+  )
+  async createNetwork(
+    @Body() createProductDto: CreateNetworkProductDto,
+    @UploadedFiles() files: any,
+  ) {
+    const processedDto = await this.processFileUploads(createProductDto, files);
+    return this.productsService.createNetworkProduct(processedDto);
+  }
+
+  @Post('region')
+  // @UseGuards(JwtAuthGuard, RolesGuard)
+  // @Roles('admin', 'management')
+  // @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Create region-based product',
+    description: 'Create a product with regional variants (e.g. International, USA)',
+  })
+  @ApiResponse({ status: 201, description: 'Product created successfully' })
+  @FileFieldsUpload(
+    [
+      { name: 'thumbnail', maxCount: 1 },
+      { name: 'galleryImages', maxCount: 20 },
+      // Allow dynamic color images for regions (simplified max count)
+      ...Array.from({ length: 50 }, (_, i) => ({ name: `region_color_image_${i}`, maxCount: 1 })),
+    ],
+    undefined,
+    UploadType.IMAGE,
+  )
+  async createRegion(
+    @Body() createProductDto: CreateRegionProductDto,
+    @UploadedFiles() files: any,
+  ) {
+    const processedDto = await this.processFileUploads(createProductDto, files);
+    return this.productsService.createRegionProduct(processedDto);
+  }
+
+  /**
+   * Helper to process file uploads and JSON parsing
+   */
+  private async processFileUploads(dto: any, files: any) {
+    // 1. Parse JSON fields
+    const jsonFields = ['specifications', 'seoKeywords', 'tags', 'videos', 'colors', 'networks', 'regions'];
+    
+    for (const field of jsonFields) {
+      if (typeof dto[field] === 'string') {
+        try {
+          dto[field] = JSON.parse(dto[field]);
+        } catch (e) {
+          throw new BadRequestException(`Invalid JSON format for field: ${field}`);
+        }
       }
     }
 
-    // Upload thumbnail image to Cloudflare
+    // 2. Handle Thumbnail
     if (files?.thumbnail?.length) {
       try {
-        const thumbnailFile = files.thumbnail[0];
         const upload = await this.cloudflareService.uploadImage(
-          thumbnailFile.buffer,
-          thumbnailFile.originalname,
+          files.thumbnail[0].buffer,
+          files.thumbnail[0].originalname,
         );
         
-        // Add thumbnail as the first image with isThumbnail flag
-        createProductDto.images = [
-          {
-            imageUrl: upload.variants?.[0] || upload.id || '',
-            isThumbnail: true,
-            altText: thumbnailFile.originalname,
-            displayOrder: 0,
-          },
-        ];
+        dto.images = dto.images || [];
+        dto.images.unshift({
+          url: upload.variants?.[0] || upload.id || '',
+          isThumbnail: true,
+          altText: files.thumbnail[0].originalname,
+          displayOrder: 0,
+        });
       } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        throw new InternalServerErrorException(
-          `Thumbnail upload failed: ${message}`,
-        );
+        throw new InternalServerErrorException(`Thumbnail upload failed: ${err.message}`);
       }
     }
 
-    // Upload gallery images to Cloudflare
+    // 3. Handle Gallery Images
     if (files?.galleryImages?.length) {
       try {
-        const uploadedGalleryImages = await Promise.all(
-          files.galleryImages.map(async (file, index) => {
+        const uploadedGallery = await Promise.all(
+          files.galleryImages.map(async (file: any, index: number) => {
             const upload = await this.cloudflareService.uploadImage(
               file.buffer,
               file.originalname,
             );
             return {
-              imageUrl: upload.variants?.[0] || upload.id || '',
+              url: upload.variants?.[0] || upload.id || '',
               isThumbnail: false,
               altText: file.originalname,
-              displayOrder: index + 1, // Start from 1 since thumbnail is 0
+              displayOrder: index + 1,
             };
           }),
         );
         
-        // Append gallery images to existing images array (after thumbnail)
-        createProductDto.images = [
-          ...(createProductDto.images || []),
-          ...uploadedGalleryImages,
-        ];
+        dto.images = [...(dto.images || []), ...uploadedGallery];
       } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        throw new InternalServerErrorException(
-          `Gallery image upload failed: ${message}`,
-        );
+        throw new InternalServerErrorException(`Gallery upload failed: ${err.message}`);
       }
     }
 
-    return this.productsService.create(createProductDto);
+    // 4. Handle Color Images (Basic Product)
+    // Note: For complex nested file uploads (networks/regions), 
+    // we might need a more robust strategy or direct S3/Cloudflare upload from FE.
+    // Here we assume basic color images are mapped by index if sent as `colors[i][colorImage]`
+    if (files && dto.colors) {
+      for (let i = 0; i < dto.colors.length; i++) {
+        const fileKey = `colors[${i}][colorImage]`;
+        if (files[fileKey]?.length) {
+           try {
+            const upload = await this.cloudflareService.uploadImage(
+              files[fileKey][0].buffer,
+              files[fileKey][0].originalname,
+            );
+            dto.colors[i].colorImage = upload.variants?.[0] || upload.id || '';
+          } catch (err) {
+            console.error(`Color image upload failed for index ${i}`, err);
+          }
+        }
+      }
+    }
+
+    return dto;
   }
 
   @Get()
@@ -274,153 +293,8 @@ export class ProductsController {
     );
   }
 
-  @Patch(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin', 'management')
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Update product (Admin/Management only)' })
-  @ApiResponse({
-    status: 200,
-    description: 'Product updated successfully',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Product not found',
-  })
-  @FileFieldsUpload(
-    [
-      { name: 'thumbnail', maxCount: 1 },
-      { name: 'galleryImages', maxCount: 20 },
-    ],
-    undefined,
-    UploadType.IMAGE,
-  )
-  async update(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() updateProductDto: UpdateProductNewDto,
-    @UploadedFiles()
-    files: {
-      thumbnail?: Express.Multer.File[];
-      galleryImages?: Express.Multer.File[];
-    },
-  ) {
-    // Parse stringified JSON fields (when sent as multipart/form-data)
-    if (typeof updateProductDto.regions === 'string') {
-      try {
-        updateProductDto.regions = JSON.parse(updateProductDto.regions as any);
-      } catch (error) {
-        throw new InternalServerErrorException('Invalid regions format. Must be valid JSON.');
-      }
-    }
-    if (typeof updateProductDto.networks === 'string') {
-      try {
-        updateProductDto.networks = JSON.parse(updateProductDto.networks as any);
-      } catch (error) {
-        throw new InternalServerErrorException('Invalid networks format. Must be valid JSON.');
-      }
-    }
-    if (typeof updateProductDto.specifications === 'string') {
-      try {
-        updateProductDto.specifications = JSON.parse(updateProductDto.specifications as any);
-      } catch (error) {
-        throw new InternalServerErrorException('Invalid specifications format. Must be valid JSON.');
-      }
-    }
-    if (typeof updateProductDto.seoKeywords === 'string') {
-      try {
-        updateProductDto.seoKeywords = JSON.parse(updateProductDto.seoKeywords as any);
-      } catch (error) {
-        throw new InternalServerErrorException('Invalid seoKeywords format. Must be valid JSON array.');
-      }
-    }
-    if (typeof updateProductDto.directColors === 'string') {
-      try {
-        updateProductDto.directColors = JSON.parse(updateProductDto.directColors as any);
-      } catch (error) {
-        throw new InternalServerErrorException('Invalid directColors format. Must be valid JSON.');
-      }
-    }
-    if (typeof updateProductDto.videos === 'string') {
-      try {
-        updateProductDto.videos = JSON.parse(updateProductDto.videos as any);
-      } catch (error) {
-        throw new InternalServerErrorException('Invalid videos format. Must be valid JSON.');
-      }
-    }
-    if (typeof updateProductDto.tags === 'string') {
-      try {
-        updateProductDto.tags = JSON.parse(updateProductDto.tags as any);
-      } catch (error) {
-        throw new InternalServerErrorException('Invalid tags format. Must be valid JSON array.');
-      }
-    }
-    if (typeof updateProductDto.faqIds === 'string') {
-      try {
-        updateProductDto.faqIds = JSON.parse(updateProductDto.faqIds as any);
-      } catch (error) {
-        throw new InternalServerErrorException('Invalid faqIds format. Must be valid JSON array.');
-      }
-    }
 
-    // Upload thumbnail image to Cloudflare
-    if (files?.thumbnail?.length) {
-      try {
-        const thumbnailFile = files.thumbnail[0];
-        const upload = await this.cloudflareService.uploadImage(
-          thumbnailFile.buffer,
-          thumbnailFile.originalname,
-        );
-        
-        // Add thumbnail as the first image with isThumbnail flag
-        updateProductDto.images = [
-          {
-            imageUrl: upload.variants?.[0] || upload.id || '',
-            isThumbnail: true,
-            altText: thumbnailFile.originalname,
-            displayOrder: 0,
-          },
-        ];
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        throw new InternalServerErrorException(
-          `Thumbnail upload failed: ${message}`,
-        );
-      }
-    }
 
-    // Upload gallery images to Cloudflare
-    if (files?.galleryImages?.length) {
-      try {
-        const uploadedGalleryImages = await Promise.all(
-          files.galleryImages.map(async (file, index) => {
-            const upload = await this.cloudflareService.uploadImage(
-              file.buffer,
-              file.originalname,
-            );
-            return {
-              imageUrl: upload.variants?.[0] || upload.id || '',
-              isThumbnail: false,
-              altText: file.originalname,
-              displayOrder: index + 1, // Start from 1 since thumbnail is 0
-            };
-          }),
-        );
-        
-        // Append gallery images to existing images array (after thumbnail)
-        updateProductDto.images = [
-          ...(updateProductDto.images || []),
-          ...uploadedGalleryImages,
-        ];
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        throw new InternalServerErrorException(
-          `Gallery image upload failed: ${message}`,
-        );
-      }
-    }
-
-    return this.productsService.update(id, updateProductDto);
-  }
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)

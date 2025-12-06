@@ -80,8 +80,7 @@ export class ProductsController {
     [
       { name: 'thumbnail', maxCount: 1 },
       { name: 'galleryImages', maxCount: 20 },
-      // Allow dynamic color images for networks (simplified max count)
-      ...Array.from({ length: 50 }, (_, i) => ({ name: `network_color_image_${i}`, maxCount: 1 })),
+      { name: 'colors', maxCount: 20 },
     ],
     undefined,
     UploadType.IMAGE,
@@ -107,8 +106,7 @@ export class ProductsController {
     [
       { name: 'thumbnail', maxCount: 1 },
       { name: 'galleryImages', maxCount: 20 },
-      // Allow dynamic color images for regions (simplified max count)
-      ...Array.from({ length: 50 }, (_, i) => ({ name: `region_color_image_${i}`, maxCount: 1 })),
+      { name: 'colors', maxCount: 20 },
     ],
     undefined,
     UploadType.IMAGE,
@@ -200,6 +198,58 @@ export class ProductsController {
             console.error(`Color image upload failed for index ${i}`, err);
           }
         }
+      }
+    }
+
+    // 5. Handle Network/Region Product Color Images (sent as 'colors' array)
+    if (files?.colors?.length) {
+      try {
+        // Upload all color images first
+        const uploadedColorImages = await Promise.all(
+          files.colors.map(async (file: any) => {
+            const upload = await this.cloudflareService.uploadImage(
+              file.buffer,
+              file.originalname,
+            );
+            return upload.variants?.[0] || upload.id || '';
+          }),
+        );
+
+        // Map uploaded images to network colors using colorImageIndex
+        if (dto.networks) {
+          for (const network of dto.networks) {
+            if (network.colors) {
+              for (const color of network.colors) {
+                // Check if color has colorImageIndex
+                if (typeof (color as any).colorImageIndex === 'number') {
+                  const index = (color as any).colorImageIndex;
+                  if (index >= 0 && index < uploadedColorImages.length) {
+                    color.colorImage = uploadedColorImages[index];
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        // Map uploaded images to region colors using colorImageIndex
+        if (dto.regions) {
+          for (const region of dto.regions) {
+            if (region.colors) {
+              for (const color of region.colors) {
+                // Check if color has colorImageIndex
+                if (typeof (color as any).colorImageIndex === 'number') {
+                  const index = (color as any).colorImageIndex;
+                  if (index >= 0 && index < uploadedColorImages.length) {
+                    color.colorImage = uploadedColorImages[index];
+                  }
+                }
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Network/Region color images upload failed', err);
       }
     }
 

@@ -19,19 +19,19 @@ import { ProductPrice } from './product-price.entity';
 @Entity('product_storages')
 @Index('IDX_product_storage_color_unique', ['colorId', 'storageSize'], {
   unique: true,
-  sparse: true,
   background: true,
-})
+  partialFilterExpression: { colorId: { $type: 'objectId' } },
+} as any)
 @Index('IDX_product_storage_region_unique', ['regionId', 'storageSize'], {
   unique: true,
-  sparse: true,
   background: true,
-})
+  partialFilterExpression: { regionId: { $type: 'objectId' } },
+} as any)
 @Index('IDX_product_storage_network_unique', ['networkId', 'storageSize'], {
   unique: true,
-  sparse: true,
   background: true,
-})
+  partialFilterExpression: { networkId: { $type: 'objectId' } },
+} as any)
 export class ProductStorage {
   @ObjectIdColumn()
   id: ObjectId;

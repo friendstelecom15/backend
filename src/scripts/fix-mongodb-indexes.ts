@@ -60,9 +60,9 @@ async function fixMongoDBIndexes() {
       { productId: 1, colorName: 1 },
       { 
         unique: true,
-        sparse: true,
         background: true,
         name: 'IDX_product_color_product_unique',
+        partialFilterExpression: { productId: { $type: 'objectId' } }
       }
     );
     
@@ -71,9 +71,9 @@ async function fixMongoDBIndexes() {
       { regionId: 1, colorName: 1 },
       { 
         unique: true,
-        sparse: true,
         background: true,
         name: 'IDX_product_color_region_unique',
+        partialFilterExpression: { regionId: { $type: 'objectId' } }
       }
     );
     
@@ -82,9 +82,9 @@ async function fixMongoDBIndexes() {
       { networkId: 1, colorName: 1 },
       { 
         unique: true,
-        sparse: true,
         background: true,
         name: 'IDX_product_color_network_unique',
+        partialFilterExpression: { networkId: { $type: 'objectId' } }
       }
     );
 
@@ -107,9 +107,9 @@ async function fixMongoDBIndexes() {
       { colorId: 1, storageSize: 1 },
       { 
         unique: true,
-        sparse: true,
         background: true,
         name: 'IDX_product_storage_color_unique',
+        partialFilterExpression: { colorId: { $type: 'objectId' } }
       }
     );
     
@@ -118,9 +118,9 @@ async function fixMongoDBIndexes() {
       { regionId: 1, storageSize: 1 },
       { 
         unique: true,
-        sparse: true,
         background: true,
         name: 'IDX_product_storage_region_unique',
+        partialFilterExpression: { regionId: { $type: 'objectId' } }
       }
     );
 
@@ -129,9 +129,9 @@ async function fixMongoDBIndexes() {
       { networkId: 1, storageSize: 1 },
       { 
         unique: true,
-        sparse: true,
         background: true,
         name: 'IDX_product_storage_network_unique',
+        partialFilterExpression: { networkId: { $type: 'objectId' } }
       }
     );
 

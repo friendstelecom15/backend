@@ -186,6 +186,7 @@ function NewProductPage() {
         id: string;
         colorName: string;
         colorImage: string;
+        colorImageFile: File | null;
         hasStorage: boolean;
         useDefaultStorages: boolean;
         singlePrice: string;
@@ -223,6 +224,7 @@ function NewProductPage() {
           id: 'color-1',
           colorName: 'Midnight',
           colorImage: '',
+          colorImageFile: null,
           hasStorage: true,
           useDefaultStorages: true,
           singlePrice: '',
@@ -727,6 +729,7 @@ function NewProductPage() {
             id: `color-${Date.now()}`,
             colorName: '',
             colorImage: '',
+            colorImageFile: null,
             hasStorage: true,
             useDefaultStorages: true,
             singlePrice: '',
@@ -761,6 +764,7 @@ function NewProductPage() {
                   id: `color-${Date.now()}`,
                   colorName: '',
                   colorImage: '',
+                  colorImageFile: null,
                   hasStorage: true,
                   useDefaultStorages: true,
                   singlePrice: '',
@@ -1029,7 +1033,12 @@ function NewProductPage() {
         }
       });
 
-      const response = await productsService.createWithFormData(formData);
+      const response =
+        productType === 'basic'
+          ? await productsService.createBasic(formData)
+          : productType === 'network'
+          ? await productsService.createNetwork(formData)
+          : await productsService.createRegion(formData);
       alert('✓ Basic product created successfully!');
     } catch (err: any) {
       console.error('Error creating basic product:', err);
@@ -1053,6 +1062,8 @@ function NewProductPage() {
         formData.append('galleryImages', file);
       });
 
+      const networkColorImages: File[] = [];
+
       // Format networks data properly for backend
       const formattedNetworks = networks.map((network, netIdx) => ({
         networkName: network.networkName,
@@ -1063,42 +1074,85 @@ function NewProductPage() {
         defaultStorages: network.hasDefaultStorages
           ? network.defaultStorages.map((storage, storIdx) => ({
               storageSize: storage.storageSize,
-              regularPrice: storage.regularPrice ? Number(storage.regularPrice) : 0,
-              comparePrice: storage.regularPrice ? Number(storage.regularPrice) : 0,
-              discountPrice: storage.discountPrice ? Number(storage.discountPrice) : 0,
-              discountPercent: storage.discountPercent ? Number(storage.discountPercent) : 0,
-              stockQuantity: storage.stockQuantity ? Number(storage.stockQuantity) : 0,
-              lowStockAlert: storage.lowStockAlert ? Number(storage.lowStockAlert) : 5,
+              regularPrice: storage.regularPrice
+                ? Number(storage.regularPrice)
+                : 0,
+              comparePrice: storage.regularPrice
+                ? Number(storage.regularPrice)
+                : 0,
+              discountPrice: storage.discountPrice
+                ? Number(storage.discountPrice)
+                : 0,
+              discountPercent: storage.discountPercent
+                ? Number(storage.discountPercent)
+                : 0,
+              stockQuantity: storage.stockQuantity
+                ? Number(storage.stockQuantity)
+                : 0,
+              lowStockAlert: storage.lowStockAlert
+                ? Number(storage.lowStockAlert)
+                : 5,
               displayOrder: storIdx,
             }))
           : undefined,
         // Colors in this network
-        colors: network.colors.map((color, colorIdx) => ({
-          colorName: color.colorName,
-          colorImage: color.colorImage || undefined,
-          hasStorage: color.hasStorage,
-          useDefaultStorages: color.useDefaultStorages,
-          displayOrder: colorIdx,
-          // If no storage, use single price
-          singlePrice: !color.hasStorage ? Number(color.singlePrice) || 0 : undefined,
-          singleComparePrice: !color.hasStorage ? Number(color.singleComparePrice) || 0 : undefined,
-          singleStockQuantity: !color.hasStorage ? Number(color.singleStockQuantity) || 0 : undefined,
-          // Custom storages (only if has storage and not using defaults)
-          storages:
-            color.hasStorage && !color.useDefaultStorages
-              ? color.storages.map((storage, storIdx) => ({
-                  storageSize: storage.storageSize,
-                  regularPrice: storage.regularPrice ? Number(storage.regularPrice) : 0,
-                  comparePrice: storage.regularPrice ? Number(storage.regularPrice) : 0,
-                  discountPrice: storage.discountPrice ? Number(storage.discountPrice) : 0,
-                  discountPercent: storage.discountPercent ? Number(storage.discountPercent) : 0,
-                  stockQuantity: storage.stockQuantity ? Number(storage.stockQuantity) : 0,
-                  lowStockAlert: storage.lowStockAlert ? Number(storage.lowStockAlert) : 5,
-                  displayOrder: storIdx,
-                }))
+        colors: network.colors.map((color, colorIdx) => {
+          let imageIndex = -1;
+          if (color.colorImageFile) {
+            networkColorImages.push(color.colorImageFile);
+            imageIndex = networkColorImages.length - 1;
+          }
+
+          return {
+            colorName: color.colorName,
+            hasStorage: color.hasStorage,
+            useDefaultStorages: color.useDefaultStorages,
+            displayOrder: colorIdx,
+            colorImageIndex: imageIndex > -1 ? imageIndex : undefined,
+            // If no storage, use single price
+            singlePrice: !color.hasStorage
+              ? Number(color.singlePrice) || 0
               : undefined,
-        })),
+            singleComparePrice: !color.hasStorage
+              ? Number(color.singleComparePrice) || 0
+              : undefined,
+            singleStockQuantity: !color.hasStorage
+              ? Number(color.singleStockQuantity) || 0
+              : undefined,
+            // Custom storages (only if has storage and not using defaults)
+            storages:
+              color.hasStorage && !color.useDefaultStorages
+                ? color.storages.map((storage, storIdx) => ({
+                    storageSize: storage.storageSize,
+                    regularPrice: storage.regularPrice
+                      ? Number(storage.regularPrice)
+                      : 0,
+                    comparePrice: storage.regularPrice
+                      ? Number(storage.regularPrice)
+                      : 0,
+                    discountPrice: storage.discountPrice
+                      ? Number(storage.discountPrice)
+                      : 0,
+                    discountPercent: storage.discountPercent
+                      ? Number(storage.discountPercent)
+                      : 0,
+                    stockQuantity: storage.stockQuantity
+                      ? Number(storage.stockQuantity)
+                      : 0,
+                    lowStockAlert: storage.lowStockAlert
+                      ? Number(storage.lowStockAlert)
+                      : 5,
+                    displayOrder: storIdx,
+                  }))
+                : undefined,
+          };
+        }),
       }));
+
+      // Append network color images
+      networkColorImages.forEach(file => {
+        formData.append('colors', file);
+      });
 
       const payload: any = {
         name: productName,
@@ -1154,7 +1208,12 @@ function NewProductPage() {
         }
       });
 
-      const response = await productsService.createWithFormData(formData);
+      const response =
+        productType === 'basic'
+          ? await productsService.createBasic(formData)
+          : productType === 'network'
+          ? await productsService.createNetwork(formData)
+          : await productsService.createRegion(formData);
       alert('✓ Network product created successfully!');
     } catch (err: any) {
       console.error('Error creating network product:', err);
@@ -1178,6 +1237,8 @@ function NewProductPage() {
         formData.append('galleryImages', file);
       });
 
+      const regionColorImages: File[] = [];
+
       // Format regions data properly for backend
       const formattedRegions = regions.map((region, regIdx) => ({
         regionName: region.regionName,
@@ -1186,41 +1247,84 @@ function NewProductPage() {
         // Default storages for this region (always present)
         defaultStorages: region.defaultStorages.map((storage, storIdx) => ({
           storageSize: storage.storageSize,
-          regularPrice: storage.regularPrice ? Number(storage.regularPrice) : 0,
-          comparePrice: storage.regularPrice ? Number(storage.regularPrice) : 0,
-          discountPrice: storage.discountPrice ? Number(storage.discountPrice) : 0,
-          discountPercent: storage.discountPercent ? Number(storage.discountPercent) : 0,
-          stockQuantity: storage.stockQuantity ? Number(storage.stockQuantity) : 0,
-          lowStockAlert: storage.lowStockAlert ? Number(storage.lowStockAlert) : 5,
+          regularPrice: storage.regularPrice
+            ? Number(storage.regularPrice)
+            : 0,
+          comparePrice: storage.regularPrice
+            ? Number(storage.regularPrice)
+            : 0,
+          discountPrice: storage.discountPrice
+            ? Number(storage.discountPrice)
+            : 0,
+          discountPercent: storage.discountPercent
+            ? Number(storage.discountPercent)
+            : 0,
+          stockQuantity: storage.stockQuantity
+            ? Number(storage.stockQuantity)
+            : 0,
+          lowStockAlert: storage.lowStockAlert
+            ? Number(storage.lowStockAlert)
+            : 5,
           displayOrder: storIdx,
         })),
         // Colors in this region
-        colors: region.colors.map((color, colorIdx) => ({
-          colorName: color.colorName,
-          colorImage: color.colorImage || undefined,
-          hasStorage: color.hasStorage,
-          useDefaultStorages: color.useDefaultStorages,
-          displayOrder: colorIdx,
-          // If no storage, use single price
-          singlePrice: !color.hasStorage ? Number(color.singlePrice) || 0 : undefined,
-          singleComparePrice: !color.hasStorage ? Number(color.singleComparePrice) || 0 : undefined,
-          singleStockQuantity: !color.hasStorage ? Number(color.singleStockQuantity) || 0 : undefined,
-          // Custom storages (only if has storage and not using defaults)
-          storages:
-            color.hasStorage && !color.useDefaultStorages
-              ? color.storages.map((storage, storIdx) => ({
-                  storageSize: storage.storageSize,
-                  regularPrice: storage.regularPrice ? Number(storage.regularPrice) : 0,
-                  comparePrice: storage.regularPrice ? Number(storage.regularPrice) : 0,
-                  discountPrice: storage.discountPrice ? Number(storage.discountPrice) : 0,
-                  discountPercent: storage.discountPercent ? Number(storage.discountPercent) : 0,
-                  stockQuantity: storage.stockQuantity ? Number(storage.stockQuantity) : 0,
-                  lowStockAlert: storage.lowStockAlert ? Number(storage.lowStockAlert) : 5,
-                  displayOrder: storIdx,
-                }))
+        colors: region.colors.map((color, colorIdx) => {
+          let imageIndex = -1;
+          if (color.colorImageFile) {
+            regionColorImages.push(color.colorImageFile);
+            imageIndex = regionColorImages.length - 1;
+          }
+
+          return {
+            colorName: color.colorName,
+            hasStorage: color.hasStorage,
+            useDefaultStorages: color.useDefaultStorages,
+            displayOrder: colorIdx,
+            colorImageIndex: imageIndex > -1 ? imageIndex : undefined,
+            // If no storage, use single price
+            singlePrice: !color.hasStorage
+              ? Number(color.singlePrice) || 0
               : undefined,
-        })),
+            singleComparePrice: !color.hasStorage
+              ? Number(color.singleComparePrice) || 0
+              : undefined,
+            singleStockQuantity: !color.hasStorage
+              ? Number(color.singleStockQuantity) || 0
+              : undefined,
+            // Custom storages (only if has storage and not using defaults)
+            storages:
+              color.hasStorage && !color.useDefaultStorages
+                ? color.storages.map((storage, storIdx) => ({
+                    storageSize: storage.storageSize,
+                    regularPrice: storage.regularPrice
+                      ? Number(storage.regularPrice)
+                      : 0,
+                    comparePrice: storage.regularPrice
+                      ? Number(storage.regularPrice)
+                      : 0,
+                    discountPrice: storage.discountPrice
+                      ? Number(storage.discountPrice)
+                      : 0,
+                    discountPercent: storage.discountPercent
+                      ? Number(storage.discountPercent)
+                      : 0,
+                    stockQuantity: storage.stockQuantity
+                      ? Number(storage.stockQuantity)
+                      : 0,
+                    lowStockAlert: storage.lowStockAlert
+                      ? Number(storage.lowStockAlert)
+                      : 5,
+                    displayOrder: storIdx,
+                  }))
+                : undefined,
+          };
+        }),
       }));
+
+      // Append region color images
+      regionColorImages.forEach(file => {
+        formData.append('colors', file);
+      });
 
       const payload: any = {
         name: productName,
@@ -1276,7 +1380,12 @@ function NewProductPage() {
         }
       });
 
-      const response = await productsService.createWithFormData(formData);
+      const response =
+        productType === 'basic'
+          ? await productsService.createBasic(formData)
+          : productType === 'network'
+          ? await productsService.createNetwork(formData)
+          : await productsService.createRegion(formData);
       alert('✓ Region product created successfully!');
     } catch (err: any) {
       console.error('Error creating region product:', err);
@@ -2316,7 +2425,7 @@ function NewProductPage() {
                     >
                       + Add Color
                     </button>
-                  </div>
+                </div>
                 </div>
               ))}
 
@@ -2478,6 +2587,8 @@ function NewProductPage() {
                             <Label className="text-sm">Color Name</Label>
                             <Input
                               value={color.colorName}
+
+
                               onChange={e =>
                                 updateColorInRegion(
                                   region.id,
@@ -2574,7 +2685,7 @@ function NewProductPage() {
                                         />
                                       </div>
                                       <div>
-                                        <Label className="text-xs">Discount</Label>
+                                        <Label className="text-xs">Discount Price</Label>
                                         <Input
                                           type="number"
                                           value={storage.discountPrice}
@@ -2648,7 +2759,7 @@ function NewProductPage() {
                     >
                       + Add Color
                     </button>
-                  </div>
+                </div>
                 </div>
               ))}
 

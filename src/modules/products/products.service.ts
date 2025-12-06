@@ -17,6 +17,8 @@ import { ProductPrice } from './entities/product-price.entity';
 import { ProductImage } from './entities/product-image.entity';
 import { ProductVideo } from './entities/product-video.entity';
 import { ProductSpecification } from './entities/product-specification.entity';
+import { Category } from '../categories/entities/category.entity';
+import { Brand } from '../brands/entities/brand.entity';
 
 @Injectable()
 export class ProductService {
@@ -481,6 +483,7 @@ export class ProductService {
       await queryRunner.release();
     }
   }
+
   async findAll(filters?: {
     categoryId?: string;
     brandId?: string;
@@ -533,119 +536,7 @@ export class ProductService {
     // Load nested relations for each product
     const productsWithFullRelations = await Promise.all(
       products.map(async (product) => {
-        // Load networks with colors and storages
-        if (product.networks && product.networks.length > 0) {
-          for (const network of product.networks) {
-            // Load default storages for network
-            const defaultStorages = await this.dataSource
-              .getMongoRepository(ProductStorage)
-              .find({
-                where: { networkId: network.id } as any,
-              });
-
-            for (const storage of defaultStorages) {
-              const price = await this.dataSource
-                .getMongoRepository(ProductPrice)
-                .findOne({
-                  where: { storageId: storage.id } as any,
-                });
-              (storage as any).price = price;
-            }
-            (network as any).defaultStorages = defaultStorages;
-
-            const colors = await this.dataSource
-              .getMongoRepository(ProductColor)
-              .find({
-                where: { networkId: network.id } as any,
-              });
-
-            for (const color of colors) {
-              const storages = await this.dataSource
-                .getMongoRepository(ProductStorage)
-                .find({
-                  where: { colorId: color.id } as any,
-                });
-
-              for (const storage of storages) {
-                const price = await this.dataSource
-                  .getMongoRepository(ProductPrice)
-                  .findOne({
-                    where: { storageId: storage.id } as any,
-                  });
-                (storage as any).price = price;
-              }
-              (color as any).storages = storages;
-            }
-            (network as any).colors = colors;
-          }
-        }
-
-        // Load regions with defaultStorages and colors
-        if (product.regions && product.regions.length > 0) {
-          for (const region of product.regions) {
-            const defaultStorages = await this.dataSource
-              .getMongoRepository(ProductStorage)
-              .find({
-                where: { regionId: region.id } as any,
-              });
-
-            for (const storage of defaultStorages) {
-              const price = await this.dataSource
-                .getMongoRepository(ProductPrice)
-                .findOne({
-                  where: { storageId: storage.id } as any,
-                });
-              (storage as any).price = price;
-            }
-            (region as any).defaultStorages = defaultStorages;
-
-            const colors = await this.dataSource
-              .getMongoRepository(ProductColor)
-              .find({
-                where: { regionId: region.id } as any,
-              });
-
-            for (const color of colors) {
-              const storages = await this.dataSource
-                .getMongoRepository(ProductStorage)
-                .find({
-                  where: { colorId: color.id } as any,
-                });
-
-              for (const storage of storages) {
-                const price = await this.dataSource
-                  .getMongoRepository(ProductPrice)
-                  .findOne({
-                    where: { storageId: storage.id } as any,
-                  });
-                (storage as any).price = price;
-              }
-              (color as any).storages = storages;
-            }
-            (region as any).colors = colors;
-          }
-        }
-
-        // Load storages for directColors
-        if (product.directColors && product.directColors.length > 0) {
-          for (const color of product.directColors) {
-            const storages = await this.dataSource
-              .getMongoRepository(ProductStorage)
-              .find({
-                where: { colorId: color.id } as any,
-              });
-
-            for (const storage of storages) {
-              const price = await this.dataSource
-                .getMongoRepository(ProductPrice)
-                .findOne({
-                  where: { storageId: storage.id } as any,
-                });
-              (storage as any).price = price;
-            }
-            (color as any).storages = storages;
-          }
-        }
+        await this.loadProductRelations(product);
 
         return product;
       }),
@@ -654,6 +545,31 @@ export class ProductService {
     return productsWithFullRelations.map((product) =>
       this.formatProductResponse(product),
     );
+  }
+
+  /**
+   * Get product details by ID with optional region/network context
+   */
+  async findProductDetails(productId: string, regionId?: string, networkId?: string) {
+    const product = await this.productRepository.findOne({
+      where: { id: new ObjectId(productId) } as any,
+      relations: [
+        'images',
+        'videos',
+        'regions',
+        'networks',
+        'directColors',
+        'specifications',
+      ],
+    });
+
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+
+    await this.loadProductRelations(product);
+
+    return this.formatProductResponse(product);
   }
 
   /**
@@ -676,127 +592,7 @@ export class ProductService {
       throw new NotFoundException('Product not found');
     }
 
-    // Manually load nested relations for networks (colors with storages)
-    if (product.networks && product.networks.length > 0) {
-      for (const network of product.networks) {
-        // Load default storages for network
-        const defaultStorages = await this.dataSource
-          .getMongoRepository(ProductStorage)
-          .find({
-            where: { networkId: network.id } as any,
-          });
-
-        for (const storage of defaultStorages) {
-          const price = await this.dataSource
-            .getMongoRepository(ProductPrice)
-            .findOne({
-              where: { storageId: storage.id } as any,
-            });
-          (storage as any).price = price;
-        }
-        (network as any).defaultStorages = defaultStorages;
-
-        // Load colors for this network
-        const colors = await this.dataSource
-          .getMongoRepository(ProductColor)
-          .find({
-            where: { networkId: network.id } as any,
-          });
-
-        for (const color of colors) {
-          // Load storages for this color
-          const storages = await this.dataSource
-            .getMongoRepository(ProductStorage)
-            .find({
-              where: { colorId: color.id } as any,
-            });
-
-          // Load prices for storages
-          for (const storage of storages) {
-            const price = await this.dataSource
-              .getMongoRepository(ProductPrice)
-              .findOne({
-                where: { storageId: storage.id } as any,
-              });
-            (storage as any).price = price;
-          }
-          (color as any).storages = storages;
-        }
-        (network as any).colors = colors;
-      }
-    }
-
-    // Manually load nested relations for regions (defaultStorages and colors with their storages)
-    if (product.regions && product.regions.length > 0) {
-      for (const region of product.regions) {
-        // Load default storages
-        const defaultStorages = await this.dataSource
-          .getMongoRepository(ProductStorage)
-          .find({
-            where: { regionId: region.id } as any,
-          });
-
-        // Load prices for default storages
-        for (const storage of defaultStorages) {
-          const price = await this.dataSource
-            .getMongoRepository(ProductPrice)
-            .findOne({
-              where: { storageId: storage.id } as any,
-            });
-          (storage as any).price = price;
-        }
-        (region as any).defaultStorages = defaultStorages;
-
-        // Load colors with their custom storages
-        const colors = await this.dataSource
-          .getMongoRepository(ProductColor)
-          .find({
-            where: { regionId: region.id } as any,
-          });
-
-        for (const color of colors) {
-          // Load custom storages for this color
-          const storages = await this.dataSource
-            .getMongoRepository(ProductStorage)
-            .find({
-              where: { colorId: color.id } as any,
-            });
-
-          // Load prices for custom storages
-          for (const storage of storages) {
-            const price = await this.dataSource
-              .getMongoRepository(ProductPrice)
-              .findOne({
-                where: { storageId: storage.id } as any,
-              });
-            (storage as any).price = price;
-          }
-          (color as any).storages = storages;
-        }
-        (region as any).colors = colors;
-      }
-    }
-
-    // Load storages for directColors
-    if (product.directColors && product.directColors.length > 0) {
-      for (const color of product.directColors) {
-        const storages = await this.dataSource
-          .getMongoRepository(ProductStorage)
-          .find({
-            where: { colorId: color.id } as any,
-          });
-
-        for (const storage of storages) {
-          const price = await this.dataSource
-            .getMongoRepository(ProductPrice)
-            .findOne({
-              where: { storageId: storage.id } as any,
-            });
-          (storage as any).price = price;
-        }
-        (color as any).storages = storages;
-      }
-    }
+    await this.loadProductRelations(product);
 
     return this.formatProductResponse(product);
   }
@@ -883,6 +679,200 @@ export class ProductService {
 
   // ============ Helper Methods ============
 
+  private async loadProductRelations(product: Product) {
+    const productId = product.id;
+
+    // 1. Load Top-level Relations manually
+    if (!product.networks || product.networks.length === 0) {
+      product.networks = await this.dataSource.getMongoRepository(ProductNetwork).find({
+        where: { productId: new ObjectId(productId) } as any,
+        order: { displayOrder: 'ASC' }
+      });
+    }
+    if (!product.regions || product.regions.length === 0) {
+      product.regions = await this.dataSource.getMongoRepository(ProductRegion).find({
+        where: { productId: new ObjectId(productId) } as any,
+        order: { displayOrder: 'ASC' }
+      });
+    }
+    if (!product.directColors || product.directColors.length === 0) {
+      product.directColors = await this.dataSource.getMongoRepository(ProductColor).find({
+        where: { productId: new ObjectId(productId) } as any,
+        order: { displayOrder: 'ASC' }
+      });
+    }
+    if (!product.images || product.images.length === 0) {
+      product.images = await this.dataSource.getMongoRepository(ProductImage).find({
+        where: { productId: new ObjectId(productId) } as any,
+        order: { displayOrder: 'ASC' }
+      });
+    }
+    if (!product.videos || product.videos.length === 0) {
+      product.videos = await this.dataSource.getMongoRepository(ProductVideo).find({
+        where: { productId: new ObjectId(productId) } as any,
+        order: { displayOrder: 'ASC' }
+      });
+    }
+    if (!product.specifications || product.specifications.length === 0) {
+      product.specifications = await this.dataSource.getMongoRepository(ProductSpecification).find({
+        where: { productId: new ObjectId(productId) } as any,
+        order: { displayOrder: 'ASC' }
+      });
+    }
+
+    // 2. Load nested relations for networks (colors with storages)
+    if (product.networks && product.networks.length > 0) {
+      for (const network of product.networks) {
+        // Load default storages for network
+        const defaultStorages = await this.dataSource
+          .getMongoRepository(ProductStorage)
+          .find({
+            where: { networkId: network.id } as any,
+            order: { displayOrder: 'ASC' }
+          });
+
+        for (const storage of defaultStorages) {
+          const price = await this.dataSource
+            .getMongoRepository(ProductPrice)
+            .findOne({
+              where: { storageId: storage.id } as any,
+            });
+          (storage as any).price = price;
+        }
+        (network as any).defaultStorages = defaultStorages;
+
+        // Load colors for this network
+        const colors = await this.dataSource
+          .getMongoRepository(ProductColor)
+          .find({
+            where: { networkId: network.id } as any,
+            order: { displayOrder: 'ASC' }
+          });
+
+        for (const color of colors) {
+          // Load storages for this color
+          const storages = await this.dataSource
+            .getMongoRepository(ProductStorage)
+            .find({
+              where: { colorId: color.id } as any,
+              order: { displayOrder: 'ASC' }
+            });
+
+          // Load prices for storages
+          for (const storage of storages) {
+            const price = await this.dataSource
+              .getMongoRepository(ProductPrice)
+              .findOne({
+                where: { storageId: storage.id } as any,
+              });
+            (storage as any).price = price;
+          }
+          (color as any).storages = storages;
+        }
+        (network as any).colors = colors;
+      }
+    }
+
+    // 3. Load nested relations for regions (defaultStorages and colors with their storages)
+    if (product.regions && product.regions.length > 0) {
+      for (const region of product.regions) {
+        // Load default storages
+        const defaultStorages = await this.dataSource
+          .getMongoRepository(ProductStorage)
+          .find({
+            where: { regionId: region.id } as any,
+            order: { displayOrder: 'ASC' }
+          });
+
+        // Load prices for default storages
+        for (const storage of defaultStorages) {
+          const price = await this.dataSource
+            .getMongoRepository(ProductPrice)
+            .findOne({
+              where: { storageId: storage.id } as any,
+            });
+          (storage as any).price = price;
+        }
+        (region as any).defaultStorages = defaultStorages;
+
+        // Load colors with their custom storages
+        const colors = await this.dataSource
+          .getMongoRepository(ProductColor)
+          .find({
+            where: { regionId: region.id } as any,
+            order: { displayOrder: 'ASC' }
+          });
+
+        for (const color of colors) {
+          // Load custom storages for this color
+          const storages = await this.dataSource
+            .getMongoRepository(ProductStorage)
+            .find({
+              where: { colorId: color.id } as any,
+              order: { displayOrder: 'ASC' }
+            });
+
+          // Load prices for custom storages
+          for (const storage of storages) {
+            const price = await this.dataSource
+              .getMongoRepository(ProductPrice)
+              .findOne({
+                where: { storageId: storage.id } as any,
+              });
+            (storage as any).price = price;
+          }
+          (color as any).storages = storages;
+        }
+        (region as any).colors = colors;
+      }
+    }
+
+    // 4. Load storages for directColors
+    if (product.directColors && product.directColors.length > 0) {
+      for (const color of product.directColors) {
+        const storages = await this.dataSource
+          .getMongoRepository(ProductStorage)
+          .find({
+            where: { colorId: color.id } as any,
+            order: { displayOrder: 'ASC' }
+          });
+
+        for (const storage of storages) {
+          const price = await this.dataSource
+            .getMongoRepository(ProductPrice)
+            .findOne({
+              where: { storageId: storage.id } as any,
+            });
+          (storage as any).price = price;
+        }
+        (color as any).storages = storages;
+      }
+    }
+
+    // 5. Load Categories and Brands
+    if (product.categoryIds && product.categoryIds.length > 0) {
+      const categories = await this.dataSource
+        .getMongoRepository(Category)
+        .find({
+          where: {
+            _id: { $in: product.categoryIds }
+          } as any
+        });
+      (product as any).categories = categories;
+    }
+
+    if (product.brandIds && product.brandIds.length > 0) {
+      const brands = await this.dataSource
+        .getMongoRepository(Brand)
+        .find({
+          where: {
+            _id: { $in: product.brandIds }
+          } as any
+        });
+      (product as any).brands = brands;
+    }
+  }
+
   private formatProductResponse(product: Product) {
     const prices = this.extractAllPrices(product);
     const totalStock = this.calculateTotalStock(product);
@@ -895,8 +885,19 @@ export class ProductService {
       description: product.description,
       categoryId: product.categoryId,
       categoryIds: product.categoryIds,
+      categories: (product as any).categories?.map((cat: any) => ({
+        id: cat.id,
+        name: cat.name,
+        slug: cat.slug,
+      })),
       brandId: product.brandId,
       brandIds: product.brandIds,
+      brands: (product as any).brands?.map((brand: any) => ({
+        id: brand.id,
+        name: brand.name,
+        slug: brand.slug,
+        logo: brand.logo,
+      })),
       productCode: product.productCode,
       sku: product.sku,
       warranty: product.warranty,

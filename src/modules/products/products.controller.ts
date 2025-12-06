@@ -124,7 +124,7 @@ export class ProductsController {
    */
   private async processFileUploads(dto: any, files: any) {
     // 1. Parse JSON fields
-    const jsonFields = ['specifications', 'seoKeywords', 'tags', 'videos', 'colors', 'networks', 'regions'];
+    const jsonFields = ['specifications', 'seoKeywords', 'tags', 'videos', 'colors', 'networks', 'regions', 'categoryIds', 'brandIds'];
     
     for (const field of jsonFields) {
       if (typeof dto[field] === 'string') {

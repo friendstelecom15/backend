@@ -1,2801 +1,513 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @next/next/no-img-element */
-/* eslint-disable @typescript-eslint/no-unused-vars */
 'use client';
 
+import {EditProductModal} from '../../components/admin/edit-product-modal';
+import {ViewProductModal} from '../../components/admin/view-product-modal';
+
 import {useState, useEffect} from 'react';
-import productsService from '../../../lib/api/services/products';
-import categoriesService from '../../../lib/api/services/categories';
-import brandsService from '../../../lib/api/services/brands';
 import Link from 'next/link';
+import Image from 'next/image';
 import {
-  ArrowLeft,
-  Upload,
-  X,
   Plus,
-  Image as ImageIcon,
+  Search,
+  Filter,
+  MoreVertical,
+  Edit,
+  Trash2,
+  Eye,
+  Copy,
 } from 'lucide-react';
+import {withProtectedRoute} from '../../lib/auth/protected-route';
+import {Card, CardContent} from '../../components/ui/card';
+import {Button} from '../../components/ui/button';
+import {Input} from '../../components/ui/input';
+import {Badge} from '../../components/ui/badge';
+import {Checkbox} from '../../components/ui/checkbox';
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '../../../components/ui/card';
-import {Button} from '../../../components/ui/button';
-import {Input} from '../../../components/ui/input';
-import {Label} from '../../../components/ui/label';
-import {Textarea} from '../../../components/ui/textarea';
-import {Switch} from '../../../components/ui/switch';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../../components/ui/dropdown-menu';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '../../../components/ui/select';
+} from '../../components/ui/select';
 import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '../../../components/ui/tabs';
-import {withProtectedRoute} from '../../../lib/auth/protected-route';
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../../components/ui/alert-dialog';
+import {formatPrice} from '../../lib/utils/format';
 
-type ProductType = 'basic' | 'network' | 'region';
+import productsService from '../../lib/api/services/products';
+import categoriesService from '../../lib/api/services/categories';
 
-function NewProductPage() {
-  const [productType, setProductType] = useState<ProductType>('basic');
+// UI Product type for display
+type UIProduct = {
+  id: string;
+  name: string;
+  image: string;
+  sku: string;
+  category: string;
+  price: number;
+  stock: number;
+  status: string;
+  description?: string;
+  type: 'basic' | 'network' | 'region';
+};
 
-  // Basic product info (shared across all types)
-  const [productName, setProductName] = useState('');
-  const [slug, setSlug] = useState('');
-  const [description, setDescription] = useState('');
-  const [shortDescription, setShortDescription] = useState('');
-  const [productCode, setProductCode] = useState('');
-  const [sku, setSku] = useState('');
-  const [warranty, setWarranty] = useState('');
-
-  // Category and Brand
+function AdminProductsPage() {
+  const [products, setProducts] = useState<UIProduct[]>([]);
+  const [activeTab, setActiveTab] = useState<'all' | 'basic' | 'network' | 'region'>('all');
+  const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
+  const [viewOpen, setViewOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [loading, setLoading] = useState<boolean>(false);
   const [categories, setCategories] = useState<{id: string; name: string}[]>(
     [],
   );
-  const [brands, setBrands] = useState<{id: string; name: string}[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
-  const [selectedBrand, setSelectedBrand] = useState<string>('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
-  // Status flags
-  const [isActive, setIsActive] = useState(true);
-  const [isOnline, setIsOnline] = useState(true);
-  const [isPos, setIsPos] = useState(true);
-  const [isPreOrder, setIsPreOrder] = useState(false);
-  const [isOfficial, setIsOfficial] = useState(false);
-  const [freeShipping, setFreeShipping] = useState(false);
-  const [isEmi, setIsEmi] = useState(false);
-
-  // Reward & Booking
-  const [rewardPoints, setRewardPoints] = useState('');
-  const [minBookingPrice, setMinBookingPrice] = useState('');
-
-  // SEO
-  const [seoTitle, setSeoTitle] = useState('');
-  const [seoDescription, setSeoDescription] = useState('');
-  const [seoKeywords, setSeoKeywords] = useState('');
-  const [seoCanonical, setSeoCanonical] = useState('');
-  const [tags, setTags] = useState('');
-
-  // File uploads
-  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
-  const [thumbnailPreview, setThumbnailPreview] = useState<string>('');
-  const [galleryImageFiles, setGalleryImageFiles] = useState<File[]>([]);
-  const [galleryImagePreviews, setGalleryImagePreviews] = useState<
-    Array<{
-      url: string;
-      altText: string;
-      file: File;
-    }>
-  >([]);
-
-  // Basic product colors
-  const [basicColors, setBasicColors] = useState<
-    Array<{
-      id: string;
-      colorName: string;
-      colorImage: string;
-      colorImageFile: File | null;
-      regularPrice: string;
-      discountPrice: string;
-      stockQuantity: string;
-    }>
-  >([]);
-
-  // Videos
-  const [videos, setVideos] = useState<
-    Array<{
-      id: string;
-      url: string;
-      type: string;
-    }>
-  >([{id: 'video-1', url: '', type: 'youtube'}]);
-
-  // Specifications
-  const [specifications, setSpecifications] = useState<
-    Array<{
-      id: string;
-      key: string;
-      value: string;
-    }>
-  >([{id: 'spec-1', key: '', value: ''}]);
-
-  // Networks (for network product type)
-  const [networks, setNetworks] = useState<
-    Array<{
-      id: string;
-      networkName: string;
-      priceAdjustment: string;
-      defaultStorageSize: string;
-      isDefault: boolean;
-      hasDefaultStorages: boolean;
-      defaultStorages: Array<{
-        id: string;
-        storageSize: string;
-        regularPrice: string;
-        discountPrice: string;
-        discountPercent: string;
-        stockQuantity: string;
-        lowStockAlert: string;
-      }>;
-      colors: Array<{
-        id: string;
-        colorName: string;
-        colorImage: string;
-        colorImageFile: File | null;
-        hasStorage: boolean;
-        useDefaultStorages: boolean;
-        singlePrice: string;
-        singleComparePrice: string;
-        singleStockQuantity: string;
-        storages: Array<{
-          id: string;
-          storageSize: string;
-          regularPrice: string;
-          discountPrice: string;
-          discountPercent: string;
-          stockQuantity: string;
-          lowStockAlert: string;
-        }>;
-      }>;
-    }>
-  >([]);
-
-  // Regions (for region product type)
-  const [regions, setRegions] = useState<
-    Array<{
-      id: string;
-      regionName: string;
-      isDefault: boolean;
-      defaultStorages: Array<{
-        id: string;
-        storageSize: string;
-        regularPrice: string;
-        discountPrice: string;
-        discountPercent: string;
-        stockQuantity: string;
-        lowStockAlert: string;
-      }>;
-      colors: Array<{
-        id: string;
-        colorName: string;
-        colorImage: string;
-        colorImageFile: File | null;
-        hasStorage: boolean;
-        useDefaultStorages: boolean;
-        singlePrice: string;
-        singleComparePrice: string;
-        singleStockQuantity: string;
-        storages: Array<{
-          id: string;
-          storageSize: string;
-          regularPrice: string;
-          discountPrice: string;
-          discountPercent: string;
-          stockQuantity: string;
-          lowStockAlert: string;
-        }>;
-      }>;
-    }>
-  >([
-    {
-      id: 'region-1',
-      regionName: 'International',
-      isDefault: true,
-      defaultStorages: [
-        {
-          id: 'default-storage-1',
-          storageSize: '256GB',
-          regularPrice: '',
-          discountPrice: '',
-          discountPercent: '',
-          stockQuantity: '',
-          lowStockAlert: '5',
-        },
-      ],
-      colors: [
-        {
-          id: 'color-1',
-          colorName: 'Midnight',
-          colorImage: '',
-          colorImageFile: null,
-          hasStorage: true,
-          useDefaultStorages: true,
-          singlePrice: '',
-          singleComparePrice: '',
-          singleStockQuantity: '',
-          storages: [],
-        },
-      ],
-    },
-  ]);
-
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Fetch categories and brands
+  // Fetch categories on mount
   useEffect(() => {
-    categoriesService.getAll().then(data => {
-      setCategories(
-        data.map((c: any) => ({
-          id: c.id,
-          name: c.name,
-        })),
-      );
-    });
-    brandsService.findAll().then(data => {
-      setBrands(data.map((b: any) => ({id: b.id, name: b.name})));
-    });
+    const fetchCategories = async () => {
+      try {
+        const cats = await categoriesService.getAll();
+        setCategories(
+          cats
+            .filter((c: any) => c.id !== 'all')
+            .map((c: any) => ({id: c.id, name: c.name}))
+        );
+      } catch {
+        setCategories([]);
+      }
+    };
+    fetchCategories();
   }, []);
 
-  // Slugify helper
-  const slugify = (text: string) =>
-    text
-      .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, '')
-      .replace(/\s+/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-+|-+$/g, '');
-
-  const handleProductNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newName = e.target.value;
-    setProductName(newName);
-    setSlug(prevSlug => {
-      const prevAuto = slugify(productName);
-      const newAuto = slugify(newName);
-      if (prevSlug === prevAuto || prevSlug === '') {
-        return newAuto;
-      }
-      return prevSlug;
-    });
-  };
-
-  const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSlug(slugify(e.target.value));
-  };
-
-  // Rich text editor
-  const formatText = (command: string, value?: string) => {
-    document.execCommand(command, false, value);
-  };
-
-  const handleShortDescriptionChange = (e: React.FormEvent<HTMLDivElement>) => {
-    setShortDescription(e.currentTarget.innerHTML);
-  };
-
-  // Thumbnail handling
-  const handleThumbnailUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setThumbnailFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setThumbnailPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const removeThumbnail = () => {
-    setThumbnailFile(null);
-    setThumbnailPreview('');
-  };
-
-  // Gallery handling
-  const handleGalleryImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    files.forEach(file => {
-      setGalleryImageFiles(prev => [...prev, file]);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setGalleryImagePreviews(prev => [
-          ...prev,
-          {url: reader.result as string, altText: '', file},
-        ]);
-      };
-      reader.readAsDataURL(file);
-    });
-  };
-
-  const removeGalleryImage = (index: number) => {
-    setGalleryImageFiles(prev => prev.filter((_, i) => i !== index));
-    setGalleryImagePreviews(prev => prev.filter((_, i) => i !== index));
-  };
-
-  // Basic color management
-  const addBasicColor = () => {
-    setBasicColors([
-      ...basicColors,
-      {
-        id: `color-${Date.now()}`,
-        colorName: '',
-        colorImage: '',
-        colorImageFile: null,
-        regularPrice: '',
-        discountPrice: '',
-        stockQuantity: '',
-      },
-    ]);
-  };
-
-  const removeBasicColor = (colorId: string) => {
-    setBasicColors(basicColors.filter(c => c.id !== colorId));
-  };
-
-  const updateBasicColor = (colorId: string, field: string, value: any) => {
-    setBasicColors(
-      basicColors.map(c => (c.id === colorId ? {...c, [field]: value} : c)),
-    );
-  };
-
-  const handleBasicColorImageUpload = (
-    colorId: string,
-    e: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setBasicColors(
-          basicColors.map(c =>
-            c.id === colorId
-              ? {
-                  ...c,
-                  colorImage: reader.result as string,
-                  colorImageFile: file,
-                }
-              : c,
-          ),
-        );
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const removeBasicColorImage = (colorId: string) => {
-    setBasicColors(
-      basicColors.map(c =>
-        c.id === colorId
-          ? {...c, colorImage: '', colorImageFile: null}
-          : c,
-      ),
-    );
-  };
-
-  // Specification management
-  const addSpecification = () => {
-    setSpecifications([
-      ...specifications,
-      {id: `spec-${Date.now()}`, key: '', value: ''},
-    ]);
-  };
-
-  const removeSpecification = (specId: string) => {
-    setSpecifications(specifications.filter(s => s.id !== specId));
-  };
-
-  const updateSpecification = (specId: string, field: string, value: string) => {
-    setSpecifications(
-      specifications.map(s =>
-        s.id === specId ? {...s, [field]: value} : s,
-      ),
-    );
-  };
-
-  // Network management
-  const addNetwork = () => {
-    setNetworks([
-      ...networks,
-      {
-        id: `network-${Date.now()}`,
-        networkName: '',
-        priceAdjustment: '0',
-        defaultStorageSize: '',
-        isDefault: false,
-        hasDefaultStorages: false,
-        defaultStorages: [
-          {
-            id: `default-storage-${Date.now()}`,
-            storageSize: '256GB',
-            regularPrice: '',
-            discountPrice: '',
-            discountPercent: '',
-            stockQuantity: '',
-            lowStockAlert: '5',
-          },
-        ],
-        colors: [
-          {
-            id: `color-${Date.now()}`,
-            colorName: '',
-            colorImage: '',
-            colorImageFile: null,
-            hasStorage: true,
-            useDefaultStorages: true,
-            singlePrice: '',
-            singleComparePrice: '',
-            singleStockQuantity: '',
-            storages: [],
-          },
-        ],
-      },
-    ]);
-  };
-
-  const removeNetwork = (networkId: string) => {
-    setNetworks(networks.filter(n => n.id !== networkId));
-  };
-
-  const updateNetwork = (networkId: string, field: string, value: any) => {
-    setNetworks(
-      networks.map(n => (n.id === networkId ? {...n, [field]: value} : n)),
-    );
-  };
-
-  // Color image upload for network colors
-  const handleNetworkColorImageUpload = (
-    networkId: string,
-    colorId: string,
-    e: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setNetworks(
-          networks.map(n =>
-            n.id === networkId
-              ? {
-                  ...n,
-                  colors: n.colors.map(c =>
-                    c.id === colorId
-                      ? {
-                          ...c,
-                          colorImage: reader.result as string,
-                          colorImageFile: file,
-                        }
-                      : c,
-                  ),
-                }
-              : n,
-          ),
-        );
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const removeNetworkColorImage = (networkId: string, colorId: string) => {
-    setNetworks(
-      networks.map(n =>
-        n.id === networkId
-          ? {
-              ...n,
-              colors: n.colors.map(c =>
-                c.id === colorId
-                  ? {...c, colorImage: '', colorImageFile: null}
-                  : c,
-              ),
-            }
-          : n,
-      ),
-    );
-  };
-
-  const addColorToNetwork = (networkId: string) => {
-    setNetworks(
-      networks.map(n =>
-        n.id === networkId
-          ? {
-              ...n,
-              colors: [
-                ...n.colors,
-                {
-                  id: `color-${Date.now()}`,
-                  colorName: '',
-                  colorImage: '',
-                  colorImageFile: null,
-                  hasStorage: true,
-                  useDefaultStorages: true,
-                  singlePrice: '',
-                  singleComparePrice: '',
-                  singleStockQuantity: '',
-                  storages: [],
-                },
-              ],
-            }
-          : n,
-      ),
-    );
-  };
-
-  const removeColorFromNetwork = (networkId: string, colorId: string) => {
-    setNetworks(
-      networks.map(n =>
-        n.id === networkId
-          ? {...n, colors: n.colors.filter(c => c.id !== colorId)}
-          : n,
-      ),
-    );
-  };
-
-  const updateColorInNetwork = (
-    networkId: string,
-    colorId: string,
-    field: string,
-    value: any,
-  ) => {
-    setNetworks(
-      networks.map(n =>
-        n.id === networkId
-          ? {
-              ...n,
-              colors: n.colors.map(c =>
-                c.id === colorId ? {...c, [field]: value} : c,
-              ),
-            }
-          : n,
-      ),
-    );
-  };
-
-  const addStorageToNetwork = (networkId: string, colorId: string) => {
-    setNetworks(
-      networks.map(n =>
-        n.id === networkId
-          ? {
-              ...n,
-              colors: n.colors.map(c =>
-                c.id === colorId
-                  ? {
-                      ...c,
-                      storages: [
-                        ...c.storages,
-                        {
-                          id: `storage-${Date.now()}`,
-                          storageSize: '',
-                          regularPrice: '',
-                          discountPrice: '',
-                          discountPercent: '',
-                          stockQuantity: '',
-                          lowStockAlert: '5',
-                        },
-                      ],
-                    }
-                  : c,
-              ),
-            }
-          : n,
-      ),
-    );
-  };
-
-  const removeStorageFromNetwork = (
-    networkId: string,
-    colorId: string,
-    storageId: string,
-  ) => {
-    setNetworks(
-      networks.map(n =>
-        n.id === networkId
-          ? {
-              ...n,
-              colors: n.colors.map(c =>
-                c.id === colorId
-                  ? {
-                      ...c,
-                      storages: c.storages.filter(s => s.id !== storageId),
-                    }
-                  : c,
-              ),
-            }
-          : n,
-      ),
-    );
-  };
-
-  const updateStorageInNetwork = (
-    networkId: string,
-    colorId: string,
-    storageId: string,
-    field: string,
-    value: any,
-  ) => {
-    setNetworks(
-      networks.map(n =>
-        n.id === networkId
-          ? {
-              ...n,
-              colors: n.colors.map(c =>
-                c.id === colorId
-                  ? {
-                      ...c,
-                      storages: c.storages.map(s =>
-                        s.id === storageId ? {...s, [field]: value} : s,
-                      ),
-                    }
-                  : c,
-              ),
-            }
-          : n,
-      ),
-    );
-  };
-
-  // Network default storage management
-  const addDefaultStorageToNetwork = (networkId: string) => {
-    setNetworks(
-      networks.map(n =>
-        n.id === networkId
-          ? {
-              ...n,
-              defaultStorages: [
-                ...n.defaultStorages,
-                {
-                  id: `default-storage-${Date.now()}`,
-                  storageSize: '',
-                  regularPrice: '',
-                  discountPrice: '',
-                  discountPercent: '',
-                  stockQuantity: '',
-                  lowStockAlert: '5',
-                },
-              ],
-            }
-          : n,
-      ),
-    );
-  };
-
-  const removeDefaultStorageFromNetwork = (networkId: string, storageId: string) => {
-    setNetworks(
-      networks.map(n =>
-        n.id === networkId
-          ? {
-              ...n,
-              defaultStorages: n.defaultStorages.filter(s => s.id !== storageId),
-            }
-          : n,
-      ),
-    );
-  };
-
-  const updateDefaultStorageInNetwork = (
-    networkId: string,
-    storageId: string,
-    field: string,
-    value: any,
-  ) => {
-    setNetworks(
-      networks.map(n =>
-        n.id === networkId
-          ? {
-              ...n,
-              defaultStorages: n.defaultStorages.map(s =>
-                s.id === storageId ? {...s, [field]: value} : s,
-              ),
-            }
-          : n,
-      ),
-    );
-  };
-
-  // Region management
-  const addRegion = () => {
-    setRegions([
-      ...regions,
-      {
-        id: `region-${Date.now()}`,
-        regionName: '',
-        isDefault: false,
-        defaultStorages: [
-          {
-            id: `default-storage-${Date.now()}`,
-            storageSize: '',
-            regularPrice: '',
-            discountPrice: '',
-            discountPercent: '',
-            stockQuantity: '',
-            lowStockAlert: '5',
-          },
-        ],
-        colors: [
-          {
-            id: `color-${Date.now()}`,
-            colorName: '',
-            colorImage: '',
-            colorImageFile: null,
-            hasStorage: true,
-            useDefaultStorages: true,
-            singlePrice: '',
-            singleComparePrice: '',
-            singleStockQuantity: '',
-            storages: [],
-          },
-        ],
-      },
-    ]);
-  };
-
-  const removeRegion = (regionId: string) => {
-    setRegions(regions.filter(r => r.id !== regionId));
-  };
-
-  const updateRegion = (regionId: string, field: string, value: any) => {
-    setRegions(
-      regions.map(r => (r.id === regionId ? {...r, [field]: value} : r)),
-    );
-  };
-
-  const addColorToRegion = (regionId: string) => {
-    setRegions(
-      regions.map(r =>
-        r.id === regionId
-          ? {
-              ...r,
-              colors: [
-                ...r.colors,
-                {
-                  id: `color-${Date.now()}`,
-                  colorName: '',
-                  colorImage: '',
-                  colorImageFile: null,
-                  hasStorage: true,
-                  useDefaultStorages: true,
-                  singlePrice: '',
-                  singleComparePrice: '',
-                  singleStockQuantity: '',
-                  storages: [],
-                },
-              ],
-            }
-          : r,
-      ),
-    );
-  };
-
-  const removeColorFromRegion = (regionId: string, colorId: string) => {
-    setRegions(
-      regions.map(r =>
-        r.id === regionId
-          ? {...r, colors: r.colors.filter(c => c.id !== colorId)}
-          : r,
-      ),
-    );
-  };
-
-  const updateColorInRegion = (
-    regionId: string,
-    colorId: string,
-    field: string,
-    value: any,
-  ) => {
-    setRegions(
-      regions.map(r =>
-        r.id === regionId
-          ? {
-              ...r,
-              colors: r.colors.map(c =>
-                c.id === colorId ? {...c, [field]: value} : c,
-              ),
-            }
-          : r,
-      ),
-    );
-  };
-
-  const addStorageToRegion = (regionId: string, colorId: string) => {
-    setRegions(
-      regions.map(r =>
-        r.id === regionId
-          ? {
-              ...r,
-              colors: r.colors.map(c =>
-                c.id === colorId
-                  ? {
-                      ...c,
-                      storages: [
-                        ...c.storages,
-                        {
-                          id: `storage-${Date.now()}`,
-                          storageSize: '',
-                          regularPrice: '',
-                          discountPrice: '',
-                          discountPercent: '',
-                          stockQuantity: '',
-                          lowStockAlert: '5',
-                        },
-                      ],
-                    }
-                  : c,
-              ),
-            }
-          : r,
-      ),
-    );
-  };
-
-  const removeStorageFromRegion = (
-    regionId: string,
-    colorId: string,
-    storageId: string,
-  ) => {
-    setRegions(
-      regions.map(r =>
-        r.id === regionId
-          ? {
-              ...r,
-              colors: r.colors.map(c =>
-                c.id === colorId
-                  ? {
-                      ...c,
-                      storages: c.storages.filter(s => s.id !== storageId),
-                    }
-                  : c,
-              ),
-            }
-          : r,
-      ),
-    );
-  };
-
-  const updateStorageInRegion = (
-    regionId: string,
-    colorId: string,
-    storageId: string,
-    field: string,
-    value: any,
-  ) => {
-    setRegions(
-      regions.map(r =>
-        r.id === regionId
-          ? {
-              ...r,
-              colors: r.colors.map(c =>
-                c.id === colorId
-                  ? {
-                      ...c,
-                      storages: c.storages.map(s =>
-                        s.id === storageId ? {...s, [field]: value} : s,
-                      ),
-                    }
-                  : c,
-              ),
-            }
-          : r,
-      ),
-    );
-  };
-
-  const addDefaultStorageToRegion = (regionId: string) => {
-    setRegions(
-      regions.map(r =>
-        r.id === regionId
-          ? {
-              ...r,
-              defaultStorages: [
-                ...r.defaultStorages,
-                {
-                  id: `default-storage-${Date.now()}`,
-                  storageSize: '',
-                  regularPrice: '',
-                  discountPrice: '',
-                  discountPercent: '',
-                  stockQuantity: '',
-                  lowStockAlert: '5',
-                },
-              ],
-            }
-          : r,
-      ),
-    );
-  };
-
-  const removeDefaultStorageFromRegion = (regionId: string, storageId: string) => {
-    setRegions(
-      regions.map(r =>
-        r.id === regionId
-          ? {
-              ...r,
-              defaultStorages: r.defaultStorages.filter(s => s.id !== storageId),
-            }
-          : r,
-      ),
-    );
-  };
-
-  const updateDefaultStorageInRegion = (
-    regionId: string,
-    storageId: string,
-    field: string,
-    value: any,
-  ) => {
-    setRegions(
-      regions.map(r =>
-        r.id === regionId
-          ? {
-              ...r,
-              defaultStorages: r.defaultStorages.map(s =>
-                s.id === storageId ? {...s, [field]: value} : s,
-              ),
-            }
-          : r,
-      ),
-    );
-  };
-
-  // SUBMIT FUNCTIONS
-  const handleBasicProductSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    try {
-      const formData = new FormData();
-
-      if (thumbnailFile) {
-        formData.append('thumbnail', thumbnailFile);
-      }
-
-      galleryImageFiles.forEach(file => {
-        formData.append('galleryImages', file);
-      });
-
-      basicColors.forEach((color, idx) => {
-        if (color.colorImageFile) {
-          formData.append(`colors[${idx}][colorImage]`, color.colorImageFile);
+  // Fetch products, optionally filtered by category
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const fetchProducts = async () => {
+      setLoading(true);
+      try {
+        const queryParams: any = {};
+        if (activeTab !== 'all') {
+          queryParams.productType = activeTab;
         }
-      });
+        if (selectedCategory && selectedCategory !== 'all') {
+          queryParams.categoryId = selectedCategory;
+        }
+        const res = await productsService.getAll(queryParams);
+        const apiProducts = Array.isArray(res) ? res : [];
+        // Find missing category IDs
+        const missingCategoryIds = [
+          ...new Set(
+            apiProducts
+              .map((p: any) => p.categoryId)
+              .filter(
+                (id: string) => id && !categories.some((c: any) => c.id === id),
+              ),
+          ),
+        ];
+        // Fetch missing categories
+        if (missingCategoryIds.length > 0) {
+          const fetched = await Promise.all(
+            missingCategoryIds.map(id => categoriesService.getById(id)),
+          );
+          setCategories(prev => {
+            const allCats = [
+              ...prev,
+              ...fetched
+                .filter(Boolean)
+                .filter((c: any) => c.id !== 'all')
+                .map((c: any) => ({id: c.id, name: c.name})),
+            ];
+            // Deduplicate by id
+            const deduped = Array.from(
+              new Map(allCats.map(cat => [cat.id, cat])).values()
+            );
+            return deduped;
+          });
+        }
+        const mapped: UIProduct[] = apiProducts.map((p: any) => {
+          const categoryObj = categories.find(c => c.id === p.categoryId);
+          
+          // Map backend fields to UI fields
+          // Stock: Use totalStock (calculated from all variants) or stockQuantity (simple product)
+          const stockNum = p.totalStock ?? p.stockQuantity ?? 0;
 
-      const payload: any = {
-        name: productName,
-        slug,
-        description: description || undefined,
-        shortDescription: shortDescription || undefined,
-        categoryId: selectedCategory || undefined,
-        brandId: selectedBrand || undefined,
-        productCode: productCode || undefined,
-        sku: sku || undefined,
-        warranty: warranty || undefined,
-        isActive,
-        isOnline,
-        isPos,
-        isPreOrder,
-        isOfficial,
-        freeShipping,
-        isEmi,
-        rewardPoints: rewardPoints ? Number(rewardPoints) : undefined,
-        minBookingPrice: minBookingPrice ? Number(minBookingPrice) : undefined,
-        seoTitle: seoTitle || undefined,
-        seoDescription: seoDescription || undefined,
-        seoKeywords: seoKeywords
-          ? seoKeywords.split(',').map(k => k.trim())
-          : undefined,
-        seoCanonical: seoCanonical || undefined,
-        tags: tags ? tags.split(',').map(t => t.trim()) : undefined,
-        videos: videos
-          .filter(v => v.url)
-          .map((v, idx) => ({
-            videoUrl: v.url,
-            videoType: v.type,
-            displayOrder: idx,
-          })),
-        specifications: specifications
-          .filter(s => s.key && s.value)
-          .map((s, idx) => ({
-            specKey: s.key,
-            specValue: s.value,
-            displayOrder: idx,
-          })),
-        colors:
-          basicColors.length > 0
-            ? basicColors.map((c, idx) => ({
-                colorName: c.colorName,
-                regularPrice: c.regularPrice ? Number(c.regularPrice) : undefined,
-                discountPrice: c.discountPrice ? Number(c.discountPrice) : undefined,
-                stockQuantity: c.stockQuantity ? Number(c.stockQuantity) : undefined,
-                displayOrder: idx,
-              }))
-            : undefined,
-      };
+          // Price: Use price (simple) or min price from range
+          const priceNum = p.price ?? p.priceRange?.min ?? 0;
 
-      Object.keys(payload).forEach(key => {
-        const value = payload[key];
-        if (value !== undefined) {
-          if (typeof value === 'object') {
-            formData.append(key, JSON.stringify(value));
-          } else {
-            formData.append(key, String(value));
+          // Image: Find thumbnail or use first image
+          const imageUrl = p.images?.find((img: any) => img.isThumbnail)?.url 
+            || p.images?.[0]?.url 
+            || '/placeholder.svg';
+
+          // Status: Derive from isActive and stock
+          let status = 'Inactive';
+          if (p.isActive) {
+             if (stockNum <= (p.lowStockAlert || 5) && stockNum > 0) status = 'Low Stock';
+             else if (stockNum > 0) status = 'Active';
+             else status = 'Out of Stock';
           }
-        }
-      });
 
-      const response =
-        productType === 'basic'
-          ? await productsService.createBasic(formData)
-          : productType === 'network'
-          ? await productsService.createNetwork(formData)
-          : await productsService.createRegion(formData);
-      alert('✓ Basic product created successfully!');
-    } catch (err: any) {
-      console.error('Error creating basic product:', err);
-      alert(`Error: ${err?.response?.data?.message || err?.message || 'Unknown error'}`);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleNetworkProductSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    try {
-      const formData = new FormData();
-
-      if (thumbnailFile) {
-        formData.append('thumbnail', thumbnailFile);
-      }
-
-      galleryImageFiles.forEach(file => {
-        formData.append('galleryImages', file);
-      });
-
-      const networkColorImages: File[] = [];
-
-      // Format networks data properly for backend
-      const formattedNetworks = networks.map((network, netIdx) => ({
-        networkName: network.networkName,
-        isDefault: network.isDefault,
-        hasDefaultStorages: network.hasDefaultStorages,
-        displayOrder: netIdx,
-        // Default storages for this network
-        defaultStorages: network.hasDefaultStorages
-          ? network.defaultStorages.map((storage, storIdx) => ({
-              storageSize: storage.storageSize,
-              regularPrice: storage.regularPrice
-                ? Number(storage.regularPrice)
-                : 0,
-              comparePrice: storage.regularPrice
-                ? Number(storage.regularPrice)
-                : 0,
-              discountPrice: storage.discountPrice
-                ? Number(storage.discountPrice)
-                : 0,
-              discountPercent: storage.discountPercent
-                ? Number(storage.discountPercent)
-                : 0,
-              stockQuantity: storage.stockQuantity
-                ? Number(storage.stockQuantity)
-                : 0,
-              lowStockAlert: storage.lowStockAlert
-                ? Number(storage.lowStockAlert)
-                : 5,
-              displayOrder: storIdx,
-            }))
-          : undefined,
-        // Colors in this network
-        colors: network.colors.map((color, colorIdx) => {
-          let imageIndex = -1;
-          if (color.colorImageFile) {
-            networkColorImages.push(color.colorImageFile);
-            imageIndex = networkColorImages.length - 1;
+          // Determine type
+          let type: 'basic' | 'network' | 'region' = 'basic';
+          
+          if (p.productType) {
+            const pt = String(p.productType).toLowerCase();
+            if (pt === 'network') type = 'network';
+            else if (pt === 'region') type = 'region';
+          } else if (p.type && ['basic', 'network', 'region'].includes(p.type)) {
+             type = p.type as 'basic' | 'network' | 'region';
+          } else {
+            if (Array.isArray(p.networks) && p.networks.length > 0) type = 'network';
+            else if (Array.isArray(p.regions) && p.regions.length > 0) type = 'region';
           }
 
           return {
-            colorName: color.colorName,
-            hasStorage: color.hasStorage,
-            useDefaultStorages: color.useDefaultStorages,
-            displayOrder: colorIdx,
-            colorImageIndex: imageIndex > -1 ? imageIndex : undefined,
-            // If no storage, use single price
-            singlePrice: !color.hasStorage
-              ? Number(color.singlePrice) || 0
-              : undefined,
-            singleComparePrice: !color.hasStorage
-              ? Number(color.singleComparePrice) || 0
-              : undefined,
-            singleStockQuantity: !color.hasStorage
-              ? Number(color.singleStockQuantity) || 0
-              : undefined,
-            // Custom storages (only if has storage and not using defaults)
-            storages:
-              color.hasStorage && !color.useDefaultStorages
-                ? color.storages.map((storage, storIdx) => ({
-                    storageSize: storage.storageSize,
-                    regularPrice: storage.regularPrice
-                      ? Number(storage.regularPrice)
-                      : 0,
-                    comparePrice: storage.regularPrice
-                      ? Number(storage.regularPrice)
-                      : 0,
-                    discountPrice: storage.discountPrice
-                      ? Number(storage.discountPrice)
-                      : 0,
-                    discountPercent: storage.discountPercent
-                      ? Number(storage.discountPercent)
-                      : 0,
-                    stockQuantity: storage.stockQuantity
-                      ? Number(storage.stockQuantity)
-                      : 0,
-                    lowStockAlert: storage.lowStockAlert
-                      ? Number(storage.lowStockAlert)
-                      : 5,
-                    displayOrder: storIdx,
-                  }))
-                : undefined,
+            id: p.id,
+            name: p.name,
+            image: imageUrl,
+            sku: p.sku || '',
+            category: categoryObj ? categoryObj.name : 'Uncategorized',
+            price: priceNum,
+            stock: stockNum,
+            status: status,
+            description: p.description || '',
+            type,
           };
-        }),
-      }));
-
-      // Append network color images
-      networkColorImages.forEach(file => {
-        formData.append('colors', file);
-      });
-
-      const payload: any = {
-        name: productName,
-        slug,
-        description: description || undefined,
-        shortDescription: shortDescription || undefined,
-        categoryId: selectedCategory || undefined,
-        brandId: selectedBrand || undefined,
-        productCode: productCode || undefined,
-        sku: sku || undefined,
-        warranty: warranty || undefined,
-        isActive,
-        isOnline,
-        isPos,
-        isPreOrder,
-        isOfficial,
-        freeShipping,
-        isEmi,
-        rewardPoints: rewardPoints ? Number(rewardPoints) : undefined,
-        minBookingPrice: minBookingPrice ? Number(minBookingPrice) : undefined,
-        seoTitle: seoTitle || undefined,
-        seoDescription: seoDescription || undefined,
-        seoKeywords: seoKeywords
-          ? seoKeywords.split(',').map(k => k.trim())
-          : undefined,
-        seoCanonical: seoCanonical || undefined,
-        tags: tags ? tags.split(',').map(t => t.trim()) : undefined,
-        videos: videos
-          .filter(v => v.url)
-          .map((v, idx) => ({
-            videoUrl: v.url,
-            videoType: v.type,
-            displayOrder: idx,
-          })),
-        specifications: specifications
-          .filter(s => s.key && s.value)
-          .map((s, idx) => ({
-            specKey: s.key,
-            specValue: s.value,
-            displayOrder: idx,
-          })),
-        networks: formattedNetworks.length > 0 ? formattedNetworks : undefined,
-      };
-
-      Object.keys(payload).forEach(key => {
-        const value = payload[key];
-        if (value !== undefined) {
-          if (typeof value === 'object') {
-            formData.append(key, JSON.stringify(value));
-          } else {
-            formData.append(key, String(value));
-          }
-        }
-      });
-
-      const response =
-        productType === 'basic'
-          ? await productsService.createBasic(formData)
-          : productType === 'network'
-          ? await productsService.createNetwork(formData)
-          : await productsService.createRegion(formData);
-      alert('✓ Network product created successfully!');
-    } catch (err: any) {
-      console.error('Error creating network product:', err);
-      alert(`Error: ${err?.response?.data?.message || err?.message || 'Unknown error'}`);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleRegionProductSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    try {
-      const formData = new FormData();
-
-      if (thumbnailFile) {
-        formData.append('thumbnail', thumbnailFile);
+        });
+        setProducts(mapped);
+      } catch {
+        setProducts([]);
+      } finally {
+        setLoading(false);
       }
+    };
+    fetchProducts();
+  }, [selectedCategory, categories, activeTab]);
 
-      galleryImageFiles.forEach(file => {
-        formData.append('galleryImages', file);
-      });
+  const handleViewClick = (product: UIProduct) => {
+    setSelectedProduct(product);
+    setViewOpen(true);
+  };
 
-      const regionColorImages: File[] = [];
+  const handleEditClick = (product: UIProduct) => {
+    setSelectedProduct(product);
+    setEditOpen(true);
+  };
 
-      // Format regions data properly for backend
-      const formattedRegions = regions.map((region, regIdx) => ({
-        regionName: region.regionName,
-        isDefault: region.isDefault,
-        displayOrder: regIdx,
-        // Default storages for this region (always present)
-        defaultStorages: region.defaultStorages.map((storage, storIdx) => ({
-          storageSize: storage.storageSize,
-          regularPrice: storage.regularPrice
-            ? Number(storage.regularPrice)
-            : 0,
-          comparePrice: storage.regularPrice
-            ? Number(storage.regularPrice)
-            : 0,
-          discountPrice: storage.discountPrice
-            ? Number(storage.discountPrice)
-            : 0,
-          discountPercent: storage.discountPercent
-            ? Number(storage.discountPercent)
-            : 0,
-          stockQuantity: storage.stockQuantity
-            ? Number(storage.stockQuantity)
-            : 0,
-          lowStockAlert: storage.lowStockAlert
-            ? Number(storage.lowStockAlert)
-            : 5,
-          displayOrder: storIdx,
-        })),
-        // Colors in this region
-        colors: region.colors.map((color, colorIdx) => {
-          let imageIndex = -1;
-          if (color.colorImageFile) {
-            regionColorImages.push(color.colorImageFile);
-            imageIndex = regionColorImages.length - 1;
-          }
+  const handleDeleteClick = (product: UIProduct) => {
+    setSelectedProduct(product);
+    setDeleteOpen(true);
+  };
 
-          return {
-            colorName: color.colorName,
-            hasStorage: color.hasStorage,
-            useDefaultStorages: color.useDefaultStorages,
-            displayOrder: colorIdx,
-            colorImageIndex: imageIndex > -1 ? imageIndex : undefined,
-            // If no storage, use single price
-            singlePrice: !color.hasStorage
-              ? Number(color.singlePrice) || 0
-              : undefined,
-            singleComparePrice: !color.hasStorage
-              ? Number(color.singleComparePrice) || 0
-              : undefined,
-            singleStockQuantity: !color.hasStorage
-              ? Number(color.singleStockQuantity) || 0
-              : undefined,
-            // Custom storages (only if has storage and not using defaults)
-            storages:
-              color.hasStorage && !color.useDefaultStorages
-                ? color.storages.map((storage, storIdx) => ({
-                    storageSize: storage.storageSize,
-                    regularPrice: storage.regularPrice
-                      ? Number(storage.regularPrice)
-                      : 0,
-                    comparePrice: storage.regularPrice
-                      ? Number(storage.regularPrice)
-                      : 0,
-                    discountPrice: storage.discountPrice
-                      ? Number(storage.discountPrice)
-                      : 0,
-                    discountPercent: storage.discountPercent
-                      ? Number(storage.discountPercent)
-                      : 0,
-                    stockQuantity: storage.stockQuantity
-                      ? Number(storage.stockQuantity)
-                      : 0,
-                    lowStockAlert: storage.lowStockAlert
-                      ? Number(storage.lowStockAlert)
-                      : 5,
-                    displayOrder: storIdx,
-                  }))
-                : undefined,
-          };
-        }),
-      }));
-
-      // Append region color images
-      regionColorImages.forEach(file => {
-        formData.append('colors', file);
-      });
-
-      const payload: any = {
-        name: productName,
-        slug,
-        description: description || undefined,
-        shortDescription: shortDescription || undefined,
-        categoryId: selectedCategory || undefined,
-        brandId: selectedBrand || undefined,
-        productCode: productCode || undefined,
-        sku: sku || undefined,
-        warranty: warranty || undefined,
-        isActive,
-        isOnline,
-        isPos,
-        isPreOrder,
-        isOfficial,
-        freeShipping,
-        isEmi,
-        rewardPoints: rewardPoints ? Number(rewardPoints) : undefined,
-        minBookingPrice: minBookingPrice ? Number(minBookingPrice) : undefined,
-        seoTitle: seoTitle || undefined,
-        seoDescription: seoDescription || undefined,
-        seoKeywords: seoKeywords
-          ? seoKeywords.split(',').map(k => k.trim())
-          : undefined,
-        seoCanonical: seoCanonical || undefined,
-        tags: tags ? tags.split(',').map(t => t.trim()) : undefined,
-        videos: videos
-          .filter(v => v.url)
-          .map((v, idx) => ({
-            videoUrl: v.url,
-            videoType: v.type,
-            displayOrder: idx,
-          })),
-        specifications: specifications
-          .filter(s => s.key && s.value)
-          .map((s, idx) => ({
-            specKey: s.key,
-            specValue: s.value,
-            displayOrder: idx,
-          })),
-        regions: formattedRegions.length > 0 ? formattedRegions : undefined,
-      };
-
-      Object.keys(payload).forEach(key => {
-        const value = payload[key];
-        if (value !== undefined) {
-          if (typeof value === 'object') {
-            formData.append(key, JSON.stringify(value));
-          } else {
-            formData.append(key, String(value));
-          }
-        }
-      });
-
-      const response =
-        productType === 'basic'
-          ? await productsService.createBasic(formData)
-          : productType === 'network'
-          ? await productsService.createNetwork(formData)
-          : await productsService.createRegion(formData);
-      alert('✓ Region product created successfully!');
-    } catch (err: any) {
-      console.error('Error creating region product:', err);
-      alert(`Error: ${err?.response?.data?.message || err?.message || 'Unknown error'}`);
-    } finally {
-      setIsSubmitting(false);
+  const handleConfirmDelete = async () => {
+    if (selectedProduct) {
+      try {
+        await productsService.delete(selectedProduct.id);
+        setProducts(products.filter(p => p.id !== selectedProduct.id));
+        setDeleteOpen(false);
+        setSelectedProduct(null);
+      } catch (error) {
+        console.error("Failed to delete product", error);
+        // You might want to add a toast notification here
+      }
     }
   };
+
+  const filteredProducts = products;
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <Link
-        href="/admin/products"
-        className="mb-6 inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Back to Products
-      </Link>
-
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Add New Product</h1>
-        <p className="mt-2 text-gray-600">Create a new product listing</p>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Products</h1>
+          <p className="text-muted-foreground">
+            Manage your product inventory.
+          </p>
+        </div>
+        <Link href="/admin/products/new">
+          <Button className="gap-2">
+            <Plus className="h-4 w-4" />
+            Add Product
+          </Button>
+        </Link>
       </div>
 
-      <Tabs value={productType} onValueChange={(value) => setProductType(value as ProductType)} className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="basic">Basic Product</TabsTrigger>
-          <TabsTrigger value="network">Network Product</TabsTrigger>
-          <TabsTrigger value="region">Region Product</TabsTrigger>
-        </TabsList>
-
-        <form
-          onSubmit={
-            productType === 'basic'
-              ? handleBasicProductSubmit
-              : productType === 'network'
-                ? handleNetworkProductSubmit
-                : handleRegionProductSubmit
-          }
-          className="space-y-6 pt-6"
+      <div className="flex items-center space-x-2 mb-4">
+        <Button
+          variant={activeTab === 'all' ? 'default' : 'outline'}
+          onClick={() => setActiveTab('all')}
         >
-        <Card>
-          <CardHeader>
-            <CardTitle>Basic Information</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="name">Product Name *</Label>
-                <Input
-                  id="name"
-                  value={productName}
-                  onChange={handleProductNameChange}
-                  placeholder="Enter product name"
-                  required
-                />
+          All Products
+        </Button>
+        <Button
+          variant={activeTab === 'basic' ? 'default' : 'outline'}
+          onClick={() => setActiveTab('basic')}
+        >
+          Basic Products
+        </Button>
+        <Button
+          variant={activeTab === 'network' ? 'default' : 'outline'}
+          onClick={() => setActiveTab('network')}
+        >
+          Network Products
+        </Button>
+        <Button
+          variant={activeTab === 'region' ? 'default' : 'outline'}
+          onClick={() => setActiveTab('region')}
+        >
+          Region Products
+        </Button>
+      </div>
+
+      <Card>
+        <CardContent className="p-6">
+          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-1 gap-4">
+              <div className="relative flex-1 sm:max-w-xs">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input placeholder="Search products..." className="pl-9" />
               </div>
-              <div>
-                <Label htmlFor="slug">URL Slug *</Label>
-                <Input
-                  id="slug"
-                  value={slug}
-                  onChange={handleSlugChange}
-                  placeholder="product-url-slug"
-                  required
-                />
-              </div>
+              <Select
+                value={selectedCategory}
+                onValueChange={setSelectedCategory}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {Array.from(
+                    new Map(
+                      categories
+                        .filter(cat => cat.id !== 'all')
+                        .map(cat => [cat.id, cat])
+                    ).values()
+                  ).map(cat => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select defaultValue="all">
+                <SelectTrigger className="w-32">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="low">Low Stock</SelectItem>
+                  <SelectItem value="out">Out of Stock</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-
-            <div>
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={description}
-                onChange={e => setDescription(e.target.value)}
-                placeholder="Enter product description (Markdown supported)"
-                rows={4}
-              />
-            </div>
-
-            <div>
-              <Label>Short Description</Label>
-              <div className="mb-2 flex gap-1 border-b border-gray-200 pb-2">
-                <button
-                  type="button"
-                  onClick={() => formatText('bold')}
-                  className="rounded px-3 py-1 text-sm font-medium hover:bg-gray-100"
-                >
-                  Bold
-                </button>
-                <button
-                  type="button"
-                  onClick={() => formatText('italic')}
-                  className="rounded px-3 py-1 text-sm font-medium hover:bg-gray-100"
-                >
-                  Italic
-                </button>
-                <button
-                  type="button"
-                  onClick={() => formatText('underline')}
-                  className="rounded px-3 py-1 text-sm font-medium hover:bg-gray-100"
-                >
-                  Underline
-                </button>
-              </div>
-              <div
-                id="shortDescription"
-                contentEditable
-                onInput={handleShortDescriptionChange}
-                className="min-h-24 rounded border border-gray-300 p-3 focus:border-blue-500 focus:outline-none"
-                suppressContentEditableWarning
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="category">Category *</Label>
-                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                  <SelectTrigger id="category">
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map(cat => (
-                      <SelectItem key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="brand">Brand *</Label>
-                <Select value={selectedBrand} onValueChange={setSelectedBrand}>
-                  <SelectTrigger id="brand">
-                    <SelectValue placeholder="Select brand" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {brands.map(br => (
-                      <SelectItem key={br.id} value={br.id}>
-                        {br.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <Label htmlFor="productCode">Product Code</Label>
-                <Input
-                  id="productCode"
-                  value={productCode}
-                  onChange={e => setProductCode(e.target.value)}
-                  placeholder="e.g., SKU-001"
-                />
-              </div>
-              <div>
-                <Label htmlFor="sku">SKU</Label>
-                <Input
-                  id="sku"
-                  value={sku}
-                  onChange={e => setSku(e.target.value)}
-                  placeholder="e.g., SKU123"
-                />
-              </div>
-              <div>
-                <Label htmlFor="warranty">Warranty</Label>
-                <Input
-                  id="warranty"
-                  value={warranty}
-                  onChange={e => setWarranty(e.target.value)}
-                  placeholder="e.g., 1 year"
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Product Status</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="isActive">Active</Label>
-                <Switch
-                  id="isActive"
-                  checked={isActive}
-                  onCheckedChange={setIsActive}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <Label htmlFor="isOnline">Online</Label>
-                <Switch
-                  id="isOnline"
-                  checked={isOnline}
-                  onCheckedChange={setIsOnline}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <Label htmlFor="isPos">POS</Label>
-                <Switch id="isPos" checked={isPos} onCheckedChange={setIsPos} />
-              </div>
-              <div className="flex items-center justify-between">
-                <Label htmlFor="isPreOrder">Pre-Order</Label>
-                <Switch
-                  id="isPreOrder"
-                  checked={isPreOrder}
-                  onCheckedChange={setIsPreOrder}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <Label htmlFor="isOfficial">Official</Label>
-                <Switch
-                  id="isOfficial"
-                  checked={isOfficial}
-                  onCheckedChange={setIsOfficial}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <Label htmlFor="freeShipping">Free Shipping</Label>
-                <Switch
-                  id="freeShipping"
-                  checked={freeShipping}
-                  onCheckedChange={setFreeShipping}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <Label htmlFor="isEmi">EMI Available</Label>
-                <Switch
-                  id="isEmi"
-                  checked={isEmi}
-                  onCheckedChange={setIsEmi}
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Media</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div>
-              <Label>Thumbnail Image</Label>
-              <div className="mt-2 rounded border-2 border-dashed border-gray-300 p-6">
-                {thumbnailPreview ? (
-                  <div className="relative inline-block">
-                    <img
-                      src={thumbnailPreview}
-                      alt="Thumbnail"
-                      className="h-32 w-32 rounded object-cover"
-                    />
-                    <button
-                      type="button"
-                      onClick={removeThumbnail}
-                      className="absolute -right-2 -top-2 rounded-full bg-red-500 p-1 text-white hover:bg-red-600"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <label className="flex cursor-pointer flex-col items-center justify-center gap-2">
-                    <Upload className="h-8 w-8 text-gray-400" />
-                    <span className="text-sm text-gray-600">Click to upload thumbnail</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleThumbnailUpload}
-                      className="hidden"
-                    />
-                  </label>
-                )}
-              </div>
-            </div>
-
-            <div>
-              <Label>Gallery Images</Label>
-              <div className="mt-2 rounded border-2 border-dashed border-gray-300 p-6">
-                {galleryImagePreviews.length > 0 ? (
-                  <div className="grid grid-cols-4 gap-4">
-                    {galleryImagePreviews.map((preview, idx) => (
-                      <div key={idx} className="relative">
-                        <img
-                          src={preview.url}
-                          alt={`Gallery ${idx}`}
-                          className="h-24 w-24 rounded object-cover"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => removeGalleryImage(idx)}
-                          className="absolute -right-2 -top-2 rounded-full bg-red-500 p-1 text-white hover:bg-red-600"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      </div>
-                    ))}
-                    <label className="flex cursor-pointer items-center justify-center rounded border-2 border-dashed border-gray-300">
-                      <Plus className="h-6 w-6 text-gray-400" />
-                      <input
-                        type="file"
-                        multiple
-                        accept="image/*"
-                        onChange={handleGalleryImageUpload}
-                        className="hidden"
-                      />
-                    </label>
-                  </div>
-                ) : (
-                  <label className="flex cursor-pointer flex-col items-center justify-center gap-2">
-                    <ImageIcon className="h-8 w-8 text-gray-400" />
-                    <span className="text-sm text-gray-600">Click to upload gallery images</span>
-                    <input
-                      type="file"
-                      multiple
-                      accept="image/*"
-                      onChange={handleGalleryImageUpload}
-                      className="hidden"
-                    />
-                  </label>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>SEO Settings</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label htmlFor="seoTitle">SEO Title</Label>
-              <Input
-                id="seoTitle"
-                value={seoTitle}
-                onChange={e => setSeoTitle(e.target.value)}
-                placeholder="SEO title"
-              />
-            </div>
-            <div>
-              <Label htmlFor="seoDescription">SEO Description</Label>
-              <Textarea
-                id="seoDescription"
-                value={seoDescription}
-                onChange={e => setSeoDescription(e.target.value)}
-                placeholder="SEO description"
-                rows={3}
-              />
-            </div>
-            <div>
-              <Label htmlFor="seoKeywords">SEO Keywords (comma-separated)</Label>
-              <Input
-                id="seoKeywords"
-                value={seoKeywords}
-                onChange={e => setSeoKeywords(e.target.value)}
-                placeholder="keyword1, keyword2, keyword3"
-              />
-            </div>
-            <div>
-              <Label htmlFor="seoCanonical">Canonical URL</Label>
-              <Input
-                id="seoCanonical"
-                value={seoCanonical}
-                onChange={e => setSeoCanonical(e.target.value)}
-                placeholder="https://example.com/product"
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Specifications</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {specifications.map((spec, idx) => (
-              <div key={spec.id} className="flex gap-2">
-                <Input
-                  placeholder="Key (e.g., Color)"
-                  value={spec.key}
-                  onChange={e =>
-                    updateSpecification(spec.id, 'key', e.target.value)
-                  }
-                />
-                <Input
-                  placeholder="Value (e.g., Black)"
-                  value={spec.value}
-                  onChange={e =>
-                    updateSpecification(spec.id, 'value', e.target.value)
-                  }
-                />
-                <button
-                  type="button"
-                  onClick={() => removeSpecification(spec.id)}
-                  className="rounded bg-red-100 px-3 py-2 text-red-600 hover:bg-red-200"
-                >
-                  Remove
-                </button>
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={addSpecification}
-              className="mt-2 rounded bg-blue-100 px-4 py-2 text-blue-600 hover:bg-blue-200"
-            >
-              + Add Specification
-            </button>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Additional Info</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="rewardPoints">Reward Points</Label>
-                <Input
-                  id="rewardPoints"
-                  type="number"
-                  value={rewardPoints}
-                  onChange={e => setRewardPoints(e.target.value)}
-                  placeholder="0"
-                />
-              </div>
-              <div>
-                <Label htmlFor="minBookingPrice">Min Booking Price</Label>
-                <Input
-                  id="minBookingPrice"
-                  type="number"
-                  value={minBookingPrice}
-                  onChange={e => setMinBookingPrice(e.target.value)}
-                  placeholder="0"
-                />
-              </div>
-            </div>
-            <div>
-              <Label htmlFor="tags">Tags (comma-separated)</Label>
-              <Input
-                id="tags"
-                value={tags}
-                onChange={e => setTags(e.target.value)}
-                placeholder="tag1, tag2, tag3"
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        <TabsContent value="basic" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Colors</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {basicColors.map((color, idx) => (
-                <div key={color.id} className="space-y-4 rounded border p-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label>Color Name</Label>
-                      <Input
-                        value={color.colorName}
-                        onChange={e =>
-                          updateBasicColor(color.id, 'colorName', e.target.value)
-                        }
-                        placeholder="e.g., Midnight Black"
-                      />
-                    </div>
-                    <div>
-                      <Label>Stock Quantity</Label>
-                      <Input
-                        type="number"
-                        value={color.stockQuantity}
-                        onChange={e =>
-                          updateBasicColor(
-                            color.id,
-                            'stockQuantity',
-                            e.target.value,
-                          )
-                        }
-                        placeholder="0"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label>Color Image</Label>
-                    <div className="mt-2 rounded border-2 border-dashed border-gray-300 p-4">
-                      {color.colorImage ? (
-                        <div className="relative inline-block">
-                          <img
-                            src={color.colorImage}
-                            alt={color.colorName}
-                            className="h-24 w-24 rounded object-cover"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => removeBasicColorImage(color.id)}
-                            className="absolute -right-2 -top-2 rounded-full bg-red-500 p-1 text-white hover:bg-red-600"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-                      ) : (
-                        <label className="flex cursor-pointer flex-col items-center justify-center gap-2">
-                          <Upload className="h-6 w-6 text-gray-400" />
-                          <span className="text-sm text-gray-600">
-                            Click to upload color image
-                          </span>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={e =>
-                              handleBasicColorImageUpload(color.id, e)
-                            }
-                            className="hidden"
-                          />
-                        </label>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label>Regular Price</Label>
-                      <Input
-                        type="number"
-                        value={color.regularPrice}
-                        onChange={e =>
-                          updateBasicColor(
-                            color.id,
-                            'regularPrice',
-                            e.target.value,
-                          )
-                        }
-                        placeholder="0"
-                      />
-                    </div>
-                    <div>
-                      <Label>Discount Price</Label>
-                      <Input
-                        type="number"
-                        value={color.discountPrice}
-                        onChange={e =>
-                          updateBasicColor(
-                            color.id,
-                            'discountPrice',
-                            e.target.value,
-                          )
-                        }
-                        placeholder="0"
-                      />
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => removeBasicColor(color.id)}
-                    className="rounded bg-red-100 px-4 py-2 text-red-600 hover:bg-red-200"
-                  >
-                    Remove Color
-                  </button>
-                </div>
-              ))}
-
-              <button
-                type="button"
-                onClick={addBasicColor}
-                className="rounded bg-blue-100 px-4 py-2 text-blue-600 hover:bg-blue-200"
-              >
-                + Add Color
-              </button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="network" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Networks & Colors</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {networks.map(network => (
-                <div key={network.id} className="space-y-4 rounded border p-4">
-                  <div className="flex items-end gap-4">
-                    <div className="flex-1">
-                      <Label>Network Name</Label>
-                      <Input
-                        value={network.networkName}
-                        onChange={e =>
-                          updateNetwork(network.id, 'networkName', e.target.value)
-                        }
-                        placeholder="e.g., Retail Partner A"
-                      />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Label className="text-sm">Has Default Storages</Label>
-                      <Switch
-                        checked={network.hasDefaultStorages}
-                        onCheckedChange={e =>
-                          updateNetwork(network.id, 'hasDefaultStorages', e)
-                        }
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => removeNetwork(network.id)}
-                      className="rounded bg-red-100 px-4 py-2 text-red-600 hover:bg-red-200"
-                    >
-                      Remove
-                    </button>
-                  </div>
-
-                  {network.hasDefaultStorages && (
-                    <div className="space-y-3 rounded bg-blue-50 p-3">
-                      <Label className="block font-semibold">Default Storages (for this Network)</Label>
-                      <p className="text-xs text-gray-600">These storages will be used by all colors unless overridden</p>
-                      {network.defaultStorages.map(storage => (
-                        <div
-                          key={storage.id}
-                          className="space-y-2 rounded bg-white p-2"
-                        >
-                          <div className="grid grid-cols-4 gap-2">
-                            <div>
-                              <Label className="text-xs">Storage Size</Label>
-                              <Input
-                                value={storage.storageSize}
-                                onChange={e =>
-                                  updateDefaultStorageInNetwork(
-                                    network.id,
-                                    storage.id,
-                                    'storageSize',
-                                    e.target.value,
-                                  )
-                                }
-                                placeholder="256GB"
-                              />
-                            </div>
-                            <div>
-                              <Label className="text-xs">Regular Price</Label>
-                              <Input
-                                type="number"
-                                value={storage.regularPrice}
-                                onChange={e =>
-                                  updateDefaultStorageInNetwork(
-                                    network.id,
-                                    storage.id,
-                                    'regularPrice',
-                                    e.target.value,
-                                  )
-                                }
-                                placeholder="0"
-                              />
-                            </div>
-                            <div>
-                              <Label className="text-xs">Discount %</Label>
-                              <Input
-                                type="number"
-                                value={storage.discountPercent}
-                                onChange={e => {
-                                  const percent = parseFloat(e.target.value) || 0;
-                                  const regularPrice = parseFloat(storage.regularPrice) || 0;
-                                  const discountPrice = regularPrice - (regularPrice * percent) / 100;
-                                  updateDefaultStorageInNetwork(
-                                    network.id,
-                                    storage.id,
-                                    'discountPercent',
-                                    e.target.value,
-                                  );
-                                  updateDefaultStorageInNetwork(
-                                    network.id,
-                                    storage.id,
-                                    'discountPrice',
-                                    discountPrice.toString(),
-                                  );
-                                }}
-                                placeholder="0"
-                              />
-                            </div>
-                            <div>
-                              <Label className="text-xs">Discount Price</Label>
-                              <Input
-                                type="number"
-                                value={storage.discountPrice}
-                                onChange={e =>
-                                  updateDefaultStorageInNetwork(
-                                    network.id,
-                                    storage.id,
-                                    'discountPrice',
-                                    e.target.value,
-                                  )
-                                }
-                                placeholder="0"
-                              />
-                            </div>
-                          </div>
-                          <div className="flex gap-2">
-                            <div className="flex-1">
-                              <Label className="text-xs">Stock</Label>
-                              <Input
-                                type="number"
-                                value={storage.stockQuantity}
-                                onChange={e =>
-                                  updateDefaultStorageInNetwork(
-                                    network.id,
-                                    storage.id,
-                                    'stockQuantity',
-                                    e.target.value,
-                                  )
-                                }
-                                placeholder="0"
-                              />
-                            </div>
-                            {network.defaultStorages.length > 1 && (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  removeDefaultStorageFromNetwork(
-                                    network.id,
-                                    storage.id,
-                                  )
-                                }
-                                className="rounded bg-red-100 px-2 py-2 text-red-600 hover:bg-red-200"
-                              >
-                                <X className="h-4 w-4" />
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                      <button
-                        type="button"
-                        onClick={() => addDefaultStorageToNetwork(network.id)}
-                        className="text-xs text-blue-600 hover:underline"
-                      >
-                        + Add Default Storage
-                      </button>
-                    </div>
-                  )}
-
-                  <div className="space-y-3">
-                    <Label className="block font-semibold">Colors</Label>
-                    {network.colors.map(color => (
-                      <div key={color.id} className="space-y-2 rounded bg-gray-50 p-3">
-                        <div className="flex items-end gap-2">
-                          <div className="flex-1">
-                            <Label className="text-sm">Color Name</Label>
-                            <Input
-                              value={color.colorName}
-                              onChange={e =>
-                                updateColorInNetwork(
-                                  network.id,
-                                  color.id,
-                                  'colorName',
-                                  e.target.value,
-                                )
-                              }
-                              placeholder="e.g., Midnight Black"
-                            />
-                          </div>
-                          <div className="flex-1">
-                            <Label className="text-sm">Color Image</Label>
-                            {color.colorImage ? (
-                              <div className="relative inline-block">
-                                <img
-                                  src={color.colorImage}
-                                  alt={color.colorName}
-                                  className="h-12 w-12 rounded object-cover"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    removeNetworkColorImage(network.id, color.id)
-                                  }
-                                  className="absolute -right-2 -top-2 rounded-full bg-red-500 p-0.5 text-white hover:bg-red-600"
-                                >
-                                  <X className="h-3 w-3" />
-                                </button>
-                              </div>
-                            ) : (
-                              <label className="flex cursor-pointer items-center justify-center rounded border-2 border-dashed border-gray-300 p-2">
-                                <Upload className="h-4 w-4 text-gray-400" />
-                                <input
-                                  type="file"
-                                  accept="image/*"
-                                  onChange={e =>
-                                    handleNetworkColorImageUpload(network.id, color.id, e)
-                                  }
-                                  className="hidden"
-                                />
-                              </label>
-                            )}
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              removeColorFromNetwork(network.id, color.id)
-                            }
-                            className="rounded bg-red-100 px-2 py-2 text-red-600 hover:bg-red-200"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <Label className="text-sm">Has Storage Options</Label>
-                          <Switch
-                            checked={color.hasStorage}
-                            onCheckedChange={e =>
-                              updateColorInNetwork(
-                                network.id,
-                                color.id,
-                                'hasStorage',
-                                e,
-                              )
-                            }
-                          />
-                        </div>
-
-                        {!color.hasStorage && (
-                          <div className="grid grid-cols-3 gap-2 rounded bg-white p-2">
-                            <div>
-                              <Label className="text-xs">Single Price</Label>
-                              <Input
-                                type="number"
-                                value={color.singlePrice}
-                                onChange={e =>
-                                  updateColorInNetwork(
-                                    network.id,
-                                    color.id,
-                                    'singlePrice',
-                                    e.target.value,
-                                  )
-                                }
-                                placeholder="0"
-                              />
-                            </div>
-                            <div>
-                              <Label className="text-xs">Compare Price</Label>
-                              <Input
-                                type="number"
-                                value={color.singleComparePrice}
-                                onChange={e =>
-                                  updateColorInNetwork(
-                                    network.id,
-                                    color.id,
-                                    'singleComparePrice',
-                                    e.target.value,
-                                  )
-                                }
-                                placeholder="0"
-                              />
-                            </div>
-                            <div>
-                              <Label className="text-xs">Stock</Label>
-                              <Input
-                                type="number"
-                                value={color.singleStockQuantity}
-                                onChange={e =>
-                                  updateColorInNetwork(
-                                    network.id,
-                                    color.id,
-                                    'singleStockQuantity',
-                                    e.target.value,
-                                  )
-                                }
-                                placeholder="0"
-                              />
-                            </div>
-                          </div>
-                        )}
-
-                        {color.hasStorage && (
-                          <>
-                            {network.hasDefaultStorages && (
-                              <div className="flex items-center gap-2">
-                                <Label className="text-sm">Use Default Storages</Label>
-                                <Switch
-                                  checked={color.useDefaultStorages}
-                                  onCheckedChange={e =>
-                                    updateColorInNetwork(
-                                      network.id,
-                                      color.id,
-                                      'useDefaultStorages',
-                                      e,
-                                    )
-                                  }
-                                />
-                              </div>
-                            )}
-
-                            {(!network.hasDefaultStorages || !color.useDefaultStorages) && (
-                              <>
-                                {color.storages.map(storage => (
-                                  <div
-                                    key={storage.id}
-                                    className="space-y-2 rounded bg-white p-2"
-                                  >
-                                    <div className="grid grid-cols-4 gap-2">
-                                      <div>
-                                        <Label className="text-xs">Storage Size</Label>
-                                        <Input
-                                          value={storage.storageSize}
-                                          onChange={e =>
-                                            updateStorageInNetwork(
-                                              network.id,
-                                              color.id,
-                                              storage.id,
-                                              'storageSize',
-                                              e.target.value,
-                                            )
-                                          }
-                                          placeholder="256GB"
-                                        />
-                                      </div>
-                                      <div>
-                                        <Label className="text-xs">Regular Price</Label>
-                                        <Input
-                                          type="number"
-                                          value={storage.regularPrice}
-                                          onChange={e =>
-                                            updateStorageInNetwork(
-                                              network.id,
-                                              color.id,
-                                              storage.id,
-                                              'regularPrice',
-                                              e.target.value,
-                                            )
-                                          }
-                                          placeholder="0"
-                                        />
-                                      </div>
-                                      <div>
-                                        <Label className="text-xs">Discount %</Label>
-                                        <Input
-                                          type="number"
-                                          value={storage.discountPercent}
-                                          onChange={e => {
-                                            const percent = parseFloat(e.target.value) || 0;
-                                            const regularPrice = parseFloat(storage.regularPrice) || 0;
-                                            const discountPrice = regularPrice - (regularPrice * percent) / 100;
-                                            updateStorageInNetwork(
-                                              network.id,
-                                              color.id,
-                                              storage.id,
-                                              'discountPercent',
-                                              e.target.value,
-                                            );
-                                            updateStorageInNetwork(
-                                              network.id,
-                                              color.id,
-                                              storage.id,
-                                              'discountPrice',
-                                              discountPrice.toString(),
-                                            );
-                                          }}
-                                          placeholder="0"
-                                        />
-                                      </div>
-                                      <div>
-                                        <Label className="text-xs">Discount Price</Label>
-                                        <Input
-                                          type="number"
-                                          value={storage.discountPrice}
-                                          onChange={e =>
-                                            updateStorageInNetwork(
-                                              network.id,
-                                              color.id,
-                                              storage.id,
-                                              'discountPrice',
-                                              e.target.value,
-                                            )
-                                          }
-                                          placeholder="0"
-                                        />
-                                      </div>
-                                    </div>
-                                    <div className="flex gap-2">
-                                      <div className="flex-1">
-                                        <Label className="text-xs">Stock</Label>
-                                        <Input
-                                          type="number"
-                                          value={storage.stockQuantity}
-                                          onChange={e =>
-                                            updateStorageInNetwork(
-                                              network.id,
-                                              color.id,
-                                              storage.id,
-                                              'stockQuantity',
-                                              e.target.value,
-                                            )
-                                          }
-                                          placeholder="0"
-                                        />
-                                      </div>
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          removeStorageFromNetwork(
-                                            network.id,
-                                            color.id,
-                                            storage.id,
-                                          )
-                                        }
-                                        className="rounded bg-red-100 px-2 py-2 text-red-600 hover:bg-red-200"
-                                      >
-                                        <X className="h-4 w-4" />
-                                      </button>
-                                    </div>
-                                  </div>
-                                ))}
-
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    addStorageToNetwork(network.id, color.id)
-                                  }
-                                  className="text-xs text-blue-600 hover:underline"
-                                >
-                                  + Add Storage
-                                </button>
-                              </>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    ))}
-
-                    <button
-                      type="button"
-                      onClick={() => addColorToNetwork(network.id)}
-                      className="text-sm text-blue-600 hover:underline"
-                    >
-                      + Add Color
-                    </button>
-                </div>
-                </div>
-              ))}
-
-              <button
-                type="button"
-                onClick={addNetwork}
-                className="rounded bg-blue-100 px-4 py-2 text-blue-600 hover:bg-blue-200"
-              >
-                + Add Network
-              </button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="region" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Regions</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {regions.map(region => (
-                <div key={region.id} className="space-y-4 rounded border p-4">
-                  <div className="flex items-end gap-4">
-                    <div className="flex-1">
-                      <Label>Region Name</Label>
-                      <Input
-                        value={region.regionName}
-                        onChange={e =>
-                          updateRegion(region.id, 'regionName', e.target.value)
-                        }
-                        placeholder="e.g., US, UK, EU"
-                      />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Label className="text-sm">Is Default</Label>
-                      <Switch
-                        checked={region.isDefault}
-                        onCheckedChange={e =>
-                          updateRegion(region.id, 'isDefault', e)
-                        }
-                      />
-                    </div>
-                    {regions.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeRegion(region.id)}
-                        className="rounded bg-red-100 px-4 py-2 text-red-600 hover:bg-red-200"
-                      >
-                        Remove
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="space-y-3 rounded bg-blue-50 p-3">
-                    <Label className="block font-semibold">Default Storages</Label>
-                    {region.defaultStorages.map(storage => (
-                      <div
-                        key={storage.id}
-                        className="space-y-2 rounded bg-white p-2"
-                      >
-                        <div className="grid grid-cols-3 gap-2">
-                          <div>
-                            <Label className="text-xs">Storage Size</Label>
-                            <Input
-                              value={storage.storageSize}
-                              onChange={e =>
-                                updateDefaultStorageInRegion(
-                                  region.id,
-                                  storage.id,
-                                  'storageSize',
-                                  e.target.value,
-                                )
-                              }
-                              placeholder="256GB"
-                            />
-                          </div>
-                          <div>
-                            <Label className="text-xs">Regular Price</Label>
-                            <Input
-                              type="number"
-                              value={storage.regularPrice}
-                              onChange={e =>
-                                updateDefaultStorageInRegion(
-                                  region.id,
-                                  storage.id,
-                                  'regularPrice',
-                                  e.target.value,
-                                )
-                              }
-                              placeholder="0"
-                            />
-                          </div>
-                          <div>
-                            <Label className="text-xs">Discount Price</Label>
-                            <Input
-                              type="number"
-                              value={storage.discountPrice}
-                              onChange={e =>
-                                updateDefaultStorageInRegion(
-                                  region.id,
-                                  storage.id,
-                                  'discountPrice',
-                                  e.target.value,
-                                )
-                              }
-                              placeholder="0"
-                            />
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <div className="flex-1">
-                            <Label className="text-xs">Stock</Label>
-                            <Input
-                              type="number"
-                              value={storage.stockQuantity}
-                              onChange={e =>
-                                updateDefaultStorageInRegion(
-                                  region.id,
-                                  storage.id,
-                                  'stockQuantity',
-                                  e.target.value,
-                                )
-                              }
-                              placeholder="0"
-                            />
-                          </div>
-                          {region.defaultStorages.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                removeDefaultStorageFromRegion(
-                                  region.id,
-                                  storage.id,
-                                )
-                              }
-                              className="rounded bg-red-100 px-2 py-2 text-red-600 hover:bg-red-200"
-                            >
-                              <X className="h-4 w-4" />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() => addDefaultStorageToRegion(region.id)}
-                      className="text-xs text-blue-600 hover:underline"
-                    >
-                      + Add Default Storage
-                    </button>
-                  </div>
-
-                  <div className="space-y-3">
-                    <Label className="block font-semibold">Colors</Label>
-                    {region.colors.map(color => (
-                      <div key={color.id} className="space-y-2 rounded bg-gray-50 p-3">
-                        <div className="flex items-end gap-2">
-                          <div className="flex-1">
-                            <Label className="text-sm">Color Name</Label>
-                            <Input
-                              value={color.colorName}
-
-
-                              onChange={e =>
-                                updateColorInRegion(
-                                  region.id,
-                                  color.id,
-                                  'colorName',
-                                  e.target.value,
-                                )
-                              }
-                              placeholder="e.g., Midnight"
-                            />
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              removeColorFromRegion(region.id, color.id)
-                            }
-                            className="rounded bg-red-100 px-2 py-2 text-red-600 hover:bg-red-200"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <Label className="text-sm">Has Storage Options</Label>
-                          <Switch
-                            checked={color.hasStorage}
-                            onCheckedChange={e =>
-                              updateColorInRegion(
-                                region.id,
-                                color.id,
-                                'hasStorage',
-                                e,
-                              )
-                            }
-                          />
-                        </div>
-
-                        {color.hasStorage && (
-                          <>
-                            <div className="flex items-center gap-2">
-                              <Label className="text-sm">Use Default Storages</Label>
-                              <Switch
-                                checked={color.useDefaultStorages}
-                                onCheckedChange={e =>
-                                  updateColorInRegion(
-                                    region.id,
-                                    color.id,
-                                    'useDefaultStorages',
-                                    e,
-                                  )
-                                }
-                              />
-                            </div>
-
-                            {!color.useDefaultStorages && (
-                              <>
-                                {color.storages.map(storage => (
-                                  <div
-                                    key={storage.id}
-                                    className="space-y-2 rounded bg-white p-2"
-                                  >
-                                    <div className="grid grid-cols-3 gap-2">
-                                      <div>
-                                        <Label className="text-xs">Storage</Label>
-                                        <Input
-                                          value={storage.storageSize}
-                                          onChange={e =>
-                                            updateStorageInRegion(
-                                              region.id,
-                                              color.id,
-                                              storage.id,
-                                              'storageSize',
-                                              e.target.value,
-                                            )
-                                          }
-                                          placeholder="256GB"
-                                        />
-                                      </div>
-                                      <div>
-                                        <Label className="text-xs">Regular</Label>
-                                        <Input
-                                          type="number"
-                                          value={storage.regularPrice}
-                                          onChange={e =>
-                                            updateStorageInRegion(
-                                              region.id,
-                                              color.id,
-                                              storage.id,
-                                              'regularPrice',
-                                              e.target.value,
-                                            )
-                                          }
-                                          placeholder="0"
-                                        />
-                                      </div>
-                                      <div>
-                                        <Label className="text-xs">Discount Price</Label>
-                                        <Input
-                                          type="number"
-                                          value={storage.discountPrice}
-                                          onChange={e =>
-                                            updateStorageInRegion(
-                                              region.id,
-                                              color.id,
-                                              storage.id,
-                                              'discountPrice',
-                                              e.target.value,
-                                            )
-                                          }
-                                          placeholder="0"
-                                        />
-                                      </div>
-                                    </div>
-                                    <div className="flex gap-2">
-                                      <div className="flex-1">
-                                        <Label className="text-xs">Stock</Label>
-                                        <Input
-                                          type="number"
-                                          value={storage.stockQuantity}
-                                          onChange={e =>
-                                            updateStorageInRegion(
-                                              region.id,
-                                              color.id,
-                                              storage.id,
-                                              'stockQuantity',
-                                              e.target.value,
-                                            )
-                                          }
-                                          placeholder="0"
-                                        />
-                                      </div>
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          removeStorageFromRegion(
-                                            region.id,
-                                            color.id,
-                                            storage.id,
-                                          )
-                                        }
-                                        className="rounded bg-red-100 px-2 py-2 text-red-600 hover:bg-red-200"
-                                      >
-                                        <X className="h-4 w-4" />
-                                      </button>
-                                    </div>
-                                  </div>
-                                ))}
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    addStorageToRegion(region.id, color.id)
-                                  }
-                                  className="text-xs text-blue-600 hover:underline"
-                                >
-                                  + Add Storage
-                                </button>
-                              </>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    ))}
-
-                    <button
-                      type="button"
-                      onClick={() => addColorToRegion(region.id)}
-                      className="text-sm text-blue-600 hover:underline"
-                    >
-                      + Add Color
-                    </button>
-                </div>
-                </div>
-              ))}
-
-              <button
-                type="button"
-                onClick={addRegion}
-                className="rounded bg-blue-100 px-4 py-2 text-blue-600 hover:bg-blue-200"
-              >
-                + Add Region
-              </button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <div className="flex gap-4">
-          <Button
-            type="submit"
-            disabled={isSubmitting}
-            className="bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
-          >
-            {isSubmitting ? 'Creating...' : `Create ${productType === 'basic' ? 'Basic' : productType === 'network' ? 'Network' : 'Region'} Product`}
-          </Button>
-          <Link href="/admin/products">
             <Button
-              type="button"
               variant="outline"
-              className="text-gray-600 hover:bg-gray-100"
-            >
-              Cancel
+              size="sm"
+              className="gap-2 bg-transparent">
+              <Filter className="h-4 w-4" />
+              More Filters
             </Button>
-          </Link>
-        </div>
-        </form>
-      </Tabs>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-border text-left text-sm text-muted-foreground">
+                  <th className="pb-3 pr-4">
+                    <Checkbox />
+                  </th>
+                  <th className="pb-3 pr-4">Product</th>
+                  <th className="pb-3 pr-4">SKU</th>
+                  <th className="pb-3 pr-4">Category</th>
+                  <th className="pb-3 pr-4">Price</th>
+                  <th className="pb-3 pr-4">Stock</th>
+                  <th className="pb-3 pr-4">Status</th>
+                  <th className="pb-3">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td
+                      colSpan={8}
+                      className="py-8 text-center text-muted-foreground">
+                      Loading products...
+                    </td>
+                  </tr>
+                ) : filteredProducts.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={8}
+                      className="py-8 text-center text-muted-foreground">
+                      No products found in this category.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredProducts.map(product => (
+                    <tr key={product.id} className="border-b border-border">
+                      <td className="py-4 pr-4">
+                        <Checkbox />
+                      </td>
+                      <td className="py-4 pr-4">
+                        <div className="flex items-center gap-3">
+                          <div className="h-12 w-12 overflow-hidden rounded-lg bg-muted">
+                            <Image
+                              src={product.image || '/placeholder.svg'}
+                              alt={product.name}
+                              width={48}
+                              height={48}
+                              className="h-full w-full object-cover"
+                            />
+                          </div>
+                          <span className="font-medium">{product.name}</span>
+                        </div>
+                      </td>
+                      <td className="py-4 pr-4 text-sm text-muted-foreground">
+                        {product.sku}
+                      </td>
+                      <td className="py-4 pr-4 text-sm">{product.category}</td>
+                      <td className="py-4 pr-4 font-medium">
+                        {formatPrice(product.price ?? 0)}
+                      </td>
+                      <td className="py-4 pr-4">{product.stock}</td>
+                      <td className="py-4 pr-4">
+                        <Badge
+                          variant="secondary"
+                          className={
+                            product.status === 'Active'
+                              ? 'bg-green-500/10 text-green-600'
+                              : product.status === 'Low Stock'
+                              ? 'bg-yellow-500/10 text-yellow-600'
+                              : product.status === 'Out of Stock'
+                              ? 'bg-red-500/10 text-red-600'
+                              : 'bg-gray-500/10 text-gray-600'
+                          }>
+                          {product.status}
+                        </Badge>
+                      </td>
+                      <td className="py-4">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => handleViewClick(product)}>
+                              <Eye className="mr-2 h-4 w-4" />
+                              View
+                            </DropdownMenuItem>
+                            {activeTab !== 'all' && (
+                              <>
+                                <DropdownMenuItem
+                                  onClick={() => handleEditClick(product)}>
+                                  <Edit className="mr-2 h-4 w-4" />
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem>
+                                  <Copy className="mr-2 h-4 w-4" />
+                                  Duplicate
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() => handleDeleteClick(product)}>
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mt-6 flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              Showing 1-5 of 456 products
+            </p>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" disabled>
+                Previous
+              </Button>
+              <Button variant="outline" size="sm">
+                Next
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* View Modal */}
+      <ViewProductModal
+        open={viewOpen}
+        onOpenChange={setViewOpen}
+        product={selectedProduct}
+      />
+
+      {/* Edit Modal */}
+      <EditProductModal
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        product={selectedProduct}
+        onSuccess={updatedProduct => {
+          setProducts(
+            products.map(p =>
+              p.id === updatedProduct.id ? {...p, ...updatedProduct} : p,
+            ),
+          );
+        }}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Product</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete{' '}
+              <span className="font-semibold">{selectedProduct?.name}</span>?
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
+// End of AdminProductsPage function
 
-export default withProtectedRoute(NewProductPage);
+export default withProtectedRoute(AdminProductsPage, {
+  requiredRoles: ['admin'],
+  fallbackTo: '/login',
+  showLoader: true,
+});

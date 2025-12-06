@@ -267,6 +267,7 @@ export class ProductsController {
   @ApiQuery({ name: 'search', required: false, type: String })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'offset', required: false, type: Number })
+  @ApiQuery({ name: 'productType', required: false, enum: ['basic', 'network', 'region'] })
   @ApiResponse({
     status: 200,
     description: 'List of products',
@@ -281,6 +282,7 @@ export class ProductsController {
     @Query('search') search?: string,
     @Query('limit') limit?: number,
     @Query('offset') offset?: number,
+    @Query('productType') productType?: string,
   ) {
     return this.productsService.findAll({
       categoryId,
@@ -290,8 +292,9 @@ export class ProductsController {
       minPrice,
       maxPrice,
       search,
-      limit,
-      offset,
+      limit: limit ? Number(limit) : undefined,
+      offset: offset ? Number(offset) : undefined,
+      productType,
     });
   }
 
@@ -330,7 +333,7 @@ export class ProductsController {
     description: 'Variant price and stock information',
   })
   getVariantPrice(
-    @Param('productId', ParseUUIDPipe) productId: string,
+    @Param('productId') productId: string,
     @Query('regionId') regionId?: string,
     @Query('colorId') colorId?: string,
     @Query('storageId') storageId?: string,
@@ -359,7 +362,7 @@ export class ProductsController {
     status: 404,
     description: 'Product not found',
   })
-  remove(@Param('id', ParseUUIDPipe) id: string) {
+  remove(@Param('id') id: string) {
     return this.productsService.remove(id);
   }
 }

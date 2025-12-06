@@ -38,7 +38,13 @@ export class Product {
   categoryId?: ObjectId;
 
   @Column({ nullable: true })
+  categoryIds?: ObjectId[];
+
+  @Column({ nullable: true })
   brandId?: ObjectId;
+
+  @Column({ nullable: true })
+  brandIds?: ObjectId[];
 
   @Column({ nullable: true, unique: true })
   productCode?: string;
@@ -75,6 +81,9 @@ export class Product {
 
   @Column({ default: 0 })
   minBookingPrice: number;
+
+  @Column({ default: 'basic' })
+  productType: 'basic' | 'network' | 'region';
 
   // Direct price fields (for simple products without variants)
   @Column({ nullable: true })

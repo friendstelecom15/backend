@@ -1,1195 +1,3107 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @next/next/no-img-element */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+'use client';
+
+import {useState, useEffect, useRef} from 'react';
+import { toast } from 'sonner';
+import productsService from '../../../lib/api/services/products';
+import categoriesService from '../../../lib/api/services/categories';
+import brandsService from '../../../lib/api/services/brands';
+import Link from 'next/link';
 import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-  InternalServerErrorException,
-} from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource, In } from 'typeorm';
-import { ObjectId } from 'mongodb';
-import { CreateProductNewDto } from './dto/create-product-new.dto';
+  ArrowLeft,
+  Upload,
+  X,
+  Plus,
+  Image as ImageIcon,
+} from 'lucide-react';
 import {
-  CreateProductColorDto,
-  CreateProductNetworkDto,
-  CreateProductRegionDto,
-  CreateProductStorageDto,
-} from './dto/create-product-new.dto';
-import { UpdateProductNewDto } from './dto/update-product-new.dto';
-import { Product } from './entities/product-new.entity';
-import { ProductRegion } from './entities/product-region.entity';
-import { ProductNetwork } from './entities/product-network.entity';
-import { ProductColor } from './entities/product-color.entity';
-import { ProductStorage } from './entities/product-storage.entity';
-import { ProductPrice } from './entities/product-price.entity';
-import { ProductImage } from './entities/product-image.entity';
-import { ProductVideo } from './entities/product-video.entity';
-import { ProductSpecification } from './entities/product-specification.entity';
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '../../../components/ui/card';
+import {Button} from '../../../components/ui/button';
+import {Input} from '../../../components/ui/input';
+import {Label} from '../../../components/ui/label';
+import {Textarea} from '../../../components/ui/textarea';
+import {Switch} from '../../../components/ui/switch';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../../components/ui/select';
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '../../../components/ui/tabs';
+import {withProtectedRoute} from '../../../lib/auth/protected-route';
 
-@Injectable()
-export class ProductService {
-  constructor(
-    @InjectRepository(Product)
-    private readonly productRepository: Repository<Product>,
-    private readonly dataSource: DataSource,
-  ) {}
+type ProductType = 'basic' | 'network' | 'region';
 
-  /**
-   * Create a complete product with all variants, pricing, images, specs in a single transaction
-   */
-  async create(dto: CreateProductNewDto): Promise<any> {
-    // Check if product with same slug already exists
-    const existingProduct = await this.productRepository.findOne({
-      where: { slug: dto.slug },
-    });
+function NewProductPage() {
+  const [productType, setProductType] = useState<ProductType>('basic');
 
-    if (existingProduct) {
-      throw new BadRequestException(`Product with slug "${dto.slug}" already exists`);
-    }
+  // Basic product info (shared across all types)
+  const [productName, setProductName] = useState('');
+  const [slug, setSlug] = useState('');
+  const [description, setDescription] = useState('');
+  const [shortDescription, setShortDescription] = useState('');
+  const shortDescriptionRef = useRef<HTMLDivElement>(null);
+  const [productCode, setProductCode] = useState('');
+  const [sku, setSku] = useState('');
+  const [warranty, setWarranty] = useState('');
 
-    // Check for duplicate productCode
-    if (dto.productCode) {
-      const existingCode = await this.productRepository.findOne({
-        where: { productCode: dto.productCode },
-      });
-      if (existingCode) {
-        throw new BadRequestException(`Product code "${dto.productCode}" already exists`);
-      }
-    }
+  // Category and Brand
+  const [categories, setCategories] = useState<{id: string; name: string}[]>(
+    [],
+  );
+  const [brands, setBrands] = useState<{id: string; name: string}[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [selectedBrand, setSelectedBrand] = useState<string>('');
 
-    // Check for duplicate SKU
-    if (dto.sku) {
-      const existingSku = await this.productRepository.findOne({
-        where: { sku: dto.sku },
-      });
-      if (existingSku) {
-        throw new BadRequestException(`SKU "${dto.sku}" already exists`);
-      }
-    }
+  // Status flags
+  const [isActive, setIsActive] = useState(true);
+  const [isOnline, setIsOnline] = useState(true);
+  const [isPos, setIsPos] = useState(true);
+  const [isPreOrder, setIsPreOrder] = useState(false);
+  const [isOfficial, setIsOfficial] = useState(false);
+  const [freeShipping, setFreeShipping] = useState(false);
+  const [isEmi, setIsEmi] = useState(false);
 
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
+  // Reward & Booking
+  const [rewardPoints, setRewardPoints] = useState('');
+  const [minBookingPrice, setMinBookingPrice] = useState('');
 
-    let savedProduct: Product | null = null;
-    const directColors = this.sanitizeColorDtos(dto.directColors);
-    const networks = this.sanitizeNetworkDtos(dto.networks);
-    const regions = this.sanitizeRegionDtos(dto.regions);
+  // SEO
+  const [seoTitle, setSeoTitle] = useState('');
+  const [seoDescription, setSeoDescription] = useState('');
+  const [seoKeywords, setSeoKeywords] = useState('');
+  const [seoCanonical, setSeoCanonical] = useState('');
+  const [tags, setTags] = useState('');
 
-    try {
-      // 1. Create Product
-      const product = queryRunner.manager.create(Product, {
-        name: dto.name,
-        slug: dto.slug,
-        shortDescription: dto.shortDescription,
-        description: dto.description,
-        categoryId: dto.categoryId ? new ObjectId(dto.categoryId) : undefined,
-        brandId: dto.brandId ? new ObjectId(dto.brandId) : undefined,
-        productCode: dto.productCode,
-        sku: dto.sku,
-        warranty: dto.warranty,
-        price: dto.price,
-        comparePrice: dto.comparePrice,
-        stockQuantity: dto.stockQuantity,
-        lowStockAlert: dto.lowStockAlert,
-        isActive: dto.isActive ?? true,
-        isOnline: dto.isOnline ?? true,
-        isPos: dto.isPos ?? true,
-        isPreOrder: dto.isPreOrder ?? false,
-        isOfficial: dto.isOfficial ?? false,
-        freeShipping: dto.freeShipping ?? false,
-        isEmi: dto.isEmi ?? false,
-        rewardPoints: dto.rewardPoints ?? 0,
-        minBookingPrice: dto.minBookingPrice ?? 0,
-        seoTitle: dto.seoTitle,
-        seoDescription: dto.seoDescription,
-        seoKeywords: dto.seoKeywords,
-        seoCanonical: dto.seoCanonical,
-        tags: dto.tags,
-        faqIds: dto.faqIds ? dto.faqIds.map(id => new ObjectId(id)) : undefined,
-      });
+  // File uploads
+  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
+  const [thumbnailPreview, setThumbnailPreview] = useState<string>('');
+  const [galleryImageFiles, setGalleryImageFiles] = useState<File[]>([]);
+  const [galleryImagePreviews, setGalleryImagePreviews] = useState<
+    Array<{
+      url: string;
+      altText: string;
+      file: File;
+    }>
+  >([]);
 
-      savedProduct = await queryRunner.manager.save(Product, product);
+  // Basic product colors
+  const [basicColors, setBasicColors] = useState<
+    Array<{
+      id: string;
+      colorName: string;
+      colorImage: string;
+      colorImageFile: File | null;
+      regularPrice: string;
+      discountPrice: string;
+      discountPercent: string;
+      stockQuantity: string;
+    }>
+  >([]);
 
-      // 2. Create Direct Colors (for products without regions)
-      if (directColors.length > 0) {
-        for (const colorDto of directColors) {
-          const color = queryRunner.manager.create(ProductColor, {
-            productId: new ObjectId(savedProduct.id),
-            colorName: colorDto.colorName,
-            colorImage: colorDto.colorImage,
-            hasStorage: colorDto.hasStorage ?? false, // Default false for simple products
-            singlePrice: colorDto.singlePrice,
-            singleComparePrice: colorDto.singleComparePrice,
-            singleDiscountPercent: colorDto.singleDiscountPercent,
-            singleDiscountPrice: colorDto.singleDiscountPrice,
-            singleStockQuantity: colorDto.singleStockQuantity,
-            singleLowStockAlert: colorDto.singleLowStockAlert ?? 5,
-            features: colorDto.features,
-            displayOrder: colorDto.displayOrder ?? 0,
-          });
-          const savedColor = await queryRunner.manager.save(ProductColor, color);
+  // Videos
+  const [videos, setVideos] = useState<
+    Array<{
+      id: string;
+      url: string;
+      type: string;
+    }>
+  >([{id: 'video-1', url: '', type: 'youtube'}]);
 
-          // Create storages if hasStorage = true
-          if (colorDto.hasStorage && colorDto.storages && colorDto.storages.length > 0) {
-            for (const storageDto of colorDto.storages) {
-              const storage = queryRunner.manager.create(ProductStorage, {
-                colorId: new ObjectId(savedColor.id),
-                storageSize: storageDto.storageSize,
-                displayOrder: storageDto.displayOrder ?? 0,
-              });
-              const savedStorage = await queryRunner.manager.save(ProductStorage, storage);
+  // Specifications
+  const [specifications, setSpecifications] = useState<
+    Array<{
+      id: string;
+      key: string;
+      value: string;
+    }>
+  >([{id: 'spec-1', key: '', value: ''}]);
 
-              // Create Price for this storage
-              const price = new ProductPrice();
-              price.storageId = new ObjectId(savedStorage.id);
-              price.regularPrice = storageDto.price.regularPrice;
-              price.comparePrice = storageDto.price.comparePrice;
-              price.discountPrice = storageDto.price.discountPrice;
-              price.discountPercent = storageDto.price.discountPercent;
-              price.campaignPrice = storageDto.price.campaignPrice;
-              price.campaignStart = storageDto.price.campaignStart
-                ? new Date(storageDto.price.campaignStart)
-                : undefined;
-              price.campaignEnd = storageDto.price.campaignEnd
-                ? new Date(storageDto.price.campaignEnd)
-                : undefined;
-              price.stockQuantity = storageDto.price.stockQuantity;
-              price.lowStockAlert = storageDto.price.lowStockAlert ?? 5;
-              await queryRunner.manager.save(ProductPrice, price);
-            }
-          }
-        }
-      }
+  // Networks (for network product type)
+  const [networks, setNetworks] = useState<
+    Array<{
+      id: string;
+      networkName: string;
+      priceAdjustment: string;
+      defaultStorageSize: string;
+      isDefault: boolean;
+      hasDefaultStorages: boolean;
+      defaultStorages: Array<{
+        id: string;
+        storageSize: string;
+        regularPrice: string;
+        discountPrice: string;
+        discountPercent: string;
+        stockQuantity: string;
+        lowStockAlert: string;
+      }>;
+      colors: Array<{
+        id: string;
+        colorName: string;
+        colorImage: string;
+        colorImageFile: File | null;
+        hasStorage: boolean;
+        useDefaultStorages: boolean;
+        singlePrice: string;
+        singleComparePrice: string;
+        singleStockQuantity: string;
+        storages: Array<{
+          id: string;
+          storageSize: string;
+          regularPrice: string;
+          discountPrice: string;
+          discountPercent: string;
+          stockQuantity: string;
+          lowStockAlert: string;
+        }>;
+      }>;
+    }>
+  >([]);
 
-      // 3. Create Networks → Colors → Storages (for network-based products like phones with carrier variants)
-      if (networks.length > 0) {
-        for (const networkDto of networks) {
-          const network = queryRunner.manager.create(ProductNetwork, {
-            productId: new ObjectId(savedProduct.id),
-            networkType: networkDto.networkType,
-            priceAdjustment: networkDto.priceAdjustment ?? 0,
-            isDefault: networkDto.isDefault ?? false,
-            displayOrder: networkDto.displayOrder ?? 0,
-          });
-          const savedNetwork = await queryRunner.manager.save(ProductNetwork, network);
+  // Regions (for region product type)
+  const [regions, setRegions] = useState<
+    Array<{
+      id: string;
+      regionName: string;
+      isDefault: boolean;
+      defaultStorages: Array<{
+        id: string;
+        storageSize: string;
+        regularPrice: string;
+        discountPrice: string;
+        discountPercent: string;
+        stockQuantity: string;
+        lowStockAlert: string;
+      }>;
+      colors: Array<{
+        id: string;
+        colorName: string;
+        colorImage: string;
+        colorImageFile: File | null;
+        hasStorage: boolean;
+        useDefaultStorages: boolean;
+        singlePrice: string;
+        singleComparePrice: string;
+        singleStockQuantity: string;
+        storages: Array<{
+          id: string;
+          storageSize: string;
+          regularPrice: string;
+          discountPrice: string;
+          discountPercent: string;
+          stockQuantity: string;
+          lowStockAlert: string;
+        }>;
+      }>;
+    }>
+  >([
+    {
+      id: 'region-1',
+      regionName: 'International',
+      isDefault: true,
+      defaultStorages: [
+        {
+          id: 'default-storage-1',
+          storageSize: '256GB',
+          regularPrice: '',
+          discountPrice: '',
+          discountPercent: '',
+          stockQuantity: '',
+          lowStockAlert: '5',
+        },
+      ],
+      colors: [
+        {
+          id: 'color-1',
+          colorName: 'Midnight',
+          colorImage: '',
+          colorImageFile: null,
+          hasStorage: true,
+          useDefaultStorages: true,
+          singlePrice: '',
+          singleComparePrice: '',
+          singleStockQuantity: '',
+          storages: [],
+        },
+      ],
+    },
+  ]);
 
-          // Create colors within this network
-          if (networkDto.colors && networkDto.colors.length > 0) {
-            for (const colorDto of networkDto.colors) {
-              const color = queryRunner.manager.create(ProductColor, {
-                productId: new ObjectId(savedProduct.id),
-                networkId: new ObjectId(savedNetwork.id),
-                colorName: colorDto.colorName,
-                colorImage: colorDto.colorImage,
-                hasStorage: colorDto.hasStorage ?? true,
-                singlePrice: colorDto.singlePrice,
-                singleComparePrice: colorDto.singleComparePrice,
-                singleStockQuantity: colorDto.singleStockQuantity,
-                features: colorDto.features,
-                displayOrder: colorDto.displayOrder ?? 0,
-              });
-              const savedColor = await queryRunner.manager.save(ProductColor, color);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-              // Create storages if hasStorage = true
-              if (colorDto.hasStorage && colorDto.storages && colorDto.storages.length > 0) {
-                for (const storageDto of colorDto.storages) {
-                  const storage = queryRunner.manager.create(ProductStorage, {
-                    colorId: new ObjectId(savedColor.id),
-                    storageSize: storageDto.storageSize,
-                    displayOrder: storageDto.displayOrder ?? 0,
-                  });
-                  const savedStorage = await queryRunner.manager.save(ProductStorage, storage);
-
-                  // Create Price for this storage
-                  const price = new ProductPrice();
-                  price.storageId = new ObjectId(savedStorage.id);
-                  price.regularPrice = storageDto.price.regularPrice;
-                  price.comparePrice = storageDto.price.comparePrice;
-                  price.discountPrice = storageDto.price.discountPrice;
-                  price.discountPercent = storageDto.price.discountPercent;
-                  price.campaignPrice = storageDto.price.campaignPrice;
-                  price.campaignStart = storageDto.price.campaignStart
-                    ? new Date(storageDto.price.campaignStart)
-                    : undefined;
-                  price.campaignEnd = storageDto.price.campaignEnd
-                    ? new Date(storageDto.price.campaignEnd)
-                    : undefined;
-                  price.stockQuantity = storageDto.price.stockQuantity;
-                  price.lowStockAlert = storageDto.price.lowStockAlert ?? 5;
-                  await queryRunner.manager.save(ProductPrice, price);
-                }
-              }
-            }
-          }
-        }
-      }
-
-      // 4. Create Regions → Default Storages + Colors (for region-based products)
-      if (regions.length > 0) {
-        for (const regionDto of regions) {
-          const region = queryRunner.manager.create(ProductRegion, {
-            productId: new ObjectId(savedProduct.id),
-            regionName: regionDto.regionName,
-            isDefault: regionDto.isDefault ?? false,
-            displayOrder: regionDto.displayOrder ?? 0,
-          });
-          const savedRegion = await queryRunner.manager.save(ProductRegion, region);
-
-          // 4a. Create default storages for this region (shared by all colors)
-          if (regionDto.defaultStorages && regionDto.defaultStorages.length > 0) {
-            for (const storageDto of regionDto.defaultStorages) {
-              const storage = queryRunner.manager.create(ProductStorage, {
-                regionId: new ObjectId(savedRegion.id),
-                storageSize: storageDto.storageSize,
-                displayOrder: storageDto.displayOrder ?? 0,
-              });
-              const savedStorage = await queryRunner.manager.save(ProductStorage, storage);
-
-              // Create Price for this default storage
-              const price = new ProductPrice();
-              price.storageId = new ObjectId(savedStorage.id);
-              price.regularPrice = storageDto.price.regularPrice;
-              price.comparePrice = storageDto.price.comparePrice;
-              price.discountPrice = storageDto.price.discountPrice;
-              price.discountPercent = storageDto.price.discountPercent;
-              price.campaignPrice = storageDto.price.campaignPrice;
-              price.campaignStart = storageDto.price.campaignStart
-                ? new Date(storageDto.price.campaignStart)
-                : undefined;
-              price.campaignEnd = storageDto.price.campaignEnd
-                ? new Date(storageDto.price.campaignEnd)
-                : undefined;
-              price.stockQuantity = storageDto.price.stockQuantity;
-              price.lowStockAlert = storageDto.price.lowStockAlert ?? 5;
-              await queryRunner.manager.save(ProductPrice, price);
-            }
-          }
-
-          // 4b. Create colors (which may use default storages or have custom storages)
-          if (regionDto.colors && regionDto.colors.length > 0) {
-            for (const colorDto of regionDto.colors) {
-              const useDefaultStorages = colorDto.useDefaultStorages ?? true;
-              
-              const color = queryRunner.manager.create(ProductColor, {
-                productId: new ObjectId(savedProduct.id),
-                regionId: new ObjectId(savedRegion.id),
-                colorName: colorDto.colorName,
-                colorImage: colorDto.colorImage,
-                hasStorage: colorDto.hasStorage ?? true,
-                useDefaultStorages: useDefaultStorages,
-                singlePrice: colorDto.singlePrice,
-                singleComparePrice: colorDto.singleComparePrice,
-                singleStockQuantity: colorDto.singleStockQuantity,
-                features: colorDto.features,
-                displayOrder: colorDto.displayOrder ?? 0,
-              });
-              const savedColor = await queryRunner.manager.save(ProductColor, color);
-
-              // Create custom storages only if useDefaultStorages = false
-              if (colorDto.hasStorage && !useDefaultStorages && colorDto.storages && colorDto.storages.length > 0) {
-                for (const storageDto of colorDto.storages) {
-                  const storage = queryRunner.manager.create(ProductStorage, {
-                    colorId: new ObjectId(savedColor.id),
-                    storageSize: storageDto.storageSize,
-                    displayOrder: storageDto.displayOrder ?? 0,
-                  });
-                  const savedStorage = await queryRunner.manager.save(ProductStorage, storage);
-
-                  // Create Price for this custom storage
-                  const price = new ProductPrice();
-                  price.storageId = new ObjectId(savedStorage.id);
-                  price.regularPrice = storageDto.price.regularPrice;
-                  price.comparePrice = storageDto.price.comparePrice;
-                  price.discountPrice = storageDto.price.discountPrice;
-                  price.discountPercent = storageDto.price.discountPercent;
-                  price.campaignPrice = storageDto.price.campaignPrice;
-                  price.campaignStart = storageDto.price.campaignStart
-                    ? new Date(storageDto.price.campaignStart)
-                    : undefined;
-                  price.campaignEnd = storageDto.price.campaignEnd
-                    ? new Date(storageDto.price.campaignEnd)
-                    : undefined;
-                  price.stockQuantity = storageDto.price.stockQuantity;
-                  price.lowStockAlert = storageDto.price.lowStockAlert ?? 5;
-                  await queryRunner.manager.save(ProductPrice, price);
-                }
-              }
-            }
-          }
-        }
-      }
-
-      // 5. Create Images
-      if (dto.images && dto.images.length > 0) {
-        for (const imageDto of dto.images) {
-          const image = queryRunner.manager.create(ProductImage, {
-            productId: new ObjectId(savedProduct.id),
-            imageUrl: imageDto.imageUrl,
-            isThumbnail: imageDto.isThumbnail ?? false,
-            altText: imageDto.altText,
-            displayOrder: imageDto.displayOrder ?? 0,
-          });
-          await queryRunner.manager.save(ProductImage, image);
-        }
-      }
-
-      // 6. Create Videos
-      if (dto.videos && dto.videos.length > 0) {
-        for (const videoDto of dto.videos) {
-          const video = queryRunner.manager.create(ProductVideo, {
-            productId: new ObjectId(savedProduct.id),
-            videoUrl: videoDto.videoUrl,
-            videoType: videoDto.videoType,
-            displayOrder: videoDto.displayOrder ?? 0,
-          });
-          await queryRunner.manager.save(ProductVideo, video);
-        }
-      }
-
-      // 7. Create Specifications
-      if (dto.specifications && dto.specifications.length > 0) {
-        for (const spec of dto.specifications) {
-          const productSpec = queryRunner.manager.create(ProductSpecification, {
-            productId: new ObjectId(savedProduct.id),
-            specKey: spec.specKey,
-            specValue: spec.specValue,
-            displayOrder: spec.displayOrder ?? 0,
-          });
-          await queryRunner.manager.save(ProductSpecification, productSpec);
-        }
-      }
-
-      await queryRunner.commitTransaction();
-
-      // Return complete product with all relations
-      return this.findOne(savedProduct.slug);
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      
-      // Log the full error for debugging
-      console.error('Product creation error:', {
-        code: error.code,
-        message: error.message,
-        stack: error.stack,
-      });
-
-      // Manual cleanup for MongoDB (since transactions don't work properly without replica set)
-      try {
-        if (error.code === 11000 || error.message?.includes('duplicate key') || error.message?.includes('E11000')) {
-          console.log('Attempting manual cleanup due to duplicate key error...');
-          
-          // Check if it's a null regionName error
-          if (error.message?.includes('regionName: null')) {
-            // Delete regions with null regionName for this product
-            await this.dataSource.manager.delete('ProductRegion', { 
-              productId: savedProduct?.id, 
-              regionName: null as any 
-            });
-            console.log('Cleaned up regions with null regionName');
-          }
-          
-          const duplicateField = this.extractDuplicateField(error);
-          throw new BadRequestException(
-            `${duplicateField} already exists. Please use a different value. Database has been cleaned up, please try again.`,
-          );
-        }
-      } catch (cleanupError) {
-        console.error('Cleanup error:', cleanupError);
-      }
-      
-      // Handle validation errors
-      if (error.name === 'ValidationError') {
-        throw new BadRequestException(`Validation error: ${error.message}`);
-      }
-      
-      throw new InternalServerErrorException(
-        `Failed to create product: ${error.message}`,
+  // Fetch categories and brands
+  useEffect(() => {
+    categoriesService.getAll().then(data => {
+      setCategories(
+        data.map((c: any) => ({
+          id: c.id,
+          name: c.name,
+        })),
       );
-    } finally {
-      await queryRunner.release();
-    }
-  }
-
-  /**
-   * Get all products with filters and pagination
-   */
-  async findAll(filters?: {
-    categoryId?: string;
-    brandId?: string;
-    isActive?: boolean;
-    isOnline?: boolean;
-    minPrice?: number;
-    maxPrice?: number;
-    search?: string;
-    limit?: number;
-    offset?: number;
-  }) {
-    const whereConditions: any = {};
-    
-    if (filters?.categoryId) {
-      whereConditions.categoryId = new ObjectId(filters.categoryId);
-    }
-    if (filters?.brandId) {
-      whereConditions.brandId = new ObjectId(filters.brandId);
-    }
-    if (filters?.isActive !== undefined) {
-      whereConditions.isActive = filters.isActive;
-    }
-    if (filters?.isOnline !== undefined) {
-      whereConditions.isOnline = filters.isOnline;
-    }
-
-    const products = await this.productRepository.find({
-      where: whereConditions,
-      take: filters?.limit || 50,
-      skip: filters?.offset || 0,
-      order: { createdAt: 'DESC' },
-      relations: ['images', 'videos', 'specifications'],
     });
+    brandsService.findAll().then(data => {
+      setBrands(data.map((b: any) => ({id: b.id, name: b.name})));
+    });
+  }, []);
 
-    if (products.length === 0) {
-      return [];
+  // Slugify helper
+  const slugify = (text: string) =>
+    text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-+|-+$/g, '');
+
+  const handleProductNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newName = e.target.value;
+    setProductName(newName);
+    setSlug(prevSlug => {
+      const prevAuto = slugify(productName);
+      const newAuto = slugify(newName);
+      if (prevSlug === prevAuto || prevSlug === '') {
+        return newAuto;
+      }
+      return prevSlug;
+    });
+  };
+
+  const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSlug(slugify(e.target.value));
+  };
+
+  // Rich text editor
+  const formatText = (command: string, value?: string) => {
+    document.execCommand(command, false, value);
+  };
+
+  const handleShortDescriptionChange = (e: React.FormEvent<HTMLDivElement>) => {
+    setShortDescription(e.currentTarget.innerHTML);
+  };
+
+  // Thumbnail handling
+  const handleThumbnailUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setThumbnailFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setThumbnailPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
     }
+  };
 
-    // Load nested relations for each product
-    const productsWithFullRelations = await Promise.all(
-      products.map(async (product) => {
-        // Load networks with colors and storages
-        if (product.networks && product.networks.length > 0) {
-          for (const network of product.networks) {
-            const colors = await this.dataSource.getMongoRepository(ProductColor).find({
-              where: { networkId: network.id } as any,
-            });
-            
-            for (const color of colors) {
-              const storages = await this.dataSource.getMongoRepository(ProductStorage).find({
-                where: { colorId: color.id } as any,
-              });
-              
-              for (const storage of storages) {
-                const price = await this.dataSource.getMongoRepository(ProductPrice).findOne({
-                  where: { storageId: storage.id } as any,
-                });
-                (storage as any).price = price;
-              }
-              (color as any).storages = storages;
-            }
-            (network as any).colors = colors;
-          }
-        }
+  const removeThumbnail = () => {
+    setThumbnailFile(null);
+    setThumbnailPreview('');
+  };
 
-        // Load regions with defaultStorages and colors
-        if (product.regions && product.regions.length > 0) {
-          for (const region of product.regions) {
-            const defaultStorages = await this.dataSource.getMongoRepository(ProductStorage).find({
-              where: { regionId: region.id } as any,
-            });
-            
-            for (const storage of defaultStorages) {
-              const price = await this.dataSource.getMongoRepository(ProductPrice).findOne({
-                where: { storageId: storage.id } as any,
-              });
-              (storage as any).price = price;
-            }
-            (region as any).defaultStorages = defaultStorages;
+  // Gallery handling
+  const handleGalleryImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    files.forEach(file => {
+      setGalleryImageFiles(prev => [...prev, file]);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setGalleryImagePreviews(prev => [
+          ...prev,
+          {url: reader.result as string, altText: '', file},
+        ]);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
 
-            const colors = await this.dataSource.getMongoRepository(ProductColor).find({
-              where: { regionId: region.id } as any,
-            });
-            
-            for (const color of colors) {
-              const storages = await this.dataSource.getMongoRepository(ProductStorage).find({
-                where: { colorId: color.id } as any,
-              });
-              
-              for (const storage of storages) {
-                const price = await this.dataSource.getMongoRepository(ProductPrice).findOne({
-                  where: { storageId: storage.id } as any,
-                });
-                (storage as any).price = price;
-              }
-              (color as any).storages = storages;
-            }
-            (region as any).colors = colors;
-          }
-        }
+  const removeGalleryImage = (index: number) => {
+    setGalleryImageFiles(prev => prev.filter((_, i) => i !== index));
+    setGalleryImagePreviews(prev => prev.filter((_, i) => i !== index));
+  };
 
-        // Load storages for directColors
-        if (product.directColors && product.directColors.length > 0) {
-          for (const color of product.directColors) {
-            const storages = await this.dataSource.getMongoRepository(ProductStorage).find({
-              where: { colorId: color.id } as any,
-            });
-            
-            for (const storage of storages) {
-              const price = await this.dataSource.getMongoRepository(ProductPrice).findOne({
-                where: { storageId: storage.id } as any,
-              });
-              (storage as any).price = price;
-            }
-            (color as any).storages = storages;
-          }
-        }
+  // Basic color management
+  const addBasicColor = () => {
+    setBasicColors([
+      ...basicColors,
+      {
+        id: `color-${Date.now()}`,
+        colorName: '',
+        colorImage: '',
+        colorImageFile: null,
+        regularPrice: '',
+        discountPrice: '',
+        discountPercent: '',
+        stockQuantity: '',
+      },
+    ]);
+  };
 
-        return product;
-      }),
+  const removeBasicColor = (colorId: string) => {
+    setBasicColors(basicColors.filter(c => c.id !== colorId));
+  };
+
+  const updateBasicColor = (colorId: string, field: string, value: any) => {
+    setBasicColors(prev =>
+      prev.map(c => (c.id === colorId ? {...c, [field]: value} : c)),
     );
+  };
 
-    return productsWithFullRelations.map((product) => this.formatProductResponse(product));
-  }
-
-  /**
-   * Get single product by slug with all details
-   */
-  async findOne(slug: string) {
-    const product = await this.productRepository.findOne({
-      where: { slug },
-      relations: ['images', 'videos', 'regions', 'networks', 'directColors', 'specifications'],
-    });
-
-    if (!product) {
-      throw new NotFoundException('Product not found');
+  const handleBasicColorImageUpload = (
+    colorId: string,
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setBasicColors(
+          basicColors.map(c =>
+            c.id === colorId
+              ? {
+                  ...c,
+                  colorImage: reader.result as string,
+                  colorImageFile: file,
+                }
+              : c,
+          ),
+        );
+      };
+      reader.readAsDataURL(file);
     }
+  };
 
-    // Manually load nested relations for networks (colors with storages)
-    if (product.networks && product.networks.length > 0) {
-      for (const network of product.networks) {
-        // Load colors for this network
-        const colors = await this.dataSource.getMongoRepository(ProductColor).find({
-          where: { networkId: network.id } as any,
-        });
-        
-        for (const color of colors) {
-          // Load storages for this color
-          const storages = await this.dataSource.getMongoRepository(ProductStorage).find({
-            where: { colorId: color.id } as any,
-          });
-          
-          // Load prices for storages
-          for (const storage of storages) {
-            const price = await this.dataSource.getMongoRepository(ProductPrice).findOne({
-              where: { storageId: storage.id } as any,
-            });
-            (storage as any).price = price;
-          }
-          (color as any).storages = storages;
-        }
-        (network as any).colors = colors;
-      }
-    }
+  const removeBasicColorImage = (colorId: string) => {
+    setBasicColors(
+      basicColors.map(c =>
+        c.id === colorId
+          ? {...c, colorImage: '', colorImageFile: null}
+          : c,
+      ),
+    );
+  };
 
-    // Manually load nested relations for regions (defaultStorages and colors with their storages)
-    if (product.regions && product.regions.length > 0) {
-      for (const region of product.regions) {
-        // Load defaultStorages with prices
-        const regionWithDefaults = await this.dataSource.getMongoRepository(ProductRegion).findOne({
-          where: { _id: region.id } as any,
-        });
-        
-        if (regionWithDefaults) {
-          // Load default storages
-          const defaultStorages = await this.dataSource.getMongoRepository(ProductStorage).find({
-            where: { regionId: region.id } as any,
-          });
-          
-          // Load prices for default storages
-          for (const storage of defaultStorages) {
-            const price = await this.dataSource.getMongoRepository(ProductPrice).findOne({
-              where: { storageId: storage.id } as any,
-            });
-            (storage as any).price = price;
-          }
-          (region as any).defaultStorages = defaultStorages;
+  // Specification management
+  const addSpecification = () => {
+    setSpecifications([
+      ...specifications,
+      {id: `spec-${Date.now()}`, key: '', value: ''},
+    ]);
+  };
 
-          // Load colors with their custom storages
-          const colors = await this.dataSource.getMongoRepository(ProductColor).find({
-            where: { regionId: region.id } as any,
-          });
-          
-          for (const color of colors) {
-            // Load custom storages for this color
-            const storages = await this.dataSource.getMongoRepository(ProductStorage).find({
-              where: { colorId: color.id } as any,
-            });
-            
-            // Load prices for custom storages
-            for (const storage of storages) {
-              const price = await this.dataSource.getMongoRepository(ProductPrice).findOne({
-                where: { storageId: storage.id } as any,
-              });
-              (storage as any).price = price;
-            }
-            (color as any).storages = storages;
-          }
-          (region as any).colors = colors;
-        }
-      }
-    }
+  const removeSpecification = (specId: string) => {
+    setSpecifications(specifications.filter(s => s.id !== specId));
+  };
 
-    // Load storages for directColors
-    if (product.directColors && product.directColors.length > 0) {
-      for (const color of product.directColors) {
-        const storages = await this.dataSource.getMongoRepository(ProductStorage).find({
-          where: { colorId: color.id } as any,
-        });
-        
-        for (const storage of storages) {
-          const price = await this.dataSource.getMongoRepository(ProductPrice).findOne({
-            where: { storageId: storage.id } as any,
-          });
-          (storage as any).price = price;
-        }
-        (color as any).storages = storages;
-      }
-    }
+  const updateSpecification = (specId: string, field: string, value: string) => {
+    setSpecifications(
+      specifications.map(s =>
+        s.id === specId ? {...s, [field]: value} : s,
+      ),
+    );
+  };
 
-    return this.formatProductResponse(product);
-  }
-
-  /**
-   * Get specific variant price
-   */
-  async getVariantPrice(
-    productId: string,
-    regionId?: string,
-    colorId?: string,
-    storageId?: string,
-  ) {
-    // For MongoDB, we need to manually query and filter
-    // This is a simplified version - you may need to implement more complex logic
-    const product = await this.productRepository.findOne({
-      where: { id: new ObjectId(productId) } as any,
-      relations: ['regions'],
-    });
-
-    if (!product || !product.regions || product.regions.length === 0) {
-      throw new NotFoundException('Product variant not found');
-    }
-
-    // Extract the specific price
-    const region = product.regions[0];
-    const color = region?.colors?.[0];
-    const storage = color?.storages?.[0];
-    const price = storage?.price;
-
-    if (!price) {
-      throw new NotFoundException('Price not found for this variant');
-    }
-
-    return {
-      region: { id: region.id, name: region.regionName },
-      color: { id: color.id, name: color.colorName, image: color.colorImage },
-      storage: { id: storage.id, size: storage.storageSize },
-      price: {
-        regular: price.regularPrice,
-        compare: price.comparePrice,
-        discount: price.discountPrice,
-        discountPercent: price.discountPercent,
-        campaign: price.campaignPrice,
-        campaignActive: this.isCampaignActive(price.campaignStart, price.campaignEnd),
-        final: this.calculateFinalPrice(price),
-      },
-      stock: {
-        quantity: price.stockQuantity,
-        lowStockAlert: price.lowStockAlert,
-        inStock: price.stockQuantity > 0,
-        isLowStock: price.stockQuantity <= price.lowStockAlert,
-      },
-    };
-  }
-
-  /**
-   * Update product
-   */
-  async update(id: string, dto: UpdateProductNewDto) {
-    const product = await this.productRepository.findOne({ 
-      where: { id: new ObjectId(id) } as any 
-    });
-
-    if (!product) {
-      throw new NotFoundException('Product not found');
-    }
-
-    // For simplicity, we'll update only the main product fields
-    // Updating nested relations would require a similar transaction approach
-    Object.assign(product, {
-      name: dto.name ?? product.name,
-      slug: dto.slug ?? product.slug,
-      shortDescription: dto.shortDescription ?? product.shortDescription,
-      description: dto.description ?? product.description,
-      categoryId: dto.categoryId ? new ObjectId(dto.categoryId) : product.categoryId,
-      brandId: dto.brandId ? new ObjectId(dto.brandId) : product.brandId,
-      productCode: dto.productCode ?? product.productCode,
-      sku: dto.sku ?? product.sku,
-      warranty: dto.warranty ?? product.warranty,
-      isActive: dto.isActive ?? product.isActive,
-      isOnline: dto.isOnline ?? product.isOnline,
-      isPos: dto.isPos ?? product.isPos,
-      isPreOrder: dto.isPreOrder ?? product.isPreOrder,
-      isOfficial: dto.isOfficial ?? product.isOfficial,
-      freeShipping: dto.freeShipping ?? product.freeShipping,
-      isEmi: dto.isEmi ?? product.isEmi,
-      rewardPoints: dto.rewardPoints ?? product.rewardPoints,
-      minBookingPrice: dto.minBookingPrice ?? product.minBookingPrice,
-      seoTitle: dto.seoTitle ?? product.seoTitle,
-      seoDescription: dto.seoDescription ?? product.seoDescription,
-      seoKeywords: dto.seoKeywords ?? product.seoKeywords,
-      seoCanonical: dto.seoCanonical ?? product.seoCanonical,
-      tags: dto.tags ?? product.tags,
-      faqIds: dto.faqIds ? dto.faqIds.map(id => new ObjectId(id)) : product.faqIds,
-    });
-
-    await this.productRepository.save(product);
-
-    return this.findOne(product.slug);
-  }
-
-  /**
-   * Soft delete product
-   */
-  async remove(id: string) {
-    const product = await this.productRepository.findOne({ 
-      where: { id: new ObjectId(id) } as any 
-    });
-
-    if (!product) {
-      throw new NotFoundException('Product not found');
-    }
-
-    await this.productRepository.softDelete(id);
-
-    return { success: true, message: 'Product deleted successfully' };
-  }
-
-  /**
-   * Search products
-   */
-  async search(query: string) {
-    return this.findAll({ search: query, limit: 20 });
-  }
-
-  // ============ Helper Methods ============
-
-  private formatProductResponse(product: Product) {
-    const prices = this.extractAllPrices(product);
-    const totalStock = this.calculateTotalStock(product);
-
-    return {
-      id: product.id,
-      name: product.name,
-      slug: product.slug,
-      description: product.description,
-      categoryId: product.categoryId,
-      brandId: product.brandId,
-      productCode: product.productCode,
-      sku: product.sku,
-      warranty: product.warranty,
-      // Simple product fields
-      price: product.price,
-      comparePrice: product.comparePrice,
-      stockQuantity: product.stockQuantity,
-      lowStockAlert: product.lowStockAlert,
-      isActive: product.isActive,
-      isOnline: product.isOnline,
-      isPos: product.isPos,
-      isPreOrder: product.isPreOrder,
-      isOfficial: product.isOfficial,
-      freeShipping: product.freeShipping,
-      isEmi: product.isEmi,
-      rewardPoints: product.rewardPoints,
-      minBookingPrice: product.minBookingPrice,
-      seo: {
-        title: product.seoTitle,
-        description: product.seoDescription,
-        keywords: product.seoKeywords,
-        canonical: product.seoCanonical,
-      },
-      tags: product.tags,
-      faqIds: product.faqIds,
-      priceRange: {
-        min: Math.min(...prices),
-        max: Math.max(...prices),
-        currency: 'BDT',
-      },
-      totalStock,
-      images: product.images?.map((img) => ({
-        id: img.id,
-        url: img.imageUrl,
-        isThumbnail: img.isThumbnail,
-        altText: img.altText,
-      })),
-      videos: product.videos?.map((vid) => ({
-        id: vid.id,
-        url: vid.videoUrl,
-        type: vid.videoType,
-      })),
-      directColors: product.directColors?.map((color) => ({
-        id: color.id,
-        name: color.colorName,
-        image: color.colorImage,
-        hasStorage: color.hasStorage,
-        singlePrice: color.singlePrice,
-        singleComparePrice: color.singleComparePrice,
-        singleDiscountPercent: color.singleDiscountPercent,
-        singleDiscountPrice: color.singleDiscountPrice,
-        singleStockQuantity: color.singleStockQuantity,
-        singleLowStockAlert: color.singleLowStockAlert,
-        features: color.features,
-        storages: color.hasStorage ? color.storages?.map((storage) => ({
-          id: storage.id,
-          size: storage.storageSize,
-          price: {
-            regular: storage.price?.regularPrice,
-            compare: storage.price?.comparePrice,
-            discount: storage.price?.discountPrice,
-            discountPercent: storage.price?.discountPercent,
-            campaign: storage.price?.campaignPrice,
-            campaignActive: this.isCampaignActive(
-              storage.price?.campaignStart,
-              storage.price?.campaignEnd,
-            ),
-            final: this.calculateFinalPrice(storage.price),
+  // Network management
+  const addNetwork = () => {
+    setNetworks([
+      ...networks,
+      {
+        id: `network-${Date.now()}`,
+        networkName: '',
+        priceAdjustment: '0',
+        defaultStorageSize: '',
+        isDefault: false,
+        hasDefaultStorages: false,
+        defaultStorages: [
+          {
+            id: `default-storage-${Date.now()}`,
+            storageSize: '256GB',
+            regularPrice: '',
+            discountPrice: '',
+            discountPercent: '',
+            stockQuantity: '',
+            lowStockAlert: '5',
           },
-          stock: storage.price?.stockQuantity,
-          inStock: (storage.price?.stockQuantity ?? 0) > 0,
-        })) : undefined,
-      })),
-      networks: product.networks?.map((network: any) => ({
-        id: network.id,
-        name: network.networkType,
-        priceAdjustment: network.priceAdjustment,
+        ],
+        colors: [
+          {
+            id: `color-${Date.now()}`,
+            colorName: '',
+            colorImage: '',
+            colorImageFile: null,
+            hasStorage: true,
+            useDefaultStorages: true,
+            singlePrice: '',
+            singleComparePrice: '',
+            singleStockQuantity: '',
+            storages: [],
+          },
+        ],
+      },
+    ]);
+  };
+
+  const removeNetwork = (networkId: string) => {
+    setNetworks(networks.filter(n => n.id !== networkId));
+  };
+
+  const updateNetwork = (networkId: string, field: string, value: any) => {
+    setNetworks(prev =>
+      prev.map(n => (n.id === networkId ? {...n, [field]: value} : n)),
+    );
+  };
+
+  // Color image upload for network colors
+  const handleNetworkColorImageUpload = (
+    networkId: string,
+    colorId: string,
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setNetworks(
+          networks.map(n =>
+            n.id === networkId
+              ? {
+                  ...n,
+                  colors: n.colors.map(c =>
+                    c.id === colorId
+                      ? {
+                          ...c,
+                          colorImage: reader.result as string,
+                          colorImageFile: file,
+                        }
+                      : c,
+                  ),
+                }
+              : n,
+          ),
+        );
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeNetworkColorImage = (networkId: string, colorId: string) => {
+    setNetworks(
+      networks.map(n =>
+        n.id === networkId
+          ? {
+              ...n,
+              colors: n.colors.map(c =>
+                c.id === colorId
+                  ? {...c, colorImage: '', colorImageFile: null}
+                  : c,
+              ),
+            }
+          : n,
+      ),
+    );
+  };
+
+  // Color image upload for region colors
+  const handleRegionColorImageUpload = (
+    regionId: string,
+    colorId: string,
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setRegions(prev =>
+          prev.map(r =>
+            r.id === regionId
+              ? {
+                  ...r,
+                  colors: r.colors.map(c =>
+                    c.id === colorId
+                      ? {
+                          ...c,
+                          colorImage: reader.result as string,
+                          colorImageFile: file,
+                        }
+                      : c,
+                  ),
+                }
+              : r,
+          ),
+        );
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeRegionColorImage = (regionId: string, colorId: string) => {
+    setRegions(prev =>
+      prev.map(r =>
+        r.id === regionId
+          ? {
+              ...r,
+              colors: r.colors.map(c =>
+                c.id === colorId
+                  ? {...c, colorImage: '', colorImageFile: null}
+                  : c,
+              ),
+            }
+          : r,
+      ),
+    );
+  };
+
+  const addColorToNetwork = (networkId: string) => {
+    setNetworks(
+      networks.map(n =>
+        n.id === networkId
+          ? {
+              ...n,
+              colors: [
+                ...n.colors,
+                {
+                  id: `color-${Date.now()}`,
+                  colorName: '',
+                  colorImage: '',
+                  colorImageFile: null,
+                  hasStorage: true,
+                  useDefaultStorages: true,
+                  singlePrice: '',
+                  singleComparePrice: '',
+                  singleStockQuantity: '',
+                  storages: [],
+                },
+              ],
+            }
+          : n,
+      ),
+    );
+  };
+
+  const removeColorFromNetwork = (networkId: string, colorId: string) => {
+    setNetworks(
+      networks.map(n =>
+        n.id === networkId
+          ? {...n, colors: n.colors.filter(c => c.id !== colorId)}
+          : n,
+      ),
+    );
+  };
+
+  const updateColorInNetwork = (
+    networkId: string,
+    colorId: string,
+    field: string,
+    value: any,
+  ) => {
+    setNetworks(prev =>
+      prev.map(n =>
+        n.id === networkId
+          ? {
+              ...n,
+              colors: n.colors.map(c =>
+                c.id === colorId ? {...c, [field]: value} : c,
+              ),
+            }
+          : n,
+      ),
+    );
+  };
+
+  const addStorageToNetwork = (networkId: string, colorId: string) => {
+    setNetworks(
+      networks.map(n =>
+        n.id === networkId
+          ? {
+              ...n,
+              colors: n.colors.map(c =>
+                c.id === colorId
+                  ? {
+                      ...c,
+                      storages: [
+                        ...c.storages,
+                        {
+                          id: `storage-${Date.now()}`,
+                          storageSize: '',
+                          regularPrice: '',
+                          discountPrice: '',
+                          discountPercent: '',
+                          stockQuantity: '',
+                          lowStockAlert: '5',
+                        },
+                      ],
+                    }
+                  : c,
+              ),
+            }
+          : n,
+      ),
+    );
+  };
+
+  const removeStorageFromNetwork = (
+    networkId: string,
+    colorId: string,
+    storageId: string,
+  ) => {
+    setNetworks(
+      networks.map(n =>
+        n.id === networkId
+          ? {
+              ...n,
+              colors: n.colors.map(c =>
+                c.id === colorId
+                  ? {
+                      ...c,
+                      storages: c.storages.filter(s => s.id !== storageId),
+                    }
+                  : c,
+              ),
+            }
+          : n,
+      ),
+    );
+  };
+
+  const updateStorageInNetwork = (
+    networkId: string,
+    colorId: string,
+    storageId: string,
+    field: string,
+    value: any,
+  ) => {
+    setNetworks(prev =>
+      prev.map(n =>
+        n.id === networkId
+          ? {
+              ...n,
+              colors: n.colors.map(c =>
+                c.id === colorId
+                  ? {
+                      ...c,
+                      storages: c.storages.map(s =>
+                        s.id === storageId ? {...s, [field]: value} : s,
+                      ),
+                    }
+                  : c,
+              ),
+            }
+          : n,
+      ),
+    );
+  };
+
+  // Network default storage management
+  const addDefaultStorageToNetwork = (networkId: string) => {
+    setNetworks(
+      networks.map(n =>
+        n.id === networkId
+          ? {
+              ...n,
+              defaultStorages: [
+                ...n.defaultStorages,
+                {
+                  id: `default-storage-${Date.now()}`,
+                  storageSize: '',
+                  regularPrice: '',
+                  discountPrice: '',
+                  discountPercent: '',
+                  stockQuantity: '',
+                  lowStockAlert: '5',
+                },
+              ],
+            }
+          : n,
+      ),
+    );
+  };
+
+  const removeDefaultStorageFromNetwork = (networkId: string, storageId: string) => {
+    setNetworks(
+      networks.map(n =>
+        n.id === networkId
+          ? {
+              ...n,
+              defaultStorages: n.defaultStorages.filter(s => s.id !== storageId),
+            }
+          : n,
+      ),
+    );
+  };
+
+  const updateDefaultStorageInNetwork = (
+    networkId: string,
+    storageId: string,
+    field: string,
+    value: any,
+  ) => {
+    setNetworks(prev =>
+      prev.map(n =>
+        n.id === networkId
+          ? {
+              ...n,
+              defaultStorages: n.defaultStorages.map(s =>
+                s.id === storageId ? {...s, [field]: value} : s,
+              ),
+            }
+          : n,
+      ),
+    );
+  };
+
+  // Region management
+  const addRegion = () => {
+    setRegions([
+      ...regions,
+      {
+        id: `region-${Date.now()}`,
+        regionName: '',
+        isDefault: false,
+        defaultStorages: [
+          {
+            id: `default-storage-${Date.now()}`,
+            storageSize: '',
+            regularPrice: '',
+            discountPrice: '',
+            discountPercent: '',
+            stockQuantity: '',
+            lowStockAlert: '5',
+          },
+        ],
+        colors: [
+          {
+            id: `color-${Date.now()}`,
+            colorName: '',
+            colorImage: '',
+            colorImageFile: null,
+            hasStorage: true,
+            useDefaultStorages: true,
+            singlePrice: '',
+            singleComparePrice: '',
+            singleStockQuantity: '',
+            storages: [],
+          },
+        ],
+      },
+    ]);
+  };
+
+  const removeRegion = (regionId: string) => {
+    setRegions(regions.filter(r => r.id !== regionId));
+  };
+
+  const updateRegion = (regionId: string, field: string, value: any) => {
+    setRegions(prev =>
+      prev.map(r => (r.id === regionId ? {...r, [field]: value} : r)),
+    );
+  };
+
+  const addColorToRegion = (regionId: string) => {
+    setRegions(
+      regions.map(r =>
+        r.id === regionId
+          ? {
+              ...r,
+              colors: [
+                ...r.colors,
+                {
+                  id: `color-${Date.now()}`,
+                  colorName: '',
+                  colorImage: '',
+                  colorImageFile: null,
+                  hasStorage: true,
+                  useDefaultStorages: true,
+                  singlePrice: '',
+                  singleComparePrice: '',
+                  singleStockQuantity: '',
+                  storages: [],
+                },
+              ],
+            }
+          : r,
+      ),
+    );
+  };
+
+  const removeColorFromRegion = (regionId: string, colorId: string) => {
+    setRegions(
+      regions.map(r =>
+        r.id === regionId
+          ? {...r, colors: r.colors.filter(c => c.id !== colorId)}
+          : r,
+      ),
+    );
+  };
+
+  const updateColorInRegion = (
+    regionId: string,
+    colorId: string,
+    field: string,
+    value: any,
+  ) => {
+    setRegions(prev =>
+      prev.map(r =>
+        r.id === regionId
+          ? {
+              ...r,
+              colors: r.colors.map(c =>
+                c.id === colorId ? {...c, [field]: value} : c,
+              ),
+            }
+          : r,
+      ),
+    );
+  };
+
+  const addStorageToRegion = (regionId: string, colorId: string) => {
+    setRegions(
+      regions.map(r =>
+        r.id === regionId
+          ? {
+              ...r,
+              colors: r.colors.map(c =>
+                c.id === colorId
+                  ? {
+                      ...c,
+                      storages: [
+                        ...c.storages,
+                        {
+                          id: `storage-${Date.now()}`,
+                          storageSize: '',
+                          regularPrice: '',
+                          discountPrice: '',
+                          discountPercent: '',
+                          stockQuantity: '',
+                          lowStockAlert: '5',
+                        },
+                      ],
+                    }
+                  : c,
+              ),
+            }
+          : r,
+      ),
+    );
+  };
+
+  const removeStorageFromRegion = (
+    regionId: string,
+    colorId: string,
+    storageId: string,
+  ) => {
+    setRegions(
+      regions.map(r =>
+        r.id === regionId
+          ? {
+              ...r,
+              colors: r.colors.map(c =>
+                c.id === colorId
+                  ? {
+                      ...c,
+                      storages: c.storages.filter(s => s.id !== storageId),
+                    }
+                  : c,
+              ),
+            }
+          : r,
+      ),
+    );
+  };
+
+  const updateStorageInRegion = (
+    regionId: string,
+    colorId: string,
+    storageId: string,
+    field: string,
+    value: any,
+  ) => {
+    setRegions(prev =>
+      prev.map(r =>
+        r.id === regionId
+          ? {
+              ...r,
+              colors: r.colors.map(c =>
+                c.id === colorId
+                  ? {
+                      ...c,
+                      storages: c.storages.map(s =>
+                        s.id === storageId ? {...s, [field]: value} : s,
+                      ),
+                    }
+                  : c,
+              ),
+            }
+          : r,
+      ),
+    );
+  };
+
+  const addDefaultStorageToRegion = (regionId: string) => {
+    setRegions(
+      regions.map(r =>
+        r.id === regionId
+          ? {
+              ...r,
+              defaultStorages: [
+                ...r.defaultStorages,
+                {
+                  id: `default-storage-${Date.now()}`,
+                  storageSize: '',
+                  regularPrice: '',
+                  discountPrice: '',
+                  discountPercent: '',
+                  stockQuantity: '',
+                  lowStockAlert: '5',
+                },
+              ],
+            }
+          : r,
+      ),
+    );
+  };
+
+  const removeDefaultStorageFromRegion = (regionId: string, storageId: string) => {
+    setRegions(
+      regions.map(r =>
+        r.id === regionId
+          ? {
+              ...r,
+              defaultStorages: r.defaultStorages.filter(s => s.id !== storageId),
+            }
+          : r,
+      ),
+    );
+  };
+
+  const updateDefaultStorageInRegion = (
+    regionId: string,
+    storageId: string,
+    field: string,
+    value: any,
+  ) => {
+    setRegions(prev =>
+      prev.map(r =>
+        r.id === regionId
+          ? {
+              ...r,
+              defaultStorages: r.defaultStorages.map(s =>
+                s.id === storageId ? {...s, [field]: value} : s,
+              ),
+            }
+          : r,
+      ),
+    );
+  };
+
+  const resetForm = () => {
+    setProductName('');
+    setSlug('');
+    setDescription('');
+    setShortDescription('');
+    if (shortDescriptionRef.current) {
+      shortDescriptionRef.current.innerHTML = '';
+    }
+    setProductCode('');
+    setSku('');
+    setWarranty('');
+    setSelectedCategory('');
+    setSelectedBrand('');
+    setIsActive(true);
+    setIsOnline(true);
+    setIsPos(true);
+    setIsPreOrder(false);
+    setIsOfficial(false);
+    setFreeShipping(false);
+    setIsEmi(false);
+    setRewardPoints('');
+    setMinBookingPrice('');
+    setSeoTitle('');
+    setSeoDescription('');
+    setSeoKeywords('');
+    setSeoCanonical('');
+    setTags('');
+    setThumbnailFile(null);
+    setThumbnailPreview('');
+    setGalleryImageFiles([]);
+    setGalleryImagePreviews([]);
+    setBasicColors([]);
+    setVideos([{id: 'video-1', url: '', type: 'youtube'}]);
+    setSpecifications([{id: 'spec-1', key: '', value: ''}]);
+    setNetworks([]);
+    setRegions([
+      {
+        id: 'region-1',
+        regionName: 'International',
+        isDefault: true,
+        defaultStorages: [
+          {
+            id: 'default-storage-1',
+            storageSize: '256GB',
+            regularPrice: '',
+            discountPrice: '',
+            discountPercent: '',
+            stockQuantity: '',
+            lowStockAlert: '5',
+          },
+        ],
+        colors: [
+          {
+            id: 'color-1',
+            colorName: 'Midnight',
+            colorImage: '',
+            colorImageFile: null,
+            hasStorage: true,
+            useDefaultStorages: true,
+            singlePrice: '',
+            singleComparePrice: '',
+            singleStockQuantity: '',
+            storages: [],
+          },
+        ],
+      },
+    ]);
+  };
+
+  // SUBMIT FUNCTIONS
+  const handleBasicProductSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      const formData = new FormData();
+
+      if (thumbnailFile) {
+        formData.append('thumbnail', thumbnailFile);
+      }
+
+      galleryImageFiles.forEach(file => {
+        formData.append('galleryImages', file);
+      });
+
+      basicColors.forEach((color, idx) => {
+        if (color.colorImageFile) {
+          formData.append(`colors[${idx}][colorImage]`, color.colorImageFile);
+        }
+      });
+
+      const payload: any = {
+        productType: 'basic',
+        name: productName,
+        slug,
+        description: description || undefined,
+        shortDescription: shortDescription || undefined,
+        categoryId: selectedCategory || undefined,
+        brandId: selectedBrand || undefined,
+        productCode: productCode || undefined,
+        sku: sku || undefined,
+        warranty: warranty || undefined,
+        isActive,
+        isOnline,
+        isPos,
+        isPreOrder,
+        isOfficial,
+        freeShipping,
+        isEmi,
+        rewardPoints: rewardPoints ? Number(rewardPoints) : undefined,
+        minBookingPrice: minBookingPrice ? Number(minBookingPrice) : undefined,
+        seoTitle: seoTitle || undefined,
+        seoDescription: seoDescription || undefined,
+        seoKeywords: seoKeywords
+          ? seoKeywords.split(',').map(k => k.trim())
+          : undefined,
+        seoCanonical: seoCanonical || undefined,
+        tags: tags ? tags.split(',').map(t => t.trim()) : undefined,
+        videos: videos
+          .filter(v => v.url)
+          .map((v, idx) => ({
+            videoUrl: v.url,
+            videoType: v.type,
+            displayOrder: idx,
+          })),
+        specifications: specifications
+          .filter(s => s.key && s.value)
+          .map((s, idx) => ({
+            specKey: s.key,
+            specValue: s.value,
+            displayOrder: idx,
+          })),
+        colors:
+          basicColors.length > 0
+            ? basicColors.map((c, idx) => ({
+                colorName: c.colorName,
+                regularPrice: c.regularPrice ? Number(c.regularPrice) : undefined,
+                discountPrice: c.discountPrice ? Number(c.discountPrice) : undefined,
+                discountPercent: c.discountPercent ? Number(c.discountPercent) : undefined,
+                stockQuantity: c.stockQuantity ? Number(c.stockQuantity) : undefined,
+                displayOrder: idx,
+              }))
+            : undefined,
+      };
+
+      Object.keys(payload).forEach(key => {
+        const value = payload[key];
+        if (value !== undefined) {
+          if (typeof value === 'object') {
+            formData.append(key, JSON.stringify(value));
+          } else {
+            formData.append(key, String(value));
+          }
+        }
+      });
+
+      const response =
+        productType === 'basic'
+          ? await productsService.createBasic(formData)
+          : productType === 'network'
+          ? await productsService.createNetwork(formData)
+          : await productsService.createRegion(formData);
+      toast.success('Basic product created successfully!');
+      resetForm();
+    } catch (err: any) {
+      console.error('Error creating basic product:', err);
+      toast.error(`Error: ${err?.response?.data?.message || err?.message || 'Unknown error'}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleNetworkProductSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      const formData = new FormData();
+
+      if (thumbnailFile) {
+        formData.append('thumbnail', thumbnailFile);
+      }
+
+      galleryImageFiles.forEach(file => {
+        formData.append('galleryImages', file);
+      });
+
+      const networkColorImages: File[] = [];
+
+      // Format networks data properly for backend
+      const formattedNetworks = networks.map((network, netIdx) => ({
+        networkName: network.networkName,
         isDefault: network.isDefault,
-        colors: network.colors?.map((color: any) => ({
-          id: color.id,
-          name: color.colorName,
-          image: color.colorImage,
-          hasStorage: color.hasStorage,
-          singlePrice: color.singlePrice,
-          singleComparePrice: color.singleComparePrice,
-          singleStockQuantity: color.singleStockQuantity,
-          features: color.features,
-          storages: color.hasStorage ? color.storages?.map((storage: any) => ({
-            id: storage.id,
-            size: storage.storageSize,
-            price: {
-              regular: storage.price?.regularPrice,
-              compare: storage.price?.comparePrice,
-              discount: storage.price?.discountPrice,
-              discountPercent: storage.price?.discountPercent,
-              campaign: storage.price?.campaignPrice,
-              campaignActive: this.isCampaignActive(
-                storage.price?.campaignStart,
-                storage.price?.campaignEnd,
-              ),
-              final: this.calculateFinalPrice(storage.price),
-            },
-            stock: storage.price?.stockQuantity,
-            inStock: (storage.price?.stockQuantity ?? 0) > 0,
-          })) : undefined,
-        })),
-      })),
-      regions: product.regions?.map((region: any) => ({
-        id: region.id,
-        name: region.regionName,
-        isDefault: region.isDefault,
-        defaultStorages: region.defaultStorages?.map((storage: any) => ({
-          id: storage.id,
-          size: storage.storageSize,
-          price: {
-            regular: storage.price?.regularPrice,
-            compare: storage.price?.comparePrice,
-            discount: storage.price?.discountPrice,
-            discountPercent: storage.price?.discountPercent,
-            campaign: storage.price?.campaignPrice,
-            campaignActive: this.isCampaignActive(
-              storage.price?.campaignStart,
-              storage.price?.campaignEnd,
-            ),
-            final: this.calculateFinalPrice(storage.price),
-          },
-          stock: storage.price?.stockQuantity,
-          inStock: (storage.price?.stockQuantity ?? 0) > 0,
-        })),
-        colors: region.colors?.map((color: any) => ({
-          id: color.id,
-          name: color.colorName,
-          image: color.colorImage,
-          hasStorage: color.hasStorage,
-          useDefaultStorages: color.useDefaultStorages,
-          singlePrice: color.singlePrice,
-          singleComparePrice: color.singleComparePrice,
-          singleStockQuantity: color.singleStockQuantity,
-          features: color.features,
-          // Include custom storages only if useDefaultStorages = false
-          customStorages: color.hasStorage && !color.useDefaultStorages ? color.storages?.map((storage: any) => ({
-            id: storage.id,
-            size: storage.storageSize,
-            price: {
-              regular: storage.price?.regularPrice,
-              compare: storage.price?.comparePrice,
-              discount: storage.price?.discountPrice,
-              discountPercent: storage.price?.discountPercent,
-              campaign: storage.price?.campaignPrice,
-              campaignActive: this.isCampaignActive(
-                storage.price?.campaignStart,
-                storage.price?.campaignEnd,
-              ),
-              final: this.calculateFinalPrice(storage.price),
-            },
-            stock: storage.price?.stockQuantity,
-            inStock: (storage.price?.stockQuantity ?? 0) > 0,
-          })) : undefined,
-        })),
-      })),
-      specifications: this.groupSpecifications(product.specifications),
-      createdAt: product.createdAt,
-      updatedAt: product.updatedAt,
-    };
-  }
-
-  private extractAllPrices(product: Product): number[] {
-    const prices: number[] = [];
-
-    // Simple product price
-    if (product.price) {
-      prices.push(product.price);
-    }
-
-    // Direct colors prices
-    product.directColors?.forEach((color) => {
-      if (color.singlePrice) {
-        prices.push(color.singlePrice);
-      }
-      if (color.hasStorage) {
-        color.storages?.forEach((storage) => {
-          if (storage.price) {
-            const finalPrice = this.calculateFinalPrice(storage.price);
-            prices.push(finalPrice);
+        hasDefaultStorages: network.hasDefaultStorages,
+        displayOrder: netIdx,
+        // Default storages for this network
+        defaultStorages: network.hasDefaultStorages
+          ? network.defaultStorages.map((storage, storIdx) => ({
+              storageSize: storage.storageSize,
+              regularPrice: storage.regularPrice
+                ? Number(storage.regularPrice)
+                : 0,
+              comparePrice: storage.regularPrice
+                ? Number(storage.regularPrice)
+                : 0,
+              discountPrice: storage.discountPrice
+                ? Number(storage.discountPrice)
+                : 0,
+              discountPercent: storage.discountPercent
+                ? Number(storage.discountPercent)
+                : 0,
+              stockQuantity: storage.stockQuantity
+                ? Number(storage.stockQuantity)
+                : 0,
+              lowStockAlert: storage.lowStockAlert
+                ? Number(storage.lowStockAlert)
+                : 5,
+              displayOrder: storIdx,
+            }))
+          : undefined,
+        // Colors in this network
+        colors: network.colors.map((color, colorIdx) => {
+          let imageIndex = -1;
+          if (color.colorImageFile) {
+            networkColorImages.push(color.colorImageFile);
+            imageIndex = networkColorImages.length - 1;
           }
-        });
-      }
-    });
 
-    // Network-based prices
-    product.networks?.forEach((network) => {
-      network.colors?.forEach((color) => {
-        if (color.singlePrice) {
-          prices.push(color.singlePrice);
-        }
-        if (color.hasStorage) {
-          color.storages?.forEach((storage) => {
-            if (storage.price) {
-              const finalPrice = this.calculateFinalPrice(storage.price);
-              prices.push(finalPrice);
-            }
-          });
+          return {
+            colorName: color.colorName,
+            hasStorage: color.hasStorage,
+            useDefaultStorages: color.useDefaultStorages,
+            displayOrder: colorIdx,
+            colorImageIndex: imageIndex > -1 ? imageIndex : undefined,
+            // If no storage, use single price
+            singlePrice: !color.hasStorage
+              ? Number(color.singlePrice) || 0
+              : undefined,
+            singleComparePrice: !color.hasStorage
+              ? Number(color.singleComparePrice) || 0
+              : undefined,
+            singleStockQuantity: !color.hasStorage
+              ? Number(color.singleStockQuantity) || 0
+              : undefined,
+            // Custom storages (only if has storage and not using defaults)
+            storages:
+              color.hasStorage && !color.useDefaultStorages
+                ? color.storages.map((storage, storIdx) => ({
+                    storageSize: storage.storageSize,
+                    regularPrice: storage.regularPrice
+                      ? Number(storage.regularPrice)
+                      : 0,
+                    comparePrice: storage.regularPrice
+                      ? Number(storage.regularPrice)
+                      : 0,
+                    discountPrice: storage.discountPrice
+                      ? Number(storage.discountPrice)
+                      : 0,
+                    discountPercent: storage.discountPercent
+                      ? Number(storage.discountPercent)
+                      : 0,
+                    stockQuantity: storage.stockQuantity
+                      ? Number(storage.stockQuantity)
+                      : 0,
+                    lowStockAlert: storage.lowStockAlert
+                      ? Number(storage.lowStockAlert)
+                      : 5,
+                    displayOrder: storIdx,
+                  }))
+                : undefined,
+          };
+        }),
+      }));
+
+      // Append network color images
+      networkColorImages.forEach(file => {
+        formData.append('colors', file);
+      });
+
+      const payload: any = {
+        productType: 'network',
+        name: productName,
+        slug,
+        description: description || undefined,
+        shortDescription: shortDescription || undefined,
+        categoryId: selectedCategory || undefined,
+        brandId: selectedBrand || undefined,
+        productCode: productCode || undefined,
+        sku: sku || undefined,
+        warranty: warranty || undefined,
+        isActive,
+        isOnline,
+        isPos,
+        isPreOrder,
+        isOfficial,
+        freeShipping,
+        isEmi,
+        rewardPoints: rewardPoints ? Number(rewardPoints) : undefined,
+        minBookingPrice: minBookingPrice ? Number(minBookingPrice) : undefined,
+        seoTitle: seoTitle || undefined,
+        seoDescription: seoDescription || undefined,
+        seoKeywords: seoKeywords
+          ? seoKeywords.split(',').map(k => k.trim())
+          : undefined,
+        seoCanonical: seoCanonical || undefined,
+        tags: tags ? tags.split(',').map(t => t.trim()) : undefined,
+        videos: videos
+          .filter(v => v.url)
+          .map((v, idx) => ({
+            videoUrl: v.url,
+            videoType: v.type,
+            displayOrder: idx,
+          })),
+        specifications: specifications
+          .filter(s => s.key && s.value)
+          .map((s, idx) => ({
+            specKey: s.key,
+            specValue: s.value,
+            displayOrder: idx,
+          })),
+        networks: formattedNetworks.length > 0 ? formattedNetworks : undefined,
+      };
+
+      Object.keys(payload).forEach(key => {
+        const value = payload[key];
+        if (value !== undefined) {
+          if (typeof value === 'object') {
+            formData.append(key, JSON.stringify(value));
+          } else {
+            formData.append(key, String(value));
+          }
         }
       });
-    });
 
-    // Region-based prices
-    product.regions?.forEach((region) => {
-      region.colors?.forEach((color) => {
-        if (color.singlePrice) {
-          prices.push(color.singlePrice);
-        }
-        if (color.hasStorage) {
-          color.storages?.forEach((storage) => {
-            if (storage.price) {
-              const finalPrice = this.calculateFinalPrice(storage.price);
-              prices.push(finalPrice);
-            }
-          });
+      const response =
+        productType === 'basic'
+          ? await productsService.createBasic(formData)
+          : productType === 'network'
+          ? await productsService.createNetwork(formData)
+          : await productsService.createRegion(formData);
+      toast.success('Network product created successfully!');
+      resetForm();
+    } catch (err: any) {
+      console.error('Error creating network product:', err);
+      toast.error(`Error: ${err?.response?.data?.message || err?.message || 'Unknown error'}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleRegionProductSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      const formData = new FormData();
+
+      if (thumbnailFile) {
+        formData.append('thumbnail', thumbnailFile);
+      }
+
+      galleryImageFiles.forEach(file => {
+        formData.append('galleryImages', file);
+      });
+
+      const regionColorImages: File[] = [];
+
+      // Format regions data properly for backend
+      const formattedRegions = regions.map((region, regIdx) => ({
+        regionName: region.regionName,
+        isDefault: region.isDefault,
+        displayOrder: regIdx,
+        // Default storages for this region (always present)
+        defaultStorages: region.defaultStorages.map((storage, storIdx) => ({
+          storageSize: storage.storageSize,
+          regularPrice: storage.regularPrice
+            ? Number(storage.regularPrice)
+            : 0,
+          comparePrice: storage.regularPrice
+            ? Number(storage.regularPrice)
+            : 0,
+          discountPrice: storage.discountPrice
+            ? Number(storage.discountPrice)
+            : 0,
+          discountPercent: storage.discountPercent
+            ? Number(storage.discountPercent)
+            : 0,
+          stockQuantity: storage.stockQuantity
+            ? Number(storage.stockQuantity)
+            : 0,
+          lowStockAlert: storage.lowStockAlert
+            ? Number(storage.lowStockAlert)
+            : 5,
+          displayOrder: storIdx,
+        })),
+        // Colors in this region
+        colors: region.colors.map((color, colorIdx) => {
+          let imageIndex = -1;
+          if (color.colorImageFile) {
+            regionColorImages.push(color.colorImageFile);
+            imageIndex = regionColorImages.length - 1;
+          }
+
+          return {
+            colorName: color.colorName,
+            hasStorage: color.hasStorage,
+            useDefaultStorages: color.useDefaultStorages,
+            displayOrder: colorIdx,
+            colorImageIndex: imageIndex > -1 ? imageIndex : undefined,
+            // If no storage, use single price
+            singlePrice: !color.hasStorage
+              ? Number(color.singlePrice) || 0
+              : undefined,
+            singleComparePrice: !color.hasStorage
+              ? Number(color.singleComparePrice) || 0
+              : undefined,
+            singleStockQuantity: !color.hasStorage
+              ? Number(color.singleStockQuantity) || 0
+              : undefined,
+            // Custom storages (only if has storage and not using defaults)
+            storages:
+              color.hasStorage && !color.useDefaultStorages
+                ? color.storages.map((storage, storIdx) => ({
+                    storageSize: storage.storageSize,
+                    regularPrice: storage.regularPrice
+                      ? Number(storage.regularPrice)
+                      : 0,
+                    comparePrice: storage.regularPrice
+                      ? Number(storage.regularPrice)
+                      : 0,
+                    discountPrice: storage.discountPrice
+                      ? Number(storage.discountPrice)
+                      : 0,
+                    discountPercent: storage.discountPercent
+                      ? Number(storage.discountPercent)
+                      : 0,
+                    stockQuantity: storage.stockQuantity
+                      ? Number(storage.stockQuantity)
+                      : 0,
+                    lowStockAlert: storage.lowStockAlert
+                      ? Number(storage.lowStockAlert)
+                      : 5,
+                    displayOrder: storIdx,
+                  }))
+                : undefined,
+          };
+        }),
+      }));
+
+      // Append region color images
+      regionColorImages.forEach(file => {
+        formData.append('colors', file);
+      });
+
+      const payload: any = {
+        productType: 'region',
+        name: productName,
+        slug,
+        description: description || undefined,
+        shortDescription: shortDescription || undefined,
+        categoryId: selectedCategory || undefined,
+        brandId: selectedBrand || undefined,
+        productCode: productCode || undefined,
+        sku: sku || undefined,
+        warranty: warranty || undefined,
+        isActive,
+        isOnline,
+        isPos,
+        isPreOrder,
+        isOfficial,
+        freeShipping,
+        isEmi,
+        rewardPoints: rewardPoints ? Number(rewardPoints) : undefined,
+        minBookingPrice: minBookingPrice ? Number(minBookingPrice) : undefined,
+        seoTitle: seoTitle || undefined,
+        seoDescription: seoDescription || undefined,
+        seoKeywords: seoKeywords
+          ? seoKeywords.split(',').map(k => k.trim())
+          : undefined,
+        seoCanonical: seoCanonical || undefined,
+        tags: tags ? tags.split(',').map(t => t.trim()) : undefined,
+        videos: videos
+          .filter(v => v.url)
+          .map((v, idx) => ({
+            videoUrl: v.url,
+            videoType: v.type,
+            displayOrder: idx,
+          })),
+        specifications: specifications
+          .filter(s => s.key && s.value)
+          .map((s, idx) => ({
+            specKey: s.key,
+            specValue: s.value,
+            displayOrder: idx,
+          })),
+        regions: formattedRegions.length > 0 ? formattedRegions : undefined,
+      };
+
+      Object.keys(payload).forEach(key => {
+        const value = payload[key];
+        if (value !== undefined) {
+          if (typeof value === 'object') {
+            formData.append(key, JSON.stringify(value));
+          } else {
+            formData.append(key, String(value));
+          }
         }
       });
-    });
 
-    return prices.length > 0 ? prices : [0];
-  }
-
-  private calculateTotalStock(product: Product): number {
-    let total = 0;
-
-    // Simple product stock
-    if (product.stockQuantity) {
-      total += product.stockQuantity;
+      const response =
+        productType === 'basic'
+          ? await productsService.createBasic(formData)
+          : productType === 'network'
+          ? await productsService.createNetwork(formData)
+          : await productsService.createRegion(formData);
+      toast.success('Region product created successfully!');
+      resetForm();
+    } catch (err: any) {
+      console.error('Error creating region product:', err);
+      toast.error(`Error: ${err?.response?.data?.message || err?.message || 'Unknown error'}`);
+    } finally {
+      setIsSubmitting(false);
     }
+  };
 
-    // Direct colors stock
-    product.directColors?.forEach((color) => {
-      if (color.singleStockQuantity) {
-        total += color.singleStockQuantity;
-      }
-      if (color.hasStorage) {
-        color.storages?.forEach((storage) => {
-          total += storage.price?.stockQuantity ?? 0;
-        });
-      }
-    });
+  return (
+    <div className="min-h-screen bg-gray-50 p-6">
+      <Link
+        href="/admin/products"
+        className="mb-6 inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Back to Products
+      </Link>
 
-    // Network-based stock
-    product.networks?.forEach((network) => {
-      network.colors?.forEach((color) => {
-        if (color.singleStockQuantity) {
-          total += color.singleStockQuantity;
-        }
-        if (color.hasStorage) {
-          color.storages?.forEach((storage) => {
-            total += storage.price?.stockQuantity ?? 0;
-          });
-        }
-      });
-    });
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900">Add New Product</h1>
+        <p className="mt-2 text-gray-600">Create a new product listing</p>
+      </div>
 
-    // Region-based stock
-    product.regions?.forEach((region) => {
-      region.colors?.forEach((color) => {
-        if (color.singleStockQuantity) {
-          total += color.singleStockQuantity;
-        }
-        if (color.hasStorage) {
-          color.storages?.forEach((storage) => {
-            total += storage.price?.stockQuantity ?? 0;
-          });
-        }
-      });
-    });
+      <Tabs 
+        value={productType} 
+        onValueChange={(value) => {
+          setProductType(value as ProductType);
+          resetForm();
+        }} 
+        className="w-full"
+      >
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="basic">Basic Product</TabsTrigger>
+          <TabsTrigger value="network">Network Product</TabsTrigger>
+          <TabsTrigger value="region">Region Product</TabsTrigger>
+        </TabsList>
 
-    return total;
-  }
+        <form
+          onSubmit={
+            productType === 'basic'
+              ? handleBasicProductSubmit
+              : productType === 'network'
+                ? handleNetworkProductSubmit
+                : handleRegionProductSubmit
+          }
+          className="space-y-6 pt-6"
+        >
+        <Card>
+          <CardHeader>
+            <CardTitle>Basic Information</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="name">Product Name *</Label>
+                <Input
+                  id="name"
+                  value={productName}
+                  onChange={handleProductNameChange}
+                  placeholder="Enter product name"
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="slug">URL Slug *</Label>
+                <Input
+                  id="slug"
+                  value={slug}
+                  onChange={handleSlugChange}
+                  placeholder="product-url-slug"
+                  required
+                />
+              </div>
+            </div>
 
-  private calculateFinalPrice(price: ProductPrice | undefined): number {
-    if (!price) return 0;
+            <div>
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                placeholder="Enter product description (Markdown supported)"
+                rows={4}
+              />
+            </div>
 
-    // Check if campaign is active
-    if (
-      price.campaignPrice &&
-      this.isCampaignActive(price.campaignStart, price.campaignEnd)
-    ) {
-      return price.campaignPrice;
-    }
+            <div>
+              <Label>Short Description</Label>
+              <div className="mb-2 flex gap-1 border-b border-gray-200 pb-2">
+                <button
+                  type="button"
+                  onClick={() => formatText('bold')}
+                  className="rounded px-3 py-1 text-sm font-medium hover:bg-gray-100"
+                >
+                  Bold
+                </button>
+                <button
+                  type="button"
+                  onClick={() => formatText('italic')}
+                  className="rounded px-3 py-1 text-sm font-medium hover:bg-gray-100"
+                >
+                  Italic
+                </button>
+                <button
+                  type="button"
+                  onClick={() => formatText('underline')}
+                  className="rounded px-3 py-1 text-sm font-medium hover:bg-gray-100"
+                >
+                  Underline
+                </button>
+              </div>
+              <div
+                id="shortDescription"
+                ref={shortDescriptionRef}
+                contentEditable
+                onInput={handleShortDescriptionChange}
+                className="min-h-24 rounded border border-gray-300 p-3 focus:border-blue-500 focus:outline-none"
+                suppressContentEditableWarning
+              />
+            </div>
 
-    // Check discount price
-    if (price.discountPrice) {
-      return price.discountPrice;
-    }
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="category">Category *</Label>
+                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                  <SelectTrigger id="category">
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map(cat => (
+                      <SelectItem key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="brand">Brand *</Label>
+                <Select value={selectedBrand} onValueChange={setSelectedBrand}>
+                  <SelectTrigger id="brand">
+                    <SelectValue placeholder="Select brand" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {brands.map(br => (
+                      <SelectItem key={br.id} value={br.id}>
+                        {br.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
 
-    // Return regular price
-    return price.regularPrice;
-  }
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="productCode">Product Code</Label>
+                <Input
+                  id="productCode"
+                  value={productCode}
+                  onChange={e => setProductCode(e.target.value)}
+                  placeholder="e.g., SKU-001"
+                />
+              </div>
+              <div>
+                <Label htmlFor="sku">SKU</Label>
+                <Input
+                  id="sku"
+                  value={sku}
+                  onChange={e => setSku(e.target.value)}
+                  placeholder="e.g., SKU123"
+                />
+              </div>
+              <div>
+                <Label htmlFor="warranty">Warranty</Label>
+                <Input
+                  id="warranty"
+                  value={warranty}
+                  onChange={e => setWarranty(e.target.value)}
+                  placeholder="e.g., 1 year"
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-  private isCampaignActive(start?: Date, end?: Date): boolean {
-    if (!start || !end) return false;
+        <Card>
+          <CardHeader>
+            <CardTitle>Product Status</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="isActive">Active</Label>
+                <Switch
+                  id="isActive"
+                  checked={isActive}
+                  onCheckedChange={setIsActive}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="isOnline">Online</Label>
+                <Switch
+                  id="isOnline"
+                  checked={isOnline}
+                  onCheckedChange={setIsOnline}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="isPos">POS</Label>
+                <Switch id="isPos" checked={isPos} onCheckedChange={setIsPos} />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="isPreOrder">Pre-Order</Label>
+                <Switch
+                  id="isPreOrder"
+                  checked={isPreOrder}
+                  onCheckedChange={setIsPreOrder}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="isOfficial">Official</Label>
+                <Switch
+                  id="isOfficial"
+                  checked={isOfficial}
+                  onCheckedChange={setIsOfficial}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="freeShipping">Free Shipping</Label>
+                <Switch
+                  id="freeShipping"
+                  checked={freeShipping}
+                  onCheckedChange={setFreeShipping}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="isEmi">EMI Available</Label>
+                <Switch
+                  id="isEmi"
+                  checked={isEmi}
+                  onCheckedChange={setIsEmi}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-    const now = new Date();
-    return now >= new Date(start) && now <= new Date(end);
-  }
+        <Card>
+          <CardHeader>
+            <CardTitle>Media</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div>
+              <Label>Thumbnail Image</Label>
+              <div className="mt-2 rounded border-2 border-dashed border-gray-300 p-6">
+                {thumbnailPreview ? (
+                  <div className="relative inline-block">
+                    <img
+                      src={thumbnailPreview}
+                      alt="Thumbnail"
+                      className="h-32 w-32 rounded object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={removeThumbnail}
+                      className="absolute -right-2 -top-2 rounded-full bg-red-500 p-1 text-white hover:bg-red-600"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="flex cursor-pointer flex-col items-center justify-center gap-2">
+                    <Upload className="h-8 w-8 text-gray-400" />
+                    <span className="text-sm text-gray-600">Click to upload thumbnail</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleThumbnailUpload}
+                      className="hidden"
+                    />
+                  </label>
+                )}
+              </div>
+            </div>
 
-  private groupSpecifications(specs?: ProductSpecification[]) {
-    if (!specs || specs.length === 0) return [];
+            <div>
+              <Label>Gallery Images</Label>
+              <div className="mt-2 rounded border-2 border-dashed border-gray-300 p-6">
+                {galleryImagePreviews.length > 0 ? (
+                  <div className="grid grid-cols-4 gap-4">
+                    {galleryImagePreviews.map((preview, idx) => (
+                      <div key={idx} className="relative">
+                        <img
+                          src={preview.url}
+                          alt={`Gallery ${idx}`}
+                          className="h-24 w-24 rounded object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeGalleryImage(idx)}
+                          className="absolute -right-2 -top-2 rounded-full bg-red-500 p-1 text-white hover:bg-red-600"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                    <label className="flex cursor-pointer items-center justify-center rounded border-2 border-dashed border-gray-300">
+                      <Plus className="h-6 w-6 text-gray-400" />
+                      <input
+                        type="file"
+                        multiple
+                        accept="image/*"
+                        onChange={handleGalleryImageUpload}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                ) : (
+                  <label className="flex cursor-pointer flex-col items-center justify-center gap-2">
+                    <ImageIcon className="h-8 w-8 text-gray-400" />
+                    <span className="text-sm text-gray-600">Click to upload gallery images</span>
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      onChange={handleGalleryImageUpload}
+                      className="hidden"
+                    />
+                  </label>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-    // Return specs as simple array of key-value pairs, sorted by displayOrder
-    return specs
-      .map((spec) => ({
-        key: spec.specKey,
-        value: spec.specValue,
-        displayOrder: spec.displayOrder,
-      }))
-      .sort((a, b) => a.displayOrder - b.displayOrder);
-  }
+        <Card>
+          <CardHeader>
+            <CardTitle>SEO Settings</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="seoTitle">SEO Title</Label>
+              <Input
+                id="seoTitle"
+                value={seoTitle}
+                onChange={e => setSeoTitle(e.target.value)}
+                placeholder="SEO title"
+              />
+            </div>
+            <div>
+              <Label htmlFor="seoDescription">SEO Description</Label>
+              <Textarea
+                id="seoDescription"
+                value={seoDescription}
+                onChange={e => setSeoDescription(e.target.value)}
+                placeholder="SEO description"
+                rows={3}
+              />
+            </div>
+            <div>
+              <Label htmlFor="seoKeywords">SEO Keywords (comma-separated)</Label>
+              <Input
+                id="seoKeywords"
+                value={seoKeywords}
+                onChange={e => setSeoKeywords(e.target.value)}
+                placeholder="keyword1, keyword2, keyword3"
+              />
+            </div>
+            <div>
+              <Label htmlFor="seoCanonical">Canonical URL</Label>
+              <Input
+                id="seoCanonical"
+                value={seoCanonical}
+                onChange={e => setSeoCanonical(e.target.value)}
+                placeholder="https://example.com/product"
+              />
+            </div>
+          </CardContent>
+        </Card>
 
-  private sanitizeStorageDtos(storages?: CreateProductStorageDto[]): CreateProductStorageDto[] {
-    return (storages ?? [])
-      .map((storage) => ({
-        ...storage,
-        storageSize: storage.storageSize?.trim() ?? '',
-      }))
-      .filter((storage) => Boolean(storage.storageSize));
-  }
+        <Card>
+          <CardHeader>
+            <CardTitle>Specifications</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {specifications.map((spec, idx) => (
+              <div key={spec.id} className="flex gap-2">
+                <Input
+                  placeholder="Key (e.g., Color)"
+                  value={spec.key}
+                  onChange={e =>
+                    updateSpecification(spec.id, 'key', e.target.value)
+                  }
+                />
+                <Input
+                  placeholder="Value (e.g., Black)"
+                  value={spec.value}
+                  onChange={e =>
+                    updateSpecification(spec.id, 'value', e.target.value)
+                  }
+                />
+                <button
+                  type="button"
+                  onClick={() => removeSpecification(spec.id)}
+                  className="rounded bg-red-100 px-3 py-2 text-red-600 hover:bg-red-200"
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={addSpecification}
+              className="mt-2 rounded bg-blue-100 px-4 py-2 text-blue-600 hover:bg-blue-200"
+            >
+              + Add Specification
+            </button>
+          </CardContent>
+        </Card>
 
-  private sanitizeColorDtos(colors?: CreateProductColorDto[]): CreateProductColorDto[] {
-    return (colors ?? [])
-      .map((color) => ({
-        ...color,
-        colorName: color.colorName?.trim() ?? '',
-        storages: this.sanitizeStorageDtos(color.storages),
-      }))
-      .filter((color) => Boolean(color.colorName));
-  }
+        <Card>
+          <CardHeader>
+            <CardTitle>Additional Info</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="rewardPoints">Reward Points</Label>
+                <Input
+                  id="rewardPoints"
+                  type="number"
+                  value={rewardPoints}
+                  onChange={e => setRewardPoints(e.target.value)}
+                  placeholder="0"
+                />
+              </div>
+              <div>
+                <Label htmlFor="minBookingPrice">Min Booking Price</Label>
+                <Input
+                  id="minBookingPrice"
+                  type="number"
+                  value={minBookingPrice}
+                  onChange={e => setMinBookingPrice(e.target.value)}
+                  placeholder="0"
+                />
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="tags">Tags (comma-separated)</Label>
+              <Input
+                id="tags"
+                value={tags}
+                onChange={e => setTags(e.target.value)}
+                placeholder="tag1, tag2, tag3"
+              />
+            </div>
+          </CardContent>
+        </Card>
 
-  private sanitizeNetworkDtos(networks?: CreateProductNetworkDto[]): CreateProductNetworkDto[] {
-    return (networks ?? [])
-      .map((network) => ({
-        ...network,
-        networkType: network.networkType?.trim() ?? '',
-        colors: this.sanitizeColorDtos(network.colors),
-      }))
-      .filter((network) => Boolean(network.networkType) && network.colors.length > 0);
-  }
+        <TabsContent value="basic" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Colors</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {basicColors.map((color, idx) => (
+                <div key={color.id} className="space-y-4 rounded border p-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Color Name</Label>
+                      <Input
+                        value={color.colorName}
+                        onChange={e =>
+                          updateBasicColor(color.id, 'colorName', e.target.value)
+                        }
+                        placeholder="e.g., Midnight Black"
+                      />
+                    </div>
+                    <div>
+                      <Label>Stock Quantity</Label>
+                      <Input
+                        type="number"
+                        value={color.stockQuantity}
+                        onChange={e =>
+                          updateBasicColor(
+                            color.id,
+                            'stockQuantity',
+                            e.target.value,
+                          )
+                        }
+                        placeholder="0"
+                      />
+                    </div>
+                  </div>
 
-  private sanitizeRegionDtos(regions?: CreateProductRegionDto[]): CreateProductRegionDto[] {
-    return (regions ?? [])
-      .map((region) => ({
-        ...region,
-        regionName: region.regionName?.trim() ?? '',
-        defaultStorages: this.sanitizeStorageDtos(region.defaultStorages),
-        colors: this.sanitizeColorDtos(region.colors),
-      }))
-      .filter(
-        (region) =>
-          Boolean(region.regionName) &&
-          (region.colors.length > 0 || region.defaultStorages.length > 0),
-      );
-  }
+                  <div>
+                    <Label>Color Image</Label>
+                    <div className="mt-2 rounded border-2 border-dashed border-gray-300 p-4">
+                      {color.colorImage ? (
+                        <div className="relative inline-block">
+                          <img
+                            src={color.colorImage}
+                            alt={color.colorName}
+                            className="h-24 w-24 rounded object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeBasicColorImage(color.id)}
+                            className="absolute -right-2 -top-2 rounded-full bg-red-500 p-1 text-white hover:bg-red-600"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <label className="flex cursor-pointer flex-col items-center justify-center gap-2">
+                          <Upload className="h-6 w-6 text-gray-400" />
+                          <span className="text-sm text-gray-600">
+                            Click to upload color image
+                          </span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={e =>
+                              handleBasicColorImageUpload(color.id, e)
+                            }
+                            className="hidden"
+                          />
+                        </label>
+                      )}
+                    </div>
+                  </div>
 
-  private extractDuplicateField(error: any): string {
-    const errorMessage = error.message || '';
-    const errorString = JSON.stringify(error);
-    
-    console.log('Duplicate error details:', { errorMessage, errorString });
-    
-    // Check for slug duplicate
-    if (errorMessage.includes('slug') || errorMessage.includes('UQ_') && errorMessage.includes('slug')) {
-      return 'Product slug';
-    }
-    
-    // Check for productCode duplicate
-    if (errorMessage.includes('productCode')) {
-      return 'Product code';
-    }
-    
-    // Check for sku duplicate
-    if (errorMessage.includes('sku')) {
-      return 'SKU';
-    }
-    
-    // Check for region name duplicate
-    if (errorMessage.includes('regionName') || errorMessage.includes('productId_1_regionName')) {
-      return 'Region name (duplicate region name for this product)';
-    }
-    
-    // Check for color name duplicate
-    if (errorMessage.includes('colorName')) {
-      if (errorMessage.includes('productId')) {
-        return 'Color name (duplicate color name for this product)';
-      }
-      if (errorMessage.includes('regionId')) {
-        return 'Color name (duplicate color name for this region)';
-      }
-      return 'Color name';
-    }
-    
-    // Check for storage size duplicate
-    if (errorMessage.includes('storageSize') || errorMessage.includes('colorId_1_storageSize')) {
-      return 'Storage size (duplicate storage size for this color)';
-    }
-    
-    // Check for specification duplicate
-    if (errorMessage.includes('specKey') || errorMessage.includes('productId_1_specKey')) {
-      return 'Specification key (duplicate specification for this product)';
-    }
-    
-    // Default message
-    return 'Value';
-  }
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Regular Price</Label>
+                      <Input
+                        type="number"
+                        value={color.regularPrice}
+                        onChange={e => {
+                          const regularPrice = parseFloat(e.target.value) || 0;
+                          const percent = parseFloat(color.discountPercent) || 0;
+                          const discountPrice = regularPrice - (regularPrice * percent) / 100;
+                          
+                          updateBasicColor(
+                            color.id,
+                            'regularPrice',
+                            e.target.value,
+                          );
+                          if (percent > 0) {
+                            updateBasicColor(
+                              color.id,
+                              'discountPrice',
+                              discountPrice.toString(),
+                            );
+                          }
+                        }}
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <Label>Discount %</Label>
+                      <Input
+                        type="number"
+                        value={color.discountPercent}
+                        onChange={e => {
+                          const percent = parseFloat(e.target.value) || 0;
+                          const regularPrice = parseFloat(color.regularPrice) || 0;
+                          const discountPrice = regularPrice - (regularPrice * percent) / 100;
+                          
+                          updateBasicColor(
+                            color.id,
+                            'discountPercent',
+                            e.target.value,
+                          );
+                          updateBasicColor(
+                            color.id,
+                            'discountPrice',
+                            discountPrice.toString(),
+                          );
+                        }}
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <Label>Discount Price</Label>
+                      <Input
+                        type="number"
+                        value={color.discountPrice}
+                        onChange={e =>
+                          updateBasicColor(
+                            color.id,
+                            'discountPrice',
+                            e.target.value,
+                          )
+                        }
+                        placeholder="0"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => removeBasicColor(color.id)}
+                    className="rounded bg-red-100 px-4 py-2 text-red-600 hover:bg-red-200"
+                  >
+                    Remove Color
+                  </button>
+                </div>
+              ))}
+
+              <button
+                type="button"
+                onClick={addBasicColor}
+                className="rounded bg-blue-100 px-4 py-2 text-blue-600 hover:bg-blue-200"
+              >
+                + Add Color
+              </button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="network" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Networks & Colors</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {networks.map(network => (
+                <div key={network.id} className="space-y-4 rounded border p-4">
+                  <div className="flex items-end gap-4">
+                    <div className="flex-1">
+                      <Label>Network Name</Label>
+                      <Input
+                        value={network.networkName}
+                        onChange={e =>
+                          updateNetwork(network.id, 'networkName', e.target.value)
+                        }
+                        placeholder="e.g., Retail Partner A"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Label className="text-sm">Has Default Storages</Label>
+                      <Switch
+                        checked={network.hasDefaultStorages}
+                        onCheckedChange={e =>
+                          updateNetwork(network.id, 'hasDefaultStorages', e)
+                        }
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeNetwork(network.id)}
+                      className="rounded bg-red-100 px-4 py-2 text-red-600 hover:bg-red-200"
+                    >
+                      Remove
+                    </button>
+                  </div>
+
+                  {network.hasDefaultStorages && (
+                    <div className="space-y-3 rounded bg-blue-50 p-3">
+                      <Label className="block font-semibold">Default Storages (for this Network)</Label>
+                      <p className="text-xs text-gray-600">These storages will be used by all colors unless overridden</p>
+                      {network.defaultStorages.map(storage => (
+                        <div
+                          key={storage.id}
+                          className="space-y-2 rounded bg-white p-2"
+                        >
+                          <div className="grid grid-cols-4 gap-2">
+                            <div>
+                              <Label className="text-xs">Storage Size</Label>
+                              <Input
+                                value={storage.storageSize}
+                                onChange={e =>
+                                  updateDefaultStorageInNetwork(
+                                    network.id,
+                                    storage.id,
+                                    'storageSize',
+                                    e.target.value,
+                                  )
+                                }
+                                placeholder="256GB"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs">Regular Price</Label>
+                              <Input
+                                type="number"
+                                value={storage.regularPrice}
+                                onChange={e => {
+                                  const regularPrice = parseFloat(e.target.value) || 0;
+                                  const percent = parseFloat(storage.discountPercent) || 0;
+                                  const discountPrice = regularPrice - (regularPrice * percent) / 100;
+                                  
+                                  updateDefaultStorageInNetwork(
+                                    network.id,
+                                    storage.id,
+                                    'regularPrice',
+                                    e.target.value,
+                                  );
+                                  if (percent > 0) {
+                                    updateDefaultStorageInNetwork(
+                                      network.id,
+                                      storage.id,
+                                      'discountPrice',
+                                      discountPrice.toString(),
+                                    );
+                                  }
+                                }}
+                                placeholder="0"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs">Discount %</Label>
+                              <Input
+                                type="number"
+                                value={storage.discountPercent}
+                                onChange={e => {
+                                  const percent = parseFloat(e.target.value) || 0;
+                                  const regularPrice = parseFloat(storage.regularPrice) || 0;
+                                  const discountPrice = regularPrice - (regularPrice * percent) / 100;
+                                  updateDefaultStorageInNetwork(
+                                    network.id,
+                                    storage.id,
+                                    'discountPercent',
+                                    e.target.value,
+                                  );
+                                  updateDefaultStorageInNetwork(
+                                    network.id,
+                                    storage.id,
+                                    'discountPrice',
+                                    discountPrice.toString(),
+                                  );
+                                }}
+                                placeholder="0"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs">Discount Price</Label>
+                              <Input
+                                type="number"
+                                value={storage.discountPrice}
+                                onChange={e =>
+                                  updateDefaultStorageInNetwork(
+                                    network.id,
+                                    storage.id,
+                                    'discountPrice',
+                                    e.target.value,
+                                  )
+                                }
+                                placeholder="0"
+                              />
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <div className="flex-1">
+                              <Label className="text-xs">Stock</Label>
+                              <Input
+                                type="number"
+                                value={storage.stockQuantity}
+                                onChange={e =>
+                                  updateDefaultStorageInNetwork(
+                                    network.id,
+                                    storage.id,
+                                    'stockQuantity',
+                                    e.target.value,
+                                  )
+                                }
+                                placeholder="0"
+                              />
+                            </div>
+                            {network.defaultStorages.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  removeDefaultStorageFromNetwork(
+                                    network.id,
+                                    storage.id,
+                                  )
+                                }
+                                className="rounded bg-red-100 px-2 py-2 text-red-600 hover:bg-red-200"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => addDefaultStorageToNetwork(network.id)}
+                        className="text-xs text-blue-600 hover:underline"
+                      >
+                        + Add Default Storage
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="space-y-3">
+                    <Label className="block font-semibold">Colors</Label>
+                    {network.colors.map(color => (
+                      <div key={color.id} className="space-y-2 rounded bg-gray-50 p-3">
+                        <div className="flex items-end gap-2">
+                          <div className="flex-1">
+                            <Label className="text-sm">Color Name</Label>
+                            <Input
+                              value={color.colorName}
+                              onChange={e =>
+                                updateColorInNetwork(
+                                  network.id,
+                                  color.id,
+                                  'colorName',
+                                  e.target.value,
+                                )
+                              }
+                              placeholder="e.g., Midnight Black"
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <Label className="text-sm">Color Image</Label>
+                            {color.colorImage ? (
+                              <div className="relative inline-block">
+                                <img
+                                  src={color.colorImage}
+                                  alt={color.colorName}
+                                  className="h-12 w-12 rounded object-cover"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    removeNetworkColorImage(network.id, color.id)
+                                  }
+                                  className="absolute -right-2 -top-2 rounded-full bg-red-500 p-0.5 text-white hover:bg-red-600"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </div>
+                            ) : (
+                              <label className="flex cursor-pointer items-center justify-center rounded border-2 border-dashed border-gray-300 p-2">
+                                <Upload className="h-4 w-4 text-gray-400" />
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={e =>
+                                    handleNetworkColorImageUpload(network.id, color.id, e)
+                                  }
+                                  className="hidden"
+                                />
+                              </label>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              removeColorFromNetwork(network.id, color.id)
+                            }
+                            className="rounded bg-red-100 px-2 py-2 text-red-600 hover:bg-red-200"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <Label className="text-sm">Has Storage Options</Label>
+                          <Switch
+                            checked={color.hasStorage}
+                            onCheckedChange={e =>
+                              updateColorInNetwork(
+                                network.id,
+                                color.id,
+                                'hasStorage',
+                                e,
+                              )
+                            }
+                          />
+                        </div>
+
+                        {!color.hasStorage && (
+                          <div className="grid grid-cols-3 gap-2 rounded bg-white p-2">
+                            <div>
+                              <Label className="text-xs">Single Price</Label>
+                              <Input
+                                type="number"
+                                value={color.singlePrice}
+                                onChange={e =>
+                                  updateColorInNetwork(
+                                    network.id,
+                                    color.id,
+                                    'singlePrice',
+                                    e.target.value,
+                                  )
+                                }
+                                placeholder="0"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs">Compare Price</Label>
+                              <Input
+                                type="number"
+                                value={color.singleComparePrice}
+                                onChange={e =>
+                                  updateColorInNetwork(
+                                    network.id,
+                                    color.id,
+                                    'singleComparePrice',
+                                    e.target.value,
+                                  )
+                                }
+                                placeholder="0"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs">Stock</Label>
+                              <Input
+                                type="number"
+                                value={color.singleStockQuantity}
+                                onChange={e =>
+                                  updateColorInNetwork(
+                                    network.id,
+                                    color.id,
+                                    'singleStockQuantity',
+                                    e.target.value,
+                                  )
+                                }
+                                placeholder="0"
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {color.hasStorage && (
+                          <>
+                            {network.hasDefaultStorages && (
+                              <div className="flex items-center gap-2">
+                                <Label className="text-sm">Use Default Storages</Label>
+                                <Switch
+                                  checked={color.useDefaultStorages}
+                                  onCheckedChange={e =>
+                                    updateColorInNetwork(
+                                      network.id,
+                                      color.id,
+                                      'useDefaultStorages',
+                                      e,
+                                    )
+                                  }
+                                />
+                              </div>
+                            )}
+
+                            {(!network.hasDefaultStorages || !color.useDefaultStorages) && (
+                              <>
+                                {color.storages.map(storage => (
+                                  <div
+                                    key={storage.id}
+                                    className="space-y-2 rounded bg-white p-2"
+                                  >
+                                    <div className="grid grid-cols-4 gap-2">
+                                      <div>
+                                        <Label className="text-xs">Storage Size</Label>
+                                        <Input
+                                          value={storage.storageSize}
+                                          onChange={e =>
+                                            updateStorageInNetwork(
+                                              network.id,
+                                              color.id,
+                                              storage.id,
+                                              'storageSize',
+                                              e.target.value,
+                                            )
+                                          }
+                                          placeholder="256GB"
+                                        />
+                                      </div>
+                                      <div>
+                                        <Label className="text-xs">Regular Price</Label>
+                                        <Input
+                                          type="number"
+                                          value={storage.regularPrice}
+                                          onChange={e => {
+                                            const regularPrice = parseFloat(e.target.value) || 0;
+                                            const percent = parseFloat(storage.discountPercent) || 0;
+                                            const discountPrice = regularPrice - (regularPrice * percent) / 100;
+                                            
+                                            updateStorageInNetwork(
+                                              network.id,
+                                              color.id,
+                                              storage.id,
+                                              'regularPrice',
+                                              e.target.value,
+                                            );
+                                            if (percent > 0) {
+                                              updateStorageInNetwork(
+                                                network.id,
+                                                color.id,
+                                                storage.id,
+                                                'discountPrice',
+                                                discountPrice.toString(),
+                                              );
+                                            }
+                                          }}
+                                          placeholder="0"
+                                        />
+                                      </div>
+                                      <div>
+                                        <Label className="text-xs">Discount %</Label>
+                                        <Input
+                                          type="number"
+                                          value={storage.discountPercent}
+                                          onChange={e => {
+                                            const percent = parseFloat(e.target.value) || 0;
+                                            const regularPrice = parseFloat(storage.regularPrice) || 0;
+                                            const discountPrice = regularPrice - (regularPrice * percent) / 100;
+                                            updateStorageInNetwork(
+                                              network.id,
+                                              color.id,
+                                              storage.id,
+                                              'discountPercent',
+                                              e.target.value,
+                                            );
+                                            updateStorageInNetwork(
+                                              network.id,
+                                              color.id,
+                                              storage.id,
+                                              'discountPrice',
+                                              discountPrice.toString(),
+                                            );
+                                          }}
+                                          placeholder="0"
+                                        />
+                                      </div>
+                                      <div>
+                                        <Label className="text-xs">Discount Price</Label>
+                                        <Input
+                                          type="number"
+                                          value={storage.discountPrice}
+                                          onChange={e =>
+                                            updateStorageInNetwork(
+                                              network.id,
+                                              color.id,
+                                              storage.id,
+                                              'discountPrice',
+                                              e.target.value,
+                                            )
+                                          }
+                                          placeholder="0"
+                                        />
+                                      </div>
+                                    </div>
+                                    <div className="flex gap-2">
+                                      <div className="flex-1">
+                                        <Label className="text-xs">Stock</Label>
+                                        <Input
+                                          type="number"
+                                          value={storage.stockQuantity}
+                                          onChange={e =>
+                                            updateStorageInNetwork(
+                                              network.id,
+                                              color.id,
+                                              storage.id,
+                                              'stockQuantity',
+                                              e.target.value,
+                                            )
+                                          }
+                                          placeholder="0"
+                                        />
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          removeStorageFromNetwork(
+                                            network.id,
+                                            color.id,
+                                            storage.id,
+                                          )
+                                        }
+                                        className="rounded bg-red-100 px-2 py-2 text-red-600 hover:bg-red-200"
+                                      >
+                                        <X className="h-4 w-4" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    addStorageToNetwork(network.id, color.id)
+                                  }
+                                  className="text-xs text-blue-600 hover:underline"
+                                >
+                                  + Add Storage
+                                </button>
+                              </>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    ))}
+
+                    <button
+                      type="button"
+                      onClick={() => addColorToNetwork(network.id)}
+                      className="text-sm text-blue-600 hover:underline"
+                    >
+                      + Add Color
+                    </button>
+                </div>
+                </div>
+              ))}
+
+              <button
+                type="button"
+                onClick={addNetwork}
+                className="rounded bg-blue-100 px-4 py-2 text-blue-600 hover:bg-blue-200"
+              >
+                + Add Network
+              </button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="region" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Regions</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {regions.map(region => (
+                <div key={region.id} className="space-y-4 rounded border p-4">
+                  <div className="flex items-end gap-4">
+                    <div className="flex-1">
+                      <Label>Region Name</Label>
+                      <Input
+                        value={region.regionName}
+                        onChange={e =>
+                          updateRegion(region.id, 'regionName', e.target.value)
+                        }
+                        placeholder="e.g., US, UK, EU"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Label className="text-sm">Is Default</Label>
+                      <Switch
+                        checked={region.isDefault}
+                        onCheckedChange={e =>
+                          updateRegion(region.id, 'isDefault', e)
+                        }
+                      />
+                    </div>
+                    {regions.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeRegion(region.id)}
+                        className="rounded bg-red-100 px-4 py-2 text-red-600 hover:bg-red-200"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="space-y-3 rounded bg-blue-50 p-3">
+                    <Label className="block font-semibold">Default Storages</Label>
+                    {region.defaultStorages.map(storage => (
+                      <div
+                        key={storage.id}
+                        className="space-y-2 rounded bg-white p-2"
+                      >
+                        <div className="grid grid-cols-4 gap-2">
+                          <div>
+                            <Label className="text-xs">Storage Size</Label>
+                            <Input
+                              value={storage.storageSize}
+                              onChange={e =>
+                                updateDefaultStorageInRegion(
+                                  region.id,
+                                  storage.id,
+                                  'storageSize',
+                                  e.target.value,
+                                )
+                              }
+                              placeholder="256GB"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Regular Price</Label>
+                            <Input
+                              type="number"
+                              value={storage.regularPrice}
+                              onChange={e => {
+                                const regularPrice = parseFloat(e.target.value) || 0;
+                                const percent = parseFloat(storage.discountPercent) || 0;
+                                const discountPrice = regularPrice - (regularPrice * percent) / 100;
+                                
+                                updateDefaultStorageInRegion(
+                                  region.id,
+                                  storage.id,
+                                  'regularPrice',
+                                  e.target.value,
+                                );
+                                if (percent > 0) {
+                                  updateDefaultStorageInRegion(
+                                    region.id,
+                                    storage.id,
+                                    'discountPrice',
+                                    discountPrice.toString(),
+                                  );
+                                }
+                              }}
+                              placeholder="0"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Discount %</Label>
+                            <Input
+                              type="number"
+                              value={storage.discountPercent}
+                              onChange={e => {
+                                const percent = parseFloat(e.target.value) || 0;
+                                const regularPrice = parseFloat(storage.regularPrice) || 0;
+                                const discountPrice = regularPrice - (regularPrice * percent) / 100;
+                                updateDefaultStorageInRegion(
+                                  region.id,
+                                  storage.id,
+                                  'discountPercent',
+                                  e.target.value,
+                                );
+                                updateDefaultStorageInRegion(
+                                  region.id,
+                                  storage.id,
+                                  'discountPrice',
+                                  discountPrice.toString(),
+                                );
+                              }}
+                              placeholder="0"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Discount Price</Label>
+                            <Input
+                              type="number"
+                              value={storage.discountPrice}
+                              onChange={e =>
+                                updateDefaultStorageInRegion(
+                                  region.id,
+                                  storage.id,
+                                  'discountPrice',
+                                  e.target.value,
+                                )
+                              }
+                              placeholder="0"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <div className="flex-1">
+                            <Label className="text-xs">Stock</Label>
+                            <Input
+                              type="number"
+                              value={storage.stockQuantity}
+                              onChange={e =>
+                                updateDefaultStorageInRegion(
+                                  region.id,
+                                  storage.id,
+                                  'stockQuantity',
+                                  e.target.value,
+                                )
+                              }
+                              placeholder="0"
+                            />
+                          </div>
+                          {region.defaultStorages.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                removeDefaultStorageFromRegion(
+                                  region.id,
+                                  storage.id,
+                                )
+                              }
+                              className="rounded bg-red-100 px-2 py-2 text-red-600 hover:bg-red-200"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => addDefaultStorageToRegion(region.id)}
+                      className="text-xs text-blue-600 hover:underline"
+                    >
+                      + Add Default Storage
+                    </button>
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label className="block font-semibold">Colors</Label>
+                    {region.colors.map(color => (
+                      <div key={color.id} className="space-y-2 rounded bg-gray-50 p-3">
+                        <div className="flex items-end gap-2">
+                          <div className="flex-1">
+                            <Label className="text-sm">Color Name</Label>
+                            <Input
+                              value={color.colorName}
+                              onChange={e =>
+                                updateColorInRegion(
+                                  region.id,
+                                  color.id,
+                                  'colorName',
+                                  e.target.value,
+                                )
+                              }
+                              placeholder="e.g., Midnight"
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <Label className="text-sm">Color Image</Label>
+                            {color.colorImage ? (
+                              <div className="relative inline-block">
+                                <img
+                                  src={color.colorImage}
+                                  alt={color.colorName}
+                                  className="h-12 w-12 rounded object-cover"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    removeRegionColorImage(region.id, color.id)
+                                  }
+                                  className="absolute -right-2 -top-2 rounded-full bg-red-500 p-0.5 text-white hover:bg-red-600"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </div>
+                            ) : (
+                              <label className="flex cursor-pointer items-center justify-center rounded border-2 border-dashed border-gray-300 p-2">
+                                <Upload className="h-4 w-4 text-gray-400" />
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={e =>
+                                    handleRegionColorImageUpload(region.id, color.id, e)
+                                  }
+                                  className="hidden"
+                                />
+                              </label>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              removeColorFromRegion(region.id, color.id)
+                            }
+                            className="rounded bg-red-100 px-2 py-2 text-red-600 hover:bg-red-200"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <Label className="text-sm">Has Storage Options</Label>
+                          <Switch
+                            checked={color.hasStorage}
+                            onCheckedChange={e =>
+                              updateColorInRegion(
+                                region.id,
+                                color.id,
+                                'hasStorage',
+                                e,
+                              )
+                            }
+                          />
+                        </div>
+
+                        {color.hasStorage && (
+                          <>
+                            <div className="flex items-center gap-2">
+                              <Label className="text-sm">Use Default Storages</Label>
+                              <Switch
+                                checked={color.useDefaultStorages}
+                                onCheckedChange={e =>
+                                  updateColorInRegion(
+                                    region.id,
+                                    color.id,
+                                    'useDefaultStorages',
+                                    e,
+                                  )
+                                }
+                              />
+                            </div>
+
+                            {!color.useDefaultStorages && (
+                              <>
+                                {color.storages.map(storage => (
+                                  <div
+                                    key={storage.id}
+                                    className="space-y-2 rounded bg-white p-2"
+                                  >
+                                    <div className="grid grid-cols-4 gap-2">
+                                      <div>
+                                        <Label className="text-xs">Storage</Label>
+                                        <Input
+                                          value={storage.storageSize}
+                                          onChange={e =>
+                                            updateStorageInRegion(
+                                              region.id,
+                                              color.id,
+                                              storage.id,
+                                              'storageSize',
+                                              e.target.value,
+                                            )
+                                          }
+                                          placeholder="256GB"
+                                        />
+                                      </div>
+                                      <div>
+                                        <Label className="text-xs">Regular</Label>
+                                        <Input
+                                          type="number"
+                                          value={storage.regularPrice}
+                                          onChange={e => {
+                                            const regularPrice = parseFloat(e.target.value) || 0;
+                                            const percent = parseFloat(storage.discountPercent) || 0;
+                                            const discountPrice = regularPrice - (regularPrice * percent) / 100;
+                                            
+                                            updateStorageInRegion(
+                                              region.id,
+                                              color.id,
+                                              storage.id,
+                                              'regularPrice',
+                                              e.target.value,
+                                            );
+                                            if (percent > 0) {
+                                              updateStorageInRegion(
+                                                region.id,
+                                                color.id,
+                                                storage.id,
+                                                'discountPrice',
+                                                discountPrice.toString(),
+                                              );
+                                            }
+                                          }}
+                                          placeholder="0"
+                                        />
+                                      </div>
+                                      <div>
+                                        <Label className="text-xs">Discount %</Label>
+                                        <Input
+                                          type="number"
+                                          value={storage.discountPercent}
+                                          onChange={e => {
+                                            const percent = parseFloat(e.target.value) || 0;
+                                            const regularPrice = parseFloat(storage.regularPrice) || 0;
+                                            const discountPrice = regularPrice - (regularPrice * percent) / 100;
+                                            updateStorageInRegion(
+                                              region.id,
+                                              color.id,
+                                              storage.id,
+                                              'discountPercent',
+                                              e.target.value,
+                                            );
+                                            updateStorageInRegion(
+                                              region.id,
+                                              color.id,
+                                              storage.id,
+                                              'discountPrice',
+                                              discountPrice.toString(),
+                                            );
+                                          }}
+                                          placeholder="0"
+                                        />
+                                      </div>
+                                      <div>
+                                        <Label className="text-xs">Discount Price</Label>
+                                        <Input
+                                          type="number"
+                                          value={storage.discountPrice}
+                                          onChange={e =>
+                                            updateStorageInRegion(
+                                              region.id,
+                                              color.id,
+                                              storage.id,
+                                              'discountPrice',
+                                              e.target.value,
+                                            )
+                                          }
+                                          placeholder="0"
+                                        />
+                                      </div>
+                                    </div>
+                                    <div className="flex gap-2">
+                                      <div className="flex-1">
+                                        <Label className="text-xs">Stock</Label>
+                                        <Input
+                                          type="number"
+                                          value={storage.stockQuantity}
+                                          onChange={e =>
+                                            updateStorageInRegion(
+                                              region.id,
+                                              color.id,
+                                              storage.id,
+                                              'stockQuantity',
+                                              e.target.value,
+                                            )
+                                          }
+                                          placeholder="0"
+                                        />
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          removeStorageFromRegion(
+                                            region.id,
+                                            color.id,
+                                            storage.id,
+                                          )
+                                        }
+                                        className="rounded bg-red-100 px-2 py-2 text-red-600 hover:bg-red-200"
+                                      >
+                                        <X className="h-4 w-4" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    addStorageToRegion(region.id, color.id)
+                                  }
+                                  className="text-xs text-blue-600 hover:underline"
+                                >
+                                  + Add Storage
+                                </button>
+                              </>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    ))}
+
+                    <button
+                      type="button"
+                      onClick={() => addColorToRegion(region.id)}
+                      className="text-sm text-blue-600 hover:underline"
+                    >
+                      + Add Color
+                    </button>
+                </div>
+                </div>
+              ))}
+
+              <button
+                type="button"
+                onClick={addRegion}
+                className="rounded bg-blue-100 px-4 py-2 text-blue-600 hover:bg-blue-200"
+              >
+                + Add Region
+              </button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <div className="flex gap-4">
+          <Button
+            type="submit"
+            disabled={isSubmitting}
+            className="bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+          >
+            {isSubmitting ? 'Creating...' : `Create ${productType === 'basic' ? 'Basic' : productType === 'network' ? 'Network' : 'Region'} Product`}
+          </Button>
+          <Link href="/admin/products">
+            <Button
+              type="button"
+              variant="outline"
+              className="text-gray-600 hover:bg-gray-100"
+            >
+              Cancel
+            </Button>
+          </Link>
+        </div>
+        </form>
+      </Tabs>
+    </div>
+  );
 }
+
+export default withProtectedRoute(NewProductPage);

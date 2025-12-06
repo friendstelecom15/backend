@@ -40,10 +40,22 @@ export class CreateBasicProductDto {
   @IsString()
   categoryId?: string;
 
+  @ApiPropertyOptional({ description: 'Category UUIDs', example: ['uuid-category-1', 'uuid-category-2'] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  categoryIds?: string[];
+
   @ApiPropertyOptional({ description: 'Brand UUID', example: 'uuid-brand' })
   @IsOptional()
   @IsString()
   brandId?: string;
+
+  @ApiPropertyOptional({ description: 'Brand UUIDs', example: ['uuid-brand-1', 'uuid-brand-2'] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  brandIds?: string[];
 
   @ApiPropertyOptional({ description: 'Product code', example: 'IPHONE15PM' })
   @IsOptional()

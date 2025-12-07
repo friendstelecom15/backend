@@ -484,69 +484,167 @@ export class ProductService {
     }
   }
 
-  async findAll(filters?: {
-    categoryId?: string;
-    brandId?: string;
-    isActive?: boolean;
-    isOnline?: boolean;
-    minPrice?: number;
-    maxPrice?: number;
-    search?: string;
-    limit?: number;
-    offset?: number;
-    productType?: string;
-  }) {
-    const whereConditions: any = {};
+  // async findAll(filters?: {
+  //   categoryId?: string;
+  //   brandId?: string;
+  //   isActive?: boolean;
+  //   isOnline?: boolean;
+  //   minPrice?: number;
+  //   maxPrice?: number;
+  //   search?: string;
+  //   limit?: number;
+  //   offset?: number;
+  //   productType?: string;
+  // }) {
+  //   const whereConditions: any = {};
 
-    if (filters?.categoryId) {
-      whereConditions.categoryId = new ObjectId(filters.categoryId);
-    }
-    if (filters?.brandId) {
-      whereConditions.brandId = new ObjectId(filters.brandId);
-    }
-    if (filters?.isActive !== undefined) {
-      whereConditions.isActive = filters.isActive;
-    }
-    if (filters?.isOnline !== undefined) {
-      whereConditions.isOnline = filters.isOnline;
-    }
-    if (filters?.productType) {
-      whereConditions.productType = filters.productType;
-    }
+  //   if (filters?.categoryId) {
+  //     whereConditions.categoryId = new ObjectId(filters.categoryId);
+  //   }
+  //   if (filters?.brandId) {
+  //     whereConditions.brandId = new ObjectId(filters.brandId);
+  //   }
+  //   if (filters?.isActive !== undefined) {
+  //     whereConditions.isActive = filters.isActive;
+  //   }
+  //   if (filters?.isOnline !== undefined) {
+  //     whereConditions.isOnline = filters.isOnline;
+  //   }
+  //   if (filters?.productType) {
+  //     whereConditions.productType = filters.productType;
+  //   }
 
-    const products = await this.productRepository.find({
-      where: whereConditions,
-      take: filters?.limit || 50,
-      skip: filters?.offset || 0,
-      order: { createdAt: 'DESC' },
-      relations: [
-        'images',
-        'videos',
-        'specifications',
-        'networks',
-        'regions',
-        'directColors',
-      ],
-    });
+  //   const products = await this.productRepository.find({
+  //     where: whereConditions,
+  //     take: filters?.limit || 50,
+  //     skip: filters?.offset || 0,
+  //     order: { createdAt: 'DESC' },
+  //     relations: [
+  //       'images',
+  //       'videos',
+  //       'specifications',
+  //       'networks',
+  //       'regions',
+  //       'directColors',
+  //     ],
+  //   });
 
-    if (products.length === 0) {
-      return [];
-    }
+  //   if (products.length === 0) {
+  //     return [];
+  //   }
 
-    // Load nested relations for each product
-    const productsWithFullRelations = await Promise.all(
-      products.map(async (product) => {
-        await this.loadProductRelations(product);
+  //   // Load nested relations for each product
+  //   const productsWithFullRelations = await Promise.all(
+  //     products.map(async (product) => {
+  //       await this.loadProductRelations(product);
 
-        return product;
-      }),
-    );
+  //       return product;
+  //     }),
+  //   );
 
-    return productsWithFullRelations.map((product) =>
-      this.formatProductResponse(product),
-    );
+  //   return productsWithFullRelations.map((product) =>
+  //     this.formatProductResponse(product),
+  //   );
+  // }
+async findAll(filters?: {
+  categoryId?: string;
+  brandId?: string;
+  isActive?: boolean;
+  isOnline?: boolean;
+  minPrice?: number;
+  maxPrice?: number;
+  search?: string;
+  limit?: number;
+  offset?: number;
+  productType?: string;
+  fields?: string;
+}) {
+  const whereConditions: any = {};
+
+  if (filters?.categoryId) {
+    whereConditions.categoryId = new ObjectId(filters.categoryId);
+  }
+  if (filters?.brandId) {
+    whereConditions.brandId = new ObjectId(filters.brandId);
+  }
+  if (filters?.isActive !== undefined) {
+    whereConditions.isActive = filters.isActive;
+  }
+  if (filters?.isOnline !== undefined) {
+    whereConditions.isOnline = filters.isOnline;
+  }
+  if (filters?.productType) {
+    whereConditions.productType = filters.productType;
   }
 
+  // FAST PATH: If fields requested, skip expensive nested relations
+  if (filters?.fields) {
+    const fieldsArray = filters.fields.split(',').map(f => f.trim());
+    
+    const products = await this.productRepository.find({
+      where: whereConditions,
+      take: filters?.limit || 20,
+      skip: filters?.offset || 0,
+      order: { createdAt: 'DESC' },
+      relations: ['images'], // Only images for list view
+    });
+
+    const total = await this.productRepository.count({ where: whereConditions });
+
+    const data = products.map(product => {
+      const result: any = {};
+      fieldsArray.forEach(field => {
+        if (field === 'images') {
+          result.images = product.images?.map(img => ({
+            id: img.id,
+            url: img.imageUrl,
+            isThumbnail: img.isThumbnail,
+            altText: img.altText,
+          }));
+        } else if (product.hasOwnProperty(field)) {
+          result[field] = (product as any)[field];
+        }
+      });
+      return result;
+    });
+
+    return { data, total };
+  }
+
+  // SLOW PATH: Full details with all nested relations (for detail pages)
+  const products = await this.productRepository.find({
+    where: whereConditions,
+    take: filters?.limit || 50,
+    skip: filters?.offset || 0,
+    order: { createdAt: 'DESC' },
+    relations: [
+      'images',
+      'videos',
+      'specifications',
+      'networks',
+      'regions',
+      'directColors',
+    ],
+  });
+
+  if (products.length === 0) {
+    return { data: [], total: 0 };
+  }
+
+  const productsWithFullRelations = await Promise.all(
+    products.map(async (product) => {
+      await this.loadProductRelations(product);
+      return product;
+    }),
+  );
+
+  const formatted = productsWithFullRelations.map((product) =>
+    this.formatProductResponse(product),
+  );
+
+  const total = await this.productRepository.count({ where: whereConditions });
+  return { data: formatted, total };
+}
   /**
    * Get product details by ID with optional region/network context
    */

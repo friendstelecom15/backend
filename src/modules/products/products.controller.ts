@@ -256,47 +256,50 @@ export class ProductsController {
     return dto;
   }
 
-  @Get()
-  @ApiOperation({ summary: 'Get all products with filters and pagination' })
-  @ApiQuery({ name: 'categoryId', required: false, type: String })
-  @ApiQuery({ name: 'brandId', required: false, type: String })
-  @ApiQuery({ name: 'isActive', required: false, type: Boolean })
-  @ApiQuery({ name: 'isOnline', required: false, type: Boolean })
-  @ApiQuery({ name: 'minPrice', required: false, type: Number })
-  @ApiQuery({ name: 'maxPrice', required: false, type: Number })
-  @ApiQuery({ name: 'search', required: false, type: String })
-  @ApiQuery({ name: 'limit', required: false, type: Number })
-  @ApiQuery({ name: 'offset', required: false, type: Number })
-  @ApiQuery({ name: 'productType', required: false, enum: ['basic', 'network', 'region'] })
-  @ApiResponse({
-    status: 200,
-    description: 'List of products',
-  })
-  findAll(
-    @Query('categoryId') categoryId?: string,
-    @Query('brandId') brandId?: string,
-    @Query('isActive') isActive?: boolean,
-    @Query('isOnline') isOnline?: boolean,
-    @Query('minPrice') minPrice?: number,
-    @Query('maxPrice') maxPrice?: number,
-    @Query('search') search?: string,
-    @Query('limit') limit?: number,
-    @Query('offset') offset?: number,
-    @Query('productType') productType?: string,
-  ) {
-    return this.productsService.findAll({
-      categoryId,
-      brandId,
-      isActive,
-      isOnline,
-      minPrice,
-      maxPrice,
-      search,
-      limit: limit ? Number(limit) : undefined,
-      offset: offset ? Number(offset) : undefined,
-      productType,
-    });
-  }
+@Get()
+@ApiOperation({ summary: 'Get all products with filters and pagination' })
+@ApiQuery({ name: 'categoryId', required: false, type: String })
+@ApiQuery({ name: 'brandId', required: false, type: String })
+@ApiQuery({ name: 'isActive', required: false, type: Boolean })
+@ApiQuery({ name: 'isOnline', required: false, type: Boolean })
+@ApiQuery({ name: 'minPrice', required: false, type: Number })
+@ApiQuery({ name: 'maxPrice', required: false, type: Number })
+@ApiQuery({ name: 'search', required: false, type: String })
+@ApiQuery({ name: 'limit', required: false, type: Number })
+@ApiQuery({ name: 'offset', required: false, type: Number })
+@ApiQuery({ name: 'productType', required: false, enum: ['basic', 'network', 'region'] })
+@ApiQuery({ name: 'fields', required: false, type: String, description: 'Comma-separated fields for lightweight response' })
+@ApiResponse({
+  status: 200,
+  description: 'List of products',
+})
+findAll(
+  @Query('categoryId') categoryId?: string,
+  @Query('brandId') brandId?: string,
+  @Query('isActive') isActive?: boolean,
+  @Query('isOnline') isOnline?: boolean,
+  @Query('minPrice') minPrice?: number,
+  @Query('maxPrice') maxPrice?: number,
+  @Query('search') search?: string,
+  @Query('limit') limit?: number,
+  @Query('offset') offset?: number,
+  @Query('productType') productType?: string,
+  @Query('fields') fields?: string,
+) {
+  return this.productsService.findAll({
+    categoryId,
+    brandId,
+    isActive,
+    isOnline,
+    minPrice,
+    maxPrice,
+    search,
+    limit: limit ? Number(limit) : undefined,
+    offset: offset ? Number(offset) : undefined,
+    productType,
+    fields,
+  });
+}
 
   @Get('search')
   @ApiOperation({ summary: 'Search products by name, description, or code' })

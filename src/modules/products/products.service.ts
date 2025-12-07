@@ -586,10 +586,34 @@ async findAll(filters?: {
       take: filters?.limit || 20,
       skip: filters?.offset || 0,
       order: { createdAt: 'DESC' },
-      relations: ['images'],
     });
 
     const total = await this.productRepository.count({ where: whereConditions });
+
+    // Manually load images for MongoDB
+    const needsImages = fieldsArray.includes('images');
+    if (needsImages && products.length > 0) {
+      const productIds = products.map(p => new ObjectId(p.id));
+      const allImages = await this.dataSource.getMongoRepository(ProductImage).find({
+        where: { productId: { $in: productIds } } as any,
+        order: { displayOrder: 'ASC' }
+      });
+
+      // Group images by productId
+      const imagesByProduct = new Map<string, ProductImage[]>();
+      allImages.forEach(img => {
+        const key = img.productId.toString();
+        if (!imagesByProduct.has(key)) {
+          imagesByProduct.set(key, []);
+        }
+        imagesByProduct.get(key)!.push(img);
+      });
+
+      // Assign images to products
+      products.forEach(product => {
+        product.images = imagesByProduct.get(product.id.toString()) || [];
+      });
+    }
 
     const data = products.map(product => {
       const result: any = {};
@@ -1432,5 +1456,21 @@ async findAll(filters?: {
     }
 
     return 'Duplicate value';
+  }
+
+  //find by id
+  async findById(id: string) {
+    const product = await this.productRepository.findOne({
+      where: { id: new ObjectId(id) } as any,
+      relations: [
+        'images',
+        'videos',
+        'regions',
+        'networks',
+        'directColors',
+        'specifications',
+      ],
+    });
+    return product;
   }
 }

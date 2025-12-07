@@ -326,6 +326,13 @@ findAll(
     return this.productsService.findOne(slug);
   }
 
+//find by id
+  @Get(':id')
+  @ApiOperation({ summary: 'Get product by ID with full details' })
+  findById(@Param('id') id: string) {
+    return this.productsService.findById(id);
+  }
+
   @Get(':productId/variant-price')
   @ApiOperation({ summary: 'Get specific variant price' })
   @ApiQuery({ name: 'regionId', required: false, type: String })

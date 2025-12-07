@@ -577,7 +577,7 @@ async findAll(filters?: {
     whereConditions.productType = filters.productType;
   }
 
-  // FAST PATH: If fields requested, skip expensive nested relations
+  // FAST PATH: Lightweight response for list views (admin products page)
   if (filters?.fields) {
     const fieldsArray = filters.fields.split(',').map(f => f.trim());
     
@@ -586,13 +586,14 @@ async findAll(filters?: {
       take: filters?.limit || 20,
       skip: filters?.offset || 0,
       order: { createdAt: 'DESC' },
-      relations: ['images'], // Only images for list view
+      relations: ['images'],
     });
 
     const total = await this.productRepository.count({ where: whereConditions });
 
     const data = products.map(product => {
       const result: any = {};
+      
       fieldsArray.forEach(field => {
         if (field === 'images') {
           result.images = product.images?.map(img => ({
@@ -600,15 +601,21 @@ async findAll(filters?: {
             url: img.imageUrl,
             isThumbnail: img.isThumbnail,
             altText: img.altText,
-          }));
+          })) || [];
         } else if (product.hasOwnProperty(field)) {
           result[field] = (product as any)[field];
         }
       });
+      
       return result;
     });
 
-    return { data, total };
+    return { 
+      data, 
+      total,
+      page: Math.floor((filters?.offset || 0) / (filters?.limit || 20)) + 1,
+      limit: filters?.limit || 20,
+    };
   }
 
   // SLOW PATH: Full details with all nested relations (for detail pages)
@@ -628,9 +635,15 @@ async findAll(filters?: {
   });
 
   if (products.length === 0) {
-    return { data: [], total: 0 };
+    return { 
+      data: [], 
+      total: 0,
+      page: 1,
+      limit: filters?.limit || 50,
+    };
   }
 
+  // Load nested relations for each product (ONLY for full detail requests)
   const productsWithFullRelations = await Promise.all(
     products.map(async (product) => {
       await this.loadProductRelations(product);
@@ -643,7 +656,13 @@ async findAll(filters?: {
   );
 
   const total = await this.productRepository.count({ where: whereConditions });
-  return { data: formatted, total };
+  
+  return { 
+    data: formatted, 
+    total,
+    page: Math.floor((filters?.offset || 0) / (filters?.limit || 50)) + 1,
+    limit: filters?.limit || 50,
+  };
 }
   /**
    * Get product details by ID with optional region/network context

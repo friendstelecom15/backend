@@ -648,14 +648,6 @@ async findAll(filters?: {
     take: filters?.limit || 50,
     skip: filters?.offset || 0,
     order: { createdAt: 'DESC' },
-    relations: [
-      'images',
-      'videos',
-      'specifications',
-      'networks',
-      'regions',
-      'directColors',
-    ],
   });
 
   if (products.length === 0) {
@@ -667,7 +659,7 @@ async findAll(filters?: {
     };
   }
 
-  // Load nested relations for each product (ONLY for full detail requests)
+  // Manually load all nested relations for each product (ONLY for full detail requests)
   const productsWithFullRelations = await Promise.all(
     products.map(async (product) => {
       await this.loadProductRelations(product);
@@ -693,15 +685,7 @@ async findAll(filters?: {
    */
   async findProductDetails(productId: string, regionId?: string, networkId?: string) {
     const product = await this.productRepository.findOne({
-      where: { id: new ObjectId(productId) } as any,
-      relations: [
-        'images',
-        'videos',
-        'regions',
-        'networks',
-        'directColors',
-        'specifications',
-      ],
+      where: { _id: new ObjectId(productId) } as any,
     });
 
     if (!product) {
@@ -719,14 +703,6 @@ async findAll(filters?: {
   async findOne(slug: string) {
     const product = await this.productRepository.findOne({
       where: { slug },
-      relations: [
-        'images',
-        'videos',
-        'regions',
-        'networks',
-        'directColors',
-        'specifications',
-      ],
     });
 
     if (!product) {
@@ -750,8 +726,7 @@ async findAll(filters?: {
     // For MongoDB, we need to manually query and filter
     // This is a simplified version - you may need to implement more complex logic
     const product = await this.productRepository.findOne({
-      where: { id: new ObjectId(productId) } as any,
-      relations: ['regions'],
+      where: { _id: new ObjectId(productId) } as any,
     });
 
     if (!product || !product.regions || product.regions.length === 0) {
@@ -799,7 +774,7 @@ async findAll(filters?: {
    */
   async remove(id: string) {
     const product = await this.productRepository.findOne({
-      where: { id: new ObjectId(id) } as any,
+      where: { _id: new ObjectId(id) } as any,
     });
 
     if (!product) {
@@ -1460,17 +1435,29 @@ async findAll(filters?: {
 
   //find by id
   async findById(id: string) {
-    const product = await this.productRepository.findOne({
-      where: { id: new ObjectId(id) } as any,
-      relations: [
-        'images',
-        'videos',
-        'regions',
-        'networks',
-        'directColors',
-        'specifications',
-      ],
-    });
-    return product;
+    try {
+      console.log('Finding product by ID:', id);
+      const objectId = new ObjectId(id);
+      console.log('ObjectId created:', objectId);
+      
+      const product = await this.productRepository.findOne({
+        where: { _id: objectId } as any,
+      });
+      
+      console.log('Product found:', product ? 'Yes' : 'No');
+      
+      if (!product) {
+        return null;
+      }
+
+      // Manually load all relations for MongoDB
+      await this.loadProductRelations(product);
+      
+      return product;
+    } catch (error) {
+      // If ObjectId conversion fails, return null
+      console.error('Error in findById:', error);
+      return null;
+    }
   }
 }

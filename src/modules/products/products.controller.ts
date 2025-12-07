@@ -327,7 +327,7 @@ findAll(
   }
 
 //find by id
-  @Get(':id')
+  @Get('id/:id')
   @ApiOperation({ summary: 'Get product by ID with full details' })
   findById(@Param('id') id: string) {
     return this.productsService.findById(id);

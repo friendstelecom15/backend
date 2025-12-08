@@ -20,27 +20,42 @@ export class CreateBasicProductDto {
   @IsNotEmpty()
   name: string;
 
-  @ApiProperty({ description: 'URL-friendly slug', example: 'iphone-15-pro-max' })
+  @ApiProperty({
+    description: 'URL-friendly slug',
+    example: 'iphone-15-pro-max',
+  })
   @IsString()
   @IsNotEmpty()
   slug: string;
 
-  @ApiPropertyOptional({ description: 'Short product description', example: 'Powerful A17 Pro chip with titanium design' })
+  @ApiPropertyOptional({
+    description: 'Short product description',
+    example: 'Powerful A17 Pro chip with titanium design',
+  })
   @IsOptional()
   @IsString()
   shortDescription?: string;
 
-  @ApiPropertyOptional({ description: 'Product description', example: 'Latest flagship phone' })
+  @ApiPropertyOptional({
+    description: 'Product description',
+    example: 'Latest flagship phone',
+  })
   @IsOptional()
   @IsString()
   description?: string;
 
-  @ApiPropertyOptional({ description: 'Category UUID', example: 'uuid-category' })
+  @ApiPropertyOptional({
+    description: 'Category UUID',
+    example: 'uuid-category',
+  })
   @IsOptional()
   @IsString()
   categoryId?: string;
 
-  @ApiPropertyOptional({ description: 'Category UUIDs', example: ['uuid-category-1', 'uuid-category-2'] })
+  @ApiPropertyOptional({
+    description: 'Category UUIDs',
+    example: ['uuid-category-1', 'uuid-category-2'],
+  })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
@@ -51,7 +66,10 @@ export class CreateBasicProductDto {
   @IsString()
   brandId?: string;
 
-  @ApiPropertyOptional({ description: 'Brand UUIDs', example: ['uuid-brand-1', 'uuid-brand-2'] })
+  @ApiPropertyOptional({
+    description: 'Brand UUIDs',
+    example: ['uuid-brand-1', 'uuid-brand-2'],
+  })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
@@ -67,7 +85,10 @@ export class CreateBasicProductDto {
   @IsString()
   sku?: string;
 
-  @ApiPropertyOptional({ description: 'Warranty information', example: '1 Year Official Warranty' })
+  @ApiPropertyOptional({
+    description: 'Warranty information',
+    example: '1 Year Official Warranty',
+  })
   @IsOptional()
   @IsString()
   warranty?: string;
@@ -113,13 +134,19 @@ export class CreateBasicProductDto {
   @Min(0)
   rewardPoints?: number;
 
-  @ApiPropertyOptional({ description: 'Minimum booking price for pre-order', example: 100 })
+  @ApiPropertyOptional({
+    description: 'Minimum booking price for pre-order',
+    example: 100,
+  })
   @IsOptional()
   @IsNumber()
   @Min(0)
   minBookingPrice?: number;
 
-  @ApiPropertyOptional({ description: 'SEO title', example: 'Buy iPhone 15 Pro Max - Best Price' })
+  @ApiPropertyOptional({
+    description: 'SEO title',
+    example: 'Buy iPhone 15 Pro Max - Best Price',
+  })
   @IsOptional()
   @IsString()
   seoTitle?: string;
@@ -129,7 +156,10 @@ export class CreateBasicProductDto {
   @IsString()
   seoDescription?: string;
 
-  @ApiPropertyOptional({ description: 'SEO keywords', example: ['iphone', 'apple', 'flagship'] })
+  @ApiPropertyOptional({
+    description: 'SEO keywords',
+    example: ['iphone', 'apple', 'flagship'],
+  })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
@@ -140,13 +170,19 @@ export class CreateBasicProductDto {
   @IsString()
   seoCanonical?: string;
 
-  @ApiPropertyOptional({ description: 'Product tags', example: ['flagship', 'premium'] })
+  @ApiPropertyOptional({
+    description: 'Product tags',
+    example: ['flagship', 'premium'],
+  })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
   tags?: string[];
 
-  @ApiPropertyOptional({ description: 'Direct price (for simple products)', example: 2990 })
+  @ApiPropertyOptional({
+    description: 'Direct price (for simple products)',
+    example: 2990,
+  })
   @IsOptional()
   @IsNumber()
   @Min(0)
@@ -164,6 +200,27 @@ export class CreateBasicProductDto {
   @Min(0)
   stockQuantity?: number;
 
+  @ApiPropertyOptional({ description: 'Is Care product?', example: false })
+  @IsOptional()
+  @IsBoolean()
+  isCare?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Delivery info',
+    example: 'Delivered in 3-5 days',
+  })
+  @IsOptional()
+  @IsString()
+  delivery?: string;
+
+  @ApiPropertyOptional({
+    description: 'Easy returns available?',
+    example: '7 days',
+  })
+  @IsOptional()
+  @IsString()
+  easyReturns?: string;
+
   @ApiPropertyOptional({ description: 'Low stock alert', example: 5 })
   @IsOptional()
   @IsNumber()
@@ -176,12 +233,18 @@ export class CreateBasicProductDto {
   @Min(0)
   campaignPrice?: number;
 
-  @ApiPropertyOptional({ description: 'Campaign start date', example: '2025-12-01T00:00:00Z' })
+  @ApiPropertyOptional({
+    description: 'Campaign start date',
+    example: '2025-12-01T00:00:00Z',
+  })
   @IsOptional()
   @IsDateString()
   campaignStart?: string;
 
-  @ApiPropertyOptional({ description: 'Campaign end date', example: '2025-12-31T23:59:59Z' })
+  @ApiPropertyOptional({
+    description: 'Campaign end date',
+    example: '2025-12-31T23:59:59Z',
+  })
   @IsOptional()
   @IsDateString()
   campaignEnd?: string;
@@ -201,7 +264,10 @@ export class NetworkStorageDto {
   @IsString()
   storageSize: string;
 
-  @ApiPropertyOptional({ description: 'Is this the default storage?', example: false })
+  @ApiPropertyOptional({
+    description: 'Is this the default storage?',
+    example: false,
+  })
   @IsOptional()
   @IsBoolean()
   isDefault?: boolean;
@@ -245,7 +311,10 @@ export class NetworkColorDto {
   @IsString()
   colorName: string;
 
-  @ApiPropertyOptional({ description: 'Color image URL', example: 'http://example.com/red.png' })
+  @ApiPropertyOptional({
+    description: 'Color image URL',
+    example: 'http://example.com/red.png',
+  })
   @IsOptional()
   @IsString()
   colorImage?: string;
@@ -277,7 +346,10 @@ export class NetworkColorDto {
   @Min(1)
   lowStockAlert?: number;
 
-  @ApiPropertyOptional({ description: 'Is this the default color?', example: false })
+  @ApiPropertyOptional({
+    description: 'Is this the default color?',
+    example: false,
+  })
   @IsOptional()
   @IsBoolean()
   isDefault?: boolean;
@@ -287,7 +359,10 @@ export class NetworkColorDto {
   @IsNumber()
   displayOrder?: number;
 
-  @ApiPropertyOptional({ description: 'Storages for the color', type: [NetworkStorageDto] })
+  @ApiPropertyOptional({
+    description: 'Storages for the color',
+    type: [NetworkStorageDto],
+  })
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
@@ -306,7 +381,10 @@ export class CreateProductNetworkDto {
   @IsString()
   code?: string;
 
-  @ApiPropertyOptional({ description: 'Network price adjustment', example: 100 })
+  @ApiPropertyOptional({
+    description: 'Network price adjustment',
+    example: 100,
+  })
   @IsOptional()
   @IsNumber()
   priceAdjustment?: number;
@@ -338,14 +416,20 @@ export class CreateProductNetworkDto {
   @IsNumber()
   displayOrder?: number;
 
-  @ApiPropertyOptional({ description: 'Colors for the network', type: [NetworkColorDto] })
+  @ApiPropertyOptional({
+    description: 'Colors for the network',
+    type: [NetworkColorDto],
+  })
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => NetworkColorDto)
   colors?: NetworkColorDto[];
 
-  @ApiPropertyOptional({ description: 'Storages for the network', type: [NetworkStorageDto] })
+  @ApiPropertyOptional({
+    description: 'Storages for the network',
+    type: [NetworkStorageDto],
+  })
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
@@ -400,7 +484,10 @@ export class CreateProductRegionDto {
 }
 
 export class CreateRegionProductDto extends CreateBasicProductDto {
-  @ApiPropertyOptional({ description: 'Product regions with variants (for region-based products)', type: [CreateProductRegionDto] })
+  @ApiPropertyOptional({
+    description: 'Product regions with variants (for region-based products)',
+    type: [CreateProductRegionDto],
+  })
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
@@ -412,37 +499,58 @@ export class CreateRegionProductDto extends CreateBasicProductDto {
 import { PartialType } from '@nestjs/swagger';
 
 export class UpdateProductNewDto extends PartialType(CreateBasicProductDto) {
-  @ApiPropertyOptional({ description: 'Product name', example: 'Updated iPhone 15 Pro Max' })
+  @ApiPropertyOptional({
+    description: 'Product name',
+    example: 'Updated iPhone 15 Pro Max',
+  })
   @IsOptional()
   @IsString()
   name?: string;
 
-  @ApiPropertyOptional({ description: 'URL-friendly slug', example: 'updated-iphone-15-pro-max' })
+  @ApiPropertyOptional({
+    description: 'URL-friendly slug',
+    example: 'updated-iphone-15-pro-max',
+  })
   @IsOptional()
   @IsString()
   slug?: string;
 
-  @ApiPropertyOptional({ description: 'Short product description', example: 'Updated description' })
+  @ApiPropertyOptional({
+    description: 'Short product description',
+    example: 'Updated description',
+  })
   @IsOptional()
   @IsString()
   shortDescription?: string;
 
-  @ApiPropertyOptional({ description: 'Product description', example: 'Updated flagship phone' })
+  @ApiPropertyOptional({
+    description: 'Product description',
+    example: 'Updated flagship phone',
+  })
   @IsOptional()
   @IsString()
   description?: string;
 
-  @ApiPropertyOptional({ description: 'Category UUID', example: 'updated-uuid-category' })
+  @ApiPropertyOptional({
+    description: 'Category UUID',
+    example: 'updated-uuid-category',
+  })
   @IsOptional()
   @IsString()
   categoryId?: string;
 
-  @ApiPropertyOptional({ description: 'Brand UUID', example: 'updated-uuid-brand' })
+  @ApiPropertyOptional({
+    description: 'Brand UUID',
+    example: 'updated-uuid-brand',
+  })
   @IsOptional()
   @IsString()
   brandId?: string;
 
-  @ApiPropertyOptional({ description: 'Product code', example: 'UPDATED-IPHONE15PM' })
+  @ApiPropertyOptional({
+    description: 'Product code',
+    example: 'UPDATED-IPHONE15PM',
+  })
   @IsOptional()
   @IsString()
   productCode?: string;
@@ -452,7 +560,10 @@ export class UpdateProductNewDto extends PartialType(CreateBasicProductDto) {
   @IsString()
   sku?: string;
 
-  @ApiPropertyOptional({ description: 'Warranty information', example: 'Updated 1 Year Warranty' })
+  @ApiPropertyOptional({
+    description: 'Warranty information',
+    example: 'Updated 1 Year Warranty',
+  })
   @IsOptional()
   @IsString()
   warranty?: string;
@@ -498,13 +609,19 @@ export class UpdateProductNewDto extends PartialType(CreateBasicProductDto) {
   @Min(0)
   rewardPoints?: number;
 
-  @ApiPropertyOptional({ description: 'Minimum booking price for pre-order', example: 100 })
+  @ApiPropertyOptional({
+    description: 'Minimum booking price for pre-order',
+    example: 100,
+  })
   @IsOptional()
   @IsNumber()
   @Min(0)
   minBookingPrice?: number;
 
-  @ApiPropertyOptional({ description: 'SEO title', example: 'Buy iPhone 15 Pro Max - Best Price' })
+  @ApiPropertyOptional({
+    description: 'SEO title',
+    example: 'Buy iPhone 15 Pro Max - Best Price',
+  })
   @IsOptional()
   @IsString()
   seoTitle?: string;
@@ -514,7 +631,10 @@ export class UpdateProductNewDto extends PartialType(CreateBasicProductDto) {
   @IsString()
   seoDescription?: string;
 
-  @ApiPropertyOptional({ description: 'SEO keywords', example: ['iphone', 'apple', 'flagship'] })
+  @ApiPropertyOptional({
+    description: 'SEO keywords',
+    example: ['iphone', 'apple', 'flagship'],
+  })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
@@ -525,13 +645,19 @@ export class UpdateProductNewDto extends PartialType(CreateBasicProductDto) {
   @IsString()
   seoCanonical?: string;
 
-  @ApiPropertyOptional({ description: 'Product tags', example: ['flagship', 'premium'] })
+  @ApiPropertyOptional({
+    description: 'Product tags',
+    example: ['flagship', 'premium'],
+  })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
   tags?: string[];
 
-  @ApiPropertyOptional({ description: 'Direct price (for simple products)', example: 2990 })
+  @ApiPropertyOptional({
+    description: 'Direct price (for simple products)',
+    example: 2990,
+  })
   @IsOptional()
   @IsNumber()
   @Min(0)
@@ -549,6 +675,27 @@ export class UpdateProductNewDto extends PartialType(CreateBasicProductDto) {
   @Min(0)
   stockQuantity?: number;
 
+  @ApiPropertyOptional({ description: 'Is Care product?', example: false })
+  @IsOptional()
+  @IsBoolean()
+  isCare?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Delivery info',
+    example: 'Delivered in 3-5 days',
+  })
+  @IsOptional()
+  @IsString()
+  delivery?: string;
+
+  @ApiPropertyOptional({
+    description: 'Easy returns available?',
+    example: '7 days',
+  })
+  @IsOptional()
+  @IsString()
+  easyReturns?: string;
+
   @ApiPropertyOptional({ description: 'Low stock alert', example: 5 })
   @IsOptional()
   @IsNumber()
@@ -561,12 +708,18 @@ export class UpdateProductNewDto extends PartialType(CreateBasicProductDto) {
   @Min(0)
   campaignPrice?: number;
 
-  @ApiPropertyOptional({ description: 'Campaign start date', example: '2025-12-01T00:00:00Z' })
+  @ApiPropertyOptional({
+    description: 'Campaign start date',
+    example: '2025-12-01T00:00:00Z',
+  })
   @IsOptional()
   @IsDateString()
   campaignStart?: string;
 
-  @ApiPropertyOptional({ description: 'Campaign end date', example: '2025-12-31T23:59:59Z' })
+  @ApiPropertyOptional({
+    description: 'Campaign end date',
+    example: '2025-12-31T23:59:59Z',
+  })
   @IsOptional()
   @IsDateString()
   campaignEnd?: string;
@@ -580,7 +733,11 @@ export class UpdateProductNewDto extends PartialType(CreateBasicProductDto) {
 
 // Adding CreateNetworkProductDto
 export class CreateNetworkProductDto extends CreateBasicProductDto {
-  @ApiPropertyOptional({ description: 'Product networks with variants (for network-based products like iPads)', type: [CreateProductNetworkDto] })
+  @ApiPropertyOptional({
+    description:
+      'Product networks with variants (for network-based products like iPads)',
+    type: [CreateProductNetworkDto],
+  })
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
@@ -594,7 +751,10 @@ export class CreateProductStorageDto {
   @IsString()
   storageSize: string;
 
-  @ApiPropertyOptional({ description: 'Is this the default storage?', example: false })
+  @ApiPropertyOptional({
+    description: 'Is this the default storage?',
+    example: false,
+  })
   @IsOptional()
   @IsBoolean()
   isDefault?: boolean;
@@ -641,7 +801,10 @@ export class CreateProductColorDto {
   @IsString()
   colorName: string;
 
-  @ApiPropertyOptional({ description: 'Color image URL', example: 'http://example.com/red.png' })
+  @ApiPropertyOptional({
+    description: 'Color image URL',
+    example: 'http://example.com/red.png',
+  })
   @IsOptional()
   @IsString()
   colorImage?: string;
@@ -671,7 +834,10 @@ export class CreateProductColorDto {
   @IsNumber()
   lowStockAlert?: number;
 
-  @ApiPropertyOptional({ description: 'Is this the default color?', example: false })
+  @ApiPropertyOptional({
+    description: 'Is this the default color?',
+    example: false,
+  })
   @IsOptional()
   @IsBoolean()
   isDefault?: boolean;
@@ -691,7 +857,10 @@ export class CreateProductColorDto {
   @IsBoolean()
   useDefaultStorages?: boolean;
 
-  @ApiPropertyOptional({ description: 'Storages for the color', type: [CreateProductStorageDto] })
+  @ApiPropertyOptional({
+    description: 'Storages for the color',
+    type: [CreateProductStorageDto],
+  })
   @IsOptional()
   @Type(() => CreateProductStorageDto)
   storages?: CreateProductStorageDto[];

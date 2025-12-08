@@ -6,6 +6,7 @@ import { CloudflareService } from 'src/config/cloudflare-video.service';
 
 import { Product as ProductNew } from './entities/product-new.entity';
 import { ProductRegion } from './entities/product-region.entity';
+import { ProductNetwork } from './entities/product-network.entity';
 import { ProductColor } from './entities/product-color.entity';
 import { ProductStorage } from './entities/product-storage.entity';
 import { ProductPrice } from './entities/product-price.entity';
@@ -22,6 +23,7 @@ import { ProductsController } from './products.controller';
       NotifyProduct,
       ProductNew,
       ProductRegion,
+      ProductNetwork,
       ProductColor,
       ProductStorage,
       ProductPrice,

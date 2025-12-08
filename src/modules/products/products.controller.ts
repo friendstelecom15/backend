@@ -396,6 +396,86 @@ findAll(
     return this.productsService.search(query);
   }
 
+  // ==================== Product Care Endpoints ====================
+  // IMPORTANT: Must be before :slug route to avoid "care" being treated as a slug
+
+  @Post('care')
+  // @UseGuards(JwtAuthGuard, RolesGuard)
+  // @Roles('admin', 'management')
+  // @ApiBearerAuth()
+  @ApiOperation({ summary: 'Create product care plan' })
+  @ApiResponse({ status: 201, description: 'Care plan created successfully' })
+  createCare(
+    @Body() createCareDto: {
+      productIds?: string[];
+      categoryIds?: string[];
+      planName: string;
+      price: number;
+      duration?: string;
+      description?: string;
+      features?: string[];
+    },
+  ) {
+    return this.productsService.createProductCare(createCareDto);
+  }
+
+  @Patch('care/:id')
+  // @UseGuards(JwtAuthGuard, RolesGuard)
+  // @Roles('admin', 'management')
+  // @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update product care plan' })
+  @ApiResponse({ status: 200, description: 'Care plan updated successfully' })
+  updateCare(
+    @Param('id') id: string,
+    @Body() updateCareDto: {
+      productIds?: string[];
+      categoryIds?: string[];
+      planName?: string;
+      price?: number;
+      duration?: string;
+      description?: string;
+      features?: string[];
+    },
+  ) {
+    return this.productsService.updateProductCare(id, updateCareDto);
+  }
+
+  @Get('care')
+  @ApiOperation({ summary: 'Get all product care plans' })
+  @ApiResponse({ status: 200, description: 'List of all care plans' })
+  getAllCares() {
+    return this.productsService.getAllProductCares();
+  }
+
+  @Get('care/:id')
+  @ApiOperation({ summary: 'Get product care plan by ID' })
+  @ApiResponse({ status: 200, description: 'Care plan details' })
+  @ApiResponse({ status: 404, description: 'Care plan not found' })
+  getCareById(@Param('id') id: string) {
+    return this.productsService.getProductCareById(id);
+  }
+
+  @Get('care/product/:productId')
+  @ApiOperation({ summary: 'Get care plans for a specific product' })
+  @ApiResponse({ status: 200, description: 'List of care plans for the product' })
+  getCaresByProductId(@Param('productId') productId: string) {
+    return this.productsService.getProductCaresByProductId(productId);
+  }
+
+  @Delete('care/:id')
+  // @UseGuards(JwtAuthGuard, RolesGuard)
+  // @Roles('admin')
+  // @ApiBearerAuth()
+  @ApiOperation({ summary: 'Delete product care plan' })
+  @ApiResponse({ status: 200, description: 'Care plan deleted successfully' })
+  @ApiResponse({ status: 404, description: 'Care plan not found' })
+  deleteCare(@Param('id') id: string) {
+    return this.productsService.deleteProductCare(id);
+  }
+
+  // ==================== Generic Product Routes ====================
+  // IMPORTANT: Must be after specific routes like "care" to avoid conflicts
+
   @Get(':slug')
   @ApiOperation({ summary: 'Get product by slug with full details' })
   @ApiResponse({
@@ -410,7 +490,6 @@ findAll(
     return this.productsService.findOne(slug);
   }
 
-//find by id
   @Get('id/:id')
   @ApiOperation({ summary: 'Get product by ID with full details' })
   findById(@Param('id') id: string) {
@@ -439,9 +518,6 @@ findAll(
       storageId,
     );
   }
-
-
-
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)

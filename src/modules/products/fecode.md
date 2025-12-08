@@ -67,6 +67,11 @@ function NewProductPage() {
   const [isOfficial, setIsOfficial] = useState(false);
   const [freeShipping, setFreeShipping] = useState(false);
   const [isEmi, setIsEmi] = useState(false);
+  const [isCare, setIsCare] = useState(true);
+
+  // Delivery & Returns
+  const [delivery, setDelivery] = useState('');
+  const [easyReturns, setEasyReturns] = useState('');
 
   // Reward & Booking
   const [rewardPoints, setRewardPoints] = useState('');
@@ -1143,6 +1148,9 @@ function NewProductPage() {
         isOfficial,
         freeShipping,
         isEmi,
+        isCare,
+        delivery: delivery || undefined,
+        easyReturns: easyReturns || undefined,
         rewardPoints: rewardPoints ? Number(rewardPoints) : undefined,
         minBookingPrice: minBookingPrice ? Number(minBookingPrice) : undefined,
         seoTitle: seoTitle || undefined,
@@ -1334,6 +1342,9 @@ function NewProductPage() {
         isOfficial,
         freeShipping,
         isEmi,
+        isCare,
+        delivery: delivery || undefined,
+        easyReturns: easyReturns || undefined,
         rewardPoints: rewardPoints ? Number(rewardPoints) : undefined,
         minBookingPrice: minBookingPrice ? Number(minBookingPrice) : undefined,
         seoTitle: seoTitle || undefined,
@@ -1511,6 +1522,9 @@ function NewProductPage() {
         isOfficial,
         freeShipping,
         isEmi,
+        isCare,
+        delivery: delivery || undefined,
+        easyReturns: easyReturns || undefined,
         rewardPoints: rewardPoints ? Number(rewardPoints) : undefined,
         minBookingPrice: minBookingPrice ? Number(minBookingPrice) : undefined,
         seoTitle: seoTitle || undefined,
@@ -1826,6 +1840,40 @@ function NewProductPage() {
                   onCheckedChange={setIsEmi}
                 />
               </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="isCare">Care Available</Label>
+                <Switch
+                  id="isCare"
+                  checked={isCare}
+                  onCheckedChange={setIsCare}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Delivery & Returns</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="delivery">Delivery Information</Label>
+              <Input
+                id="delivery"
+                value={delivery}
+                onChange={(e) => setDelivery(e.target.value)}
+                placeholder="e.g., Same day delivery in Dhaka"
+              />
+            </div>
+            <div>
+              <Label htmlFor="easyReturns">Easy Returns Policy</Label>
+              <Input
+                id="easyReturns"
+                value={easyReturns}
+                onChange={(e) => setEasyReturns(e.target.value)}
+                placeholder="e.g., 7 days easy return"
+              />
             </div>
           </CardContent>
         </Card>

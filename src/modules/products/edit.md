@@ -73,6 +73,9 @@ export function EditProductModal({
   const [isOfficial, setIsOfficial] = useState(false);
   const [freeShipping, setFreeShipping] = useState(false);
   const [isEmi, setIsEmi] = useState(false);
+  const [isCare, setIsCare] = useState(true);
+  const [delivery, setDelivery] = useState('');
+  const [easyReturns, setEasyReturns] = useState('');
 
   // Reward & Booking
   const [rewardPoints, setRewardPoints] = useState('');
@@ -129,7 +132,7 @@ export function EditProductModal({
   const addNetwork = () => {
     setNetworks([...networks, {
       id: `network-${Date.now()}`,
-      networkName: '',
+      networkType: '',
       isDefault: false,
       hasDefaultStorages: false,
       defaultStorages: [],
@@ -190,9 +193,24 @@ export function EditProductModal({
         n.id === networkId
           ? {
               ...n,
-              defaultStorages: n.defaultStorages.map((s: any) =>
-                s.id === storageId ? {...s, [field]: value} : s
-              ),
+              defaultStorages: n.defaultStorages.map((s: any) => {
+                if (s.id === storageId) {
+                  const updated = {...s, [field]: value};
+                  
+                  // Auto-calculate discount price when discount percent or regular price changes
+                  if (field === 'discountPercent' || field === 'regularPrice') {
+                    const regularPrice = field === 'regularPrice' ? Number(value) : Number(s.regularPrice);
+                    const discountPercent = field === 'discountPercent' ? Number(value) : Number(s.discountPercent);
+                    
+                    if (regularPrice > 0 && discountPercent > 0) {
+                      updated.discountPrice = Math.round(regularPrice - (regularPrice * discountPercent / 100)).toString();
+                    }
+                  }
+                  
+                  return updated;
+                }
+                return s;
+              }),
             }
           : n
       )
@@ -362,9 +380,25 @@ export function EditProductModal({
                 c.id === colorId
                   ? {
                       ...c,
-                      storages: c.storages.map((s: any) =>
-                        s.id === storageId ? {...s, [field]: value} : s
-                      ),
+                      storages: c.storages.map((s: any) => {
+                        if (s.id === storageId) {
+                          const updated = {...s, [field]: value};
+                          
+                          // Auto-calculate discount price when discount percent or regular price changes
+                          if (field === 'discountPercent' || field === 'regularPrice') {
+                            const regularPrice = field === 'regularPrice' ? Number(value) : Number(s.regularPrice);
+                            const discountPercent = field === 'discountPercent' ? Number(value) : Number(s.discountPercent);
+                            
+                            if (regularPrice > 0 && discountPercent > 0) {
+                              const discountPrice = Math.round(regularPrice - (regularPrice * discountPercent / 100));
+                              updated.discountPrice = discountPrice.toString();
+                            }
+                          }
+                          
+                          return updated;
+                        }
+                        return s;
+                      }),
                     }
                   : c
               ),
@@ -438,9 +472,24 @@ export function EditProductModal({
         r.id === regionId
           ? {
               ...r,
-              defaultStorages: r.defaultStorages.map((s: any) =>
-                s.id === storageId ? {...s, [field]: value} : s
-              ),
+              defaultStorages: r.defaultStorages.map((s: any) => {
+                if (s.id === storageId) {
+                  const updated = {...s, [field]: value};
+                  
+                  // Auto-calculate discount price when discount percent or regular price changes
+                  if (field === 'discountPercent' || field === 'regularPrice') {
+                    const regularPrice = field === 'regularPrice' ? Number(value) : Number(s.regularPrice);
+                    const discountPercent = field === 'discountPercent' ? Number(value) : Number(s.discountPercent);
+                    
+                    if (regularPrice > 0 && discountPercent > 0) {
+                      updated.discountPrice = Math.round(regularPrice - (regularPrice * discountPercent / 100)).toString();
+                    }
+                  }
+                  
+                  return updated;
+                }
+                return s;
+              }),
             }
           : r
       )
@@ -610,9 +659,25 @@ export function EditProductModal({
                 c.id === colorId
                   ? {
                       ...c,
-                      storages: c.storages.map((s: any) =>
-                        s.id === storageId ? {...s, [field]: value} : s
-                      ),
+                      storages: c.storages.map((s: any) => {
+                        if (s.id === storageId) {
+                          const updated = {...s, [field]: value};
+                          
+                          // Auto-calculate discount price when discount percent or regular price changes
+                          if (field === 'discountPercent' || field === 'regularPrice') {
+                            const regularPrice = field === 'regularPrice' ? Number(value) : Number(s.regularPrice);
+                            const discountPercent = field === 'discountPercent' ? Number(value) : Number(s.discountPercent);
+                            
+                            if (regularPrice > 0 && discountPercent > 0) {
+                              const discountPrice = Math.round(regularPrice - (regularPrice * discountPercent / 100));
+                              updated.discountPrice = discountPrice.toString();
+                            }
+                          }
+                          
+                          return updated;
+                        }
+                        return s;
+                      }),
                     }
                   : c
               ),
@@ -659,13 +724,16 @@ export function EditProductModal({
       setSelectedCategories(product.categoryIds || (product.categoryId ? [product.categoryId] : []));
       setSelectedBrands(product.brandIds || (product.brandId ? [product.brandId] : []));
 
-      setIsActive(product.isActive !== false);
-      setIsOnline(product.isOnline !== false);
-      setIsPos(product.isPos !== false);
-      setIsPreOrder(product.isPreOrder === true);
-      setIsOfficial(product.isOfficial === true);
-      setFreeShipping(product.freeShipping === true);
-      setIsEmi(product.isEmi === true);
+      setIsActive(!!product.isActive);
+      setIsOnline(!!product.isOnline);
+      setIsPos(!!product.isPos);
+      setIsPreOrder(!!product.isPreOrder);
+      setIsOfficial(!!product.isOfficial);
+      setFreeShipping(!!product.freeShipping);
+      setIsEmi(!!product.isEmi);
+      setIsCare(!!product.isCare);
+      setDelivery(product.delivery || '');
+      setEasyReturns(product.easyReturns || '');
 
       setRewardPoints(product.rewardPoints?.toString() || '');
       setMinBookingPrice(product.minBookingPrice?.toString() || '');
@@ -731,32 +799,40 @@ export function EditProductModal({
       } else if (type === 'network') {
         if (product.networks) {
           setNetworks(product.networks.map((n: any) => ({
-            ...n,
             id: n.id || `network-${Date.now()}-${Math.random()}`,
-            networkName: n.networkName || n.name,
+            networkType: n.networkType || n.networkName || n.name,
+            isDefault: n.isDefault || false,
+            hasDefaultStorages: n.hasDefaultStorages !== false && n.defaultStorages && n.defaultStorages.length > 0,
             defaultStorages: n.defaultStorages?.map((s: any) => ({
-              ...s,
               id: s.id || `ds-${Date.now()}-${Math.random()}`,
+              storageSize: s.storageSize || '',
+              isDefault: s.isDefault || false,
               regularPrice: s.price?.regularPrice?.toString() || s.regularPrice?.toString() || '',
               discountPrice: s.price?.discountPrice?.toString() || s.discountPrice?.toString() || '',
               discountPercent: s.price?.discountPercent?.toString() || s.discountPercent?.toString() || '',
               stockQuantity: s.price?.stockQuantity?.toString() || s.stockQuantity?.toString() || '',
+              lowStockAlert: s.price?.lowStockAlert?.toString() || s.lowStockAlert?.toString() || '5',
             })) || [],
             colors: n.colors?.map((c: any) => ({
-              ...c,
               id: c.id || `color-${Date.now()}-${Math.random()}`,
               colorName: c.colorName || c.name,
               colorImage: c.colorImage || c.image,
-              singlePrice: c.regularPrice?.toString() || '',
-              singleComparePrice: c.comparePrice?.toString() || '',
-              singleStockQuantity: c.stockQuantity?.toString() || '',
+              colorImageFile: null,
+              hasStorage: c.hasStorage !== false,
+              useDefaultStorages: c.useDefaultStorages !== false,
+              isDefault: c.isDefault || false,
+              singlePrice: c.singlePrice?.toString() || c.regularPrice?.toString() || '',
+              singleComparePrice: c.singleComparePrice?.toString() || c.comparePrice?.toString() || '',
+              singleStockQuantity: c.singleStockQuantity?.toString() || c.stockQuantity?.toString() || '',
               storages: c.storages?.map((s: any) => ({
-                ...s,
                 id: s.id || `s-${Date.now()}-${Math.random()}`,
+                storageSize: s.storageSize || '',
+                isDefault: s.isDefault || false,
                 regularPrice: s.price?.regularPrice?.toString() || s.regularPrice?.toString() || '',
                 discountPrice: s.price?.discountPrice?.toString() || s.discountPrice?.toString() || '',
                 discountPercent: s.price?.discountPercent?.toString() || s.discountPercent?.toString() || '',
                 stockQuantity: s.price?.stockQuantity?.toString() || s.stockQuantity?.toString() || '',
+                lowStockAlert: s.price?.lowStockAlert?.toString() || s.lowStockAlert?.toString() || '5',
               })) || []
             })) || []
           })));
@@ -770,28 +846,35 @@ export function EditProductModal({
             id: r.id || `region-${Date.now()}-${Math.random()}`,
             regionName: r.regionName || r.name,
             defaultStorages: r.defaultStorages?.map((s: any) => ({
-              ...s,
               id: s.id || `ds-${Date.now()}-${Math.random()}`,
+              storageSize: s.storageSize || '',
+              isDefault: s.isDefault || false,
               regularPrice: s.price?.regularPrice?.toString() || s.regularPrice?.toString() || '',
               discountPrice: s.price?.discountPrice?.toString() || s.discountPrice?.toString() || '',
               discountPercent: s.price?.discountPercent?.toString() || s.discountPercent?.toString() || '',
               stockQuantity: s.price?.stockQuantity?.toString() || s.stockQuantity?.toString() || '',
+              lowStockAlert: s.price?.lowStockAlert?.toString() || s.lowStockAlert?.toString() || '5',
             })) || [],
             colors: r.colors?.map((c: any) => ({
-              ...c,
               id: c.id || `color-${Date.now()}-${Math.random()}`,
               colorName: c.colorName || c.name,
               colorImage: c.colorImage || c.image,
-              singlePrice: c.regularPrice?.toString() || '',
-              singleComparePrice: c.comparePrice?.toString() || '',
-              singleStockQuantity: c.stockQuantity?.toString() || '',
+              colorImageFile: null,
+              hasStorage: c.hasStorage !== false,
+              useDefaultStorages: c.useDefaultStorages !== false,
+              isDefault: c.isDefault || false,
+              singlePrice: c.singlePrice?.toString() || c.regularPrice?.toString() || '',
+              singleComparePrice: c.singleComparePrice?.toString() || c.comparePrice?.toString() || '',
+              singleStockQuantity: c.singleStockQuantity?.toString() || c.stockQuantity?.toString() || '',
               storages: c.storages?.map((s: any) => ({
-                ...s,
                 id: s.id || `s-${Date.now()}-${Math.random()}`,
+                storageSize: s.storageSize || '',
+                isDefault: s.isDefault || false,
                 regularPrice: s.price?.regularPrice?.toString() || s.regularPrice?.toString() || '',
                 discountPrice: s.price?.discountPrice?.toString() || s.discountPrice?.toString() || '',
                 discountPercent: s.price?.discountPercent?.toString() || s.discountPercent?.toString() || '',
                 stockQuantity: s.price?.stockQuantity?.toString() || s.stockQuantity?.toString() || '',
+                lowStockAlert: s.price?.lowStockAlert?.toString() || s.lowStockAlert?.toString() || '5',
               })) || []
             })) || []
           })));
@@ -881,7 +964,24 @@ export function EditProductModal({
   };
 
   const updateBasicColor = (colorId: string, field: string, value: any) => {
-    setBasicColors(prev => prev.map(c => (c.id === colorId ? {...c, [field]: value} : c)));
+    setBasicColors(prev => prev.map(c => {
+      if (c.id === colorId) {
+        const updated = {...c, [field]: value};
+        
+        // Auto-calculate discount price when discount percent or regular price changes
+        if (field === 'discountPercent' || field === 'regularPrice') {
+          const regularPrice = field === 'regularPrice' ? Number(value) : Number(c.regularPrice);
+          const discountPercent = field === 'discountPercent' ? Number(value) : Number(c.discountPercent);
+          
+          if (regularPrice > 0 && discountPercent > 0) {
+            updated.discountPrice = Math.round(regularPrice - (regularPrice * discountPercent / 100)).toString();
+          }
+        }
+        
+        return updated;
+      }
+      return c;
+    }));
   };
 
   const handleBasicColorImageUpload = (colorId: string, e: React.ChangeEvent<HTMLInputElement>) => {
@@ -943,13 +1043,16 @@ export function EditProductModal({
         productCode: productCode || undefined,
         sku: sku || undefined,
         warranty: warranty || undefined,
-        isActive,
-        isOnline,
-        isPos,
-        isPreOrder,
-        isOfficial,
-        freeShipping,
-        isEmi,
+        isActive: !!isActive,
+        isOnline: !!isOnline,
+        isPos: !!isPos,
+        isPreOrder: !!isPreOrder,
+        isOfficial: !!isOfficial,
+        freeShipping: !!freeShipping,
+        isEmi: !!isEmi,
+        isCare: !!isCare,
+        delivery: delivery || undefined,
+        easyReturns: easyReturns || undefined,
         rewardPoints: rewardPoints ? Number(rewardPoints) : undefined,
         minBookingPrice: minBookingPrice ? Number(minBookingPrice) : undefined,
         seoTitle: seoTitle || undefined,
@@ -989,7 +1092,7 @@ export function EditProductModal({
         const networkColorImages: File[] = [];
         payload.networks = networks.map((network, netIdx) => ({
           id: network.id.startsWith('network-') ? undefined : network.id,
-          networkName: network.networkName,
+          networkType: network.networkType,
           isDefault: network.isDefault,
           hasDefaultStorages: network.hasDefaultStorages,
           displayOrder: netIdx,
@@ -1193,6 +1296,22 @@ export function EditProductModal({
                 <div className="flex items-center justify-between"><Label>Official</Label><Switch checked={isOfficial} onCheckedChange={setIsOfficial} /></div>
                 <div className="flex items-center justify-between"><Label>Free Shipping</Label><Switch checked={freeShipping} onCheckedChange={setFreeShipping} /></div>
                 <div className="flex items-center justify-between"><Label>EMI</Label><Switch checked={isEmi} onCheckedChange={setIsEmi} /></div>
+                <div className="flex items-center justify-between"><Label>Care Available</Label><Switch checked={isCare} onCheckedChange={setIsCare} /></div>
+              </div>
+            </div>
+
+            {/* Delivery & Returns */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Delivery & Returns</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Delivery</Label>
+                  <Input value={delivery} onChange={e => setDelivery(e.target.value)} placeholder="e.g., 2-3 business days" />
+                </div>
+                <div>
+                  <Label>Easy Returns</Label>
+                  <Input value={easyReturns} onChange={e => setEasyReturns(e.target.value)} placeholder="e.g., 7 days return policy" />
+                </div>
               </div>
             </div>
 
@@ -1309,13 +1428,13 @@ export function EditProductModal({
                       <div key={network.id} className="space-y-4 rounded border p-4 mb-4">
                         <div className="flex items-end gap-4">
                           <div className="flex-1">
-                            <Label>Network Name</Label>
+                            <Label>Network Type</Label>
                             <Input
-                              value={network.networkName}
+                              value={network.networkType}
                               onChange={e =>
-                                updateNetwork(network.id, 'networkName', e.target.value)
+                                updateNetwork(network.id, 'networkType', e.target.value)
                               }
-                              placeholder="e.g., Retail Partner A"
+                              placeholder="e.g., WiFi+ Cellular, WiFi Only"
                             />
                           </div>
                           <div className="flex items-center gap-2">
@@ -1723,6 +1842,24 @@ export function EditProductModal({
                               }
                               placeholder="e.g., North Region"
                             />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Checkbox
+                              id={`region-default-${region.id}`}
+                              checked={region.isDefault}
+                              onCheckedChange={(checked) => {
+                                setRegions(prev =>
+                                  prev.map(r =>
+                                    r.id === region.id
+                                      ? { ...r, isDefault: !!checked }
+                                      : { ...r, isDefault: false }
+                                  )
+                                );
+                              }}
+                            />
+                            <Label htmlFor={`region-default-${region.id}`} className="text-sm cursor-pointer">
+                              Default Region
+                            </Label>
                           </div>
                           <Button
                             type="button"

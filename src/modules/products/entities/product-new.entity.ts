@@ -76,6 +76,15 @@ export class Product {
   @Column({ default: false })
   isEmi: boolean;
 
+  @Column({ default: false })
+  isCare: boolean;
+
+  @Column({ nullable: true })
+  delivery?: string;
+
+  @Column({ nullable: true })
+  easyReturns?: string;
+
   @Column({ default: 0 })
   rewardPoints: number;
 

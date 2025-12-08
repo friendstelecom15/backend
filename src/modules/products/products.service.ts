@@ -113,6 +113,7 @@ export class ProductService {
           color.regularPrice = c.regularPrice ?? c.singlePrice;
           color.discountPrice = c.discountPrice ?? c.singleDiscountPrice;
           color.stockQuantity = c.stockQuantity ?? c.singleStockQuantity;
+          color.isDefault = c.isDefault ?? false;
           
           color.displayOrder = c.displayOrder ?? 0;
           
@@ -124,6 +125,7 @@ export class ProductService {
               const storage = new ProductStorage();
               storage.colorId = savedColor.id;
               storage.storageSize = s.storageSize;
+              storage.isDefault = s.isDefault ?? false;
               storage.displayOrder = s.displayOrder ?? 0;
               
               const savedStorage = await queryRunner.manager.save(ProductStorage, storage);
@@ -229,7 +231,14 @@ export class ProductService {
         for (const n of createProductDto.networks) {
           const network = new ProductNetwork();
           network.productId = savedProduct.id;
-          network.networkType = n.networkName || n.name; // Handle both naming conventions
+          // Handle multiple field name variations from frontend
+          network.networkType = n.networkName || n.name || (n as any).networkType || '';
+          
+          // Validate networkType is not empty
+          if (!network.networkType || network.networkType.trim() === '') {
+            throw new BadRequestException('Network type/name is required');
+          }
+          
           network.priceAdjustment = n.priceAdjustment;
           network.isDefault = n.isDefault ?? false;
           network.displayOrder = n.displayOrder ?? 0;
@@ -242,6 +251,7 @@ export class ProductService {
               const storage = new ProductStorage();
               storage.networkId = savedNetwork.id; // Linked to network directly
               storage.storageSize = ds.storageSize;
+              storage.isDefault = ds.isDefault ?? false;
               storage.displayOrder = ds.displayOrder ?? 0;
               
               const savedStorage = await queryRunner.manager.save(ProductStorage, storage);
@@ -275,6 +285,7 @@ export class ProductService {
               color.regularPrice = c.regularPrice;
               color.discountPrice = c.discountPrice;
               color.stockQuantity = c.stockQuantity;
+              color.isDefault = c.isDefault ?? false;
               
               color.displayOrder = c.displayOrder ?? 0;
 
@@ -286,6 +297,7 @@ export class ProductService {
                   const storage = new ProductStorage();
                   storage.colorId = savedColor.id;
                   storage.storageSize = s.storageSize;
+                  storage.isDefault = s.isDefault ?? false;
                   storage.displayOrder = s.displayOrder ?? 0;
                   
                   const savedStorage = await queryRunner.manager.save(ProductStorage, storage);
@@ -392,7 +404,14 @@ export class ProductService {
         for (const r of createProductDto.regions) {
           const region = new ProductRegion();
           region.productId = savedProduct.id;
-          region.regionName = r.regionName || r.name;
+          // Handle multiple field name variations from frontend
+          region.regionName = r.regionName || r.name || (r as any).region || '';
+          
+          // Validate regionName is not empty
+          if (!region.regionName || region.regionName.trim() === '') {
+            throw new BadRequestException('Region name is required');
+          }
+          
           region.isDefault = r.isDefault ?? false;
           region.displayOrder = r.displayOrder ?? 0;
 
@@ -406,6 +425,7 @@ export class ProductService {
               const storage = new ProductStorage();
               storage.regionId = savedRegion.id;
               storage.storageSize = ds.storageSize;
+              storage.isDefault = ds.isDefault ?? false;
               storage.displayOrder = ds.displayOrder ?? 0;
               
               const savedStorage = await queryRunner.manager.save(ProductStorage, storage);
@@ -439,6 +459,7 @@ export class ProductService {
               color.regularPrice = c.regularPrice ?? c.singlePrice;
               color.discountPrice = c.discountPrice ?? c.singleDiscountPrice;
               color.stockQuantity = c.stockQuantity ?? c.singleStockQuantity;
+              color.isDefault = c.isDefault ?? false;
               
               color.displayOrder = c.displayOrder ?? 0;
 
@@ -450,6 +471,7 @@ export class ProductService {
                   const storage = new ProductStorage();
                   storage.colorId = savedColor.id;
                   storage.storageSize = s.storageSize;
+                  storage.isDefault = s.isDefault ?? false;
                   storage.displayOrder = s.displayOrder ?? 0;
                   
                   const savedStorage = await queryRunner.manager.save(ProductStorage, storage);
@@ -463,6 +485,770 @@ export class ProductService {
                   price.stockQuantity = s.stockQuantity ?? 0;
                   price.lowStockAlert = s.lowStockAlert ?? 0;
                   
+                  await queryRunner.manager.save(ProductPrice, price);
+                }
+              }
+            }
+          }
+        }
+      }
+
+      await queryRunner.commitTransaction();
+      return this.findOne(savedProduct.slug);
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      if (err.code === 11000) {
+        throw new BadRequestException(this.extractDuplicateField(err));
+      }
+      throw new InternalServerErrorException(err.message);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  /**
+   * Update Basic Product
+   */
+  async updateBasicProduct(id: string, updateProductDto: CreateBasicProductDto) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // 1. Find existing product
+      const product = await this.productRepository.findOne({
+        where: { _id: new ObjectId(id) } as any,
+      });
+
+      if (!product) {
+        throw new NotFoundException('Product not found');
+      }
+
+      if (product.productType !== 'basic') {
+        throw new BadRequestException('Product is not a basic product');
+      }
+
+      // 2. Update Product
+      Object.assign(product, updateProductDto);
+      product.productType = 'basic';
+
+      // Handle multiple categories and brands
+      if ((updateProductDto as any).categoryIds) {
+        product.categoryIds = (updateProductDto as any).categoryIds.map((id: string) => new ObjectId(id));
+      }
+      if ((updateProductDto as any).brandIds) {
+        product.brandIds = (updateProductDto as any).brandIds.map((id: string) => new ObjectId(id));
+      }
+
+      delete (product as any).colors;
+      delete (product as any).images;
+      delete (product as any).videos;
+      delete (product as any).specifications;
+
+      const savedProduct = await queryRunner.manager.save(Product, product);
+
+      // 3. Delete existing related data
+      await queryRunner.manager.delete(ProductImage, { productId: new ObjectId(id) });
+      await queryRunner.manager.delete(ProductVideo, { productId: new ObjectId(id) });
+      // Use deleteMany for MongoDB to ensure all specs are deleted
+      await queryRunner.manager.getMongoRepository(ProductSpecification).deleteMany({ 
+        productId: new ObjectId(id) 
+      });
+
+      // Load and preserve existing color images before deletion
+      const existingColors = await queryRunner.manager.find(ProductColor, {
+        where: { productId: new ObjectId(id) } as any,
+      });
+      
+      // Create a map of existing color images by color name
+      const existingColorImages = new Map<string, string>();
+      existingColors.forEach(color => {
+        if (color.colorImage) {
+          existingColorImages.set(color.colorName.toLowerCase().trim(), color.colorImage);
+        }
+      });
+
+      // Delete existing colors and their related data (MongoDB-specific)
+      for (const color of existingColors) {
+        const colorObjectId = new ObjectId(color.id);
+        
+        const existingStorages = await queryRunner.manager.find(ProductStorage, {
+          where: { colorId: colorObjectId } as any,
+        });
+        
+        for (const storage of existingStorages) {
+          const storageObjectId = new ObjectId(storage.id);
+          await queryRunner.manager.getMongoRepository(ProductPrice).deleteMany({ 
+            storageId: storageObjectId 
+          });
+        }
+        
+        await queryRunner.manager.getMongoRepository(ProductStorage).deleteMany({ 
+          colorId: colorObjectId 
+        });
+      }
+
+      await queryRunner.manager.getMongoRepository(ProductColor).deleteMany({ 
+        productId: new ObjectId(id) 
+      });
+
+      // 4. Save new Images
+      if ((updateProductDto as any).images) {
+        const images = (updateProductDto as any).images.map((img: any) => {
+          const image = new ProductImage();
+          image.productId = savedProduct.id;
+          image.imageUrl = img.url;
+          image.isThumbnail = img.isThumbnail;
+          image.altText = img.altText;
+          image.displayOrder = img.displayOrder;
+          return image;
+        });
+        await queryRunner.manager.save(ProductImage, images);
+      }
+
+      // 5. Save new Videos
+      if ((updateProductDto as any).videos) {
+        const videos = (updateProductDto as any).videos.map((vid: any) => {
+          const video = new ProductVideo();
+          video.productId = savedProduct.id;
+          video.videoUrl = vid.videoUrl;
+          video.videoType = vid.videoType;
+          video.displayOrder = vid.displayOrder;
+          return video;
+        });
+        await queryRunner.manager.save(ProductVideo, videos);
+      }
+
+      // 6. Save new Specifications
+      if ((updateProductDto as any).specifications) {
+        // Deduplicate specifications by specKey (keep last occurrence)
+        const specMap = new Map();
+        (updateProductDto as any).specifications.forEach((s: any) => {
+          if (s.specKey && s.specValue) {
+            specMap.set(s.specKey, s);
+          }
+        });
+        
+        const specs = Array.from(specMap.values()).map((s: any, index: number) => {
+          const spec = new ProductSpecification();
+          spec.productId = savedProduct.id;
+          spec.specKey = s.specKey;
+          spec.specValue = s.specValue;
+          spec.displayOrder = s.displayOrder ?? index;
+          return spec;
+        });
+        
+        if (specs.length > 0) {
+          await queryRunner.manager.save(ProductSpecification, specs);
+        }
+      }
+
+      // 7. Save new Colors
+      if ((updateProductDto as any).colors) {
+        for (const c of (updateProductDto as any).colors) {
+          const color = new ProductColor();
+          color.productId = savedProduct.id;
+          color.colorName = c.colorName;
+          // Preserve existing image if not provided in update
+          const colorKey = c.colorName?.toLowerCase().trim();
+          color.colorImage = c.colorImage || (colorKey ? existingColorImages.get(colorKey) : undefined) || undefined;
+          color.hasStorage = c.hasStorage ?? false;
+          color.singlePrice = c.singlePrice;
+          color.singleComparePrice = c.singleComparePrice;
+          color.singleStockQuantity = c.singleStockQuantity;
+          color.regularPrice = c.regularPrice ?? c.singlePrice;
+          color.discountPrice = c.discountPrice ?? c.singleDiscountPrice;
+          color.stockQuantity = c.stockQuantity ?? c.singleStockQuantity;
+          color.isDefault = c.isDefault ?? false;
+          color.displayOrder = c.displayOrder ?? 0;
+
+          const savedColor = await queryRunner.manager.save(ProductColor, color);
+
+          // Save Storages for this Color
+          if (c.storages && c.storages.length > 0) {
+            for (const s of c.storages) {
+              const storage = new ProductStorage();
+              storage.colorId = savedColor.id;
+              storage.storageSize = s.storageSize;
+              storage.isDefault = s.isDefault ?? false;
+              storage.displayOrder = s.displayOrder ?? 0;
+
+              const savedStorage = await queryRunner.manager.save(ProductStorage, storage);
+
+              const price = new ProductPrice();
+              price.storageId = savedStorage.id;
+              price.regularPrice = s.regularPrice ?? 0;
+              price.comparePrice = s.comparePrice;
+              price.discountPrice = s.discountPrice;
+              price.discountPercent = s.discountPercent;
+              price.stockQuantity = s.stockQuantity ?? 0;
+              price.lowStockAlert = s.lowStockAlert ?? 0;
+
+              await queryRunner.manager.save(ProductPrice, price);
+            }
+          }
+        }
+      }
+
+      await queryRunner.commitTransaction();
+      return this.findOne(savedProduct.slug);
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      if (err.code === 11000) {
+        throw new BadRequestException(this.extractDuplicateField(err));
+      }
+      throw new InternalServerErrorException(err.message);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  /**
+   * Update Network Product
+   */
+  async updateNetworkProduct(id: string, updateProductDto: CreateNetworkProductDto) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // 1. Find existing product
+      const product = await this.productRepository.findOne({
+        where: { _id: new ObjectId(id) } as any,
+      });
+
+      if (!product) {
+        throw new NotFoundException('Product not found');
+      }
+
+      if (product.productType !== 'network') {
+        throw new BadRequestException('Product is not a network product');
+      }
+
+      // 2. Update Product
+      Object.assign(product, updateProductDto);
+      product.productType = 'network';
+
+      // Handle multiple categories and brands
+      if ((updateProductDto as any).categoryIds) {
+        product.categoryIds = (updateProductDto as any).categoryIds.map((id: string) => new ObjectId(id));
+      }
+      if ((updateProductDto as any).brandIds) {
+        product.brandIds = (updateProductDto as any).brandIds.map((id: string) => new ObjectId(id));
+      }
+
+      delete (product as any).networks;
+      delete (product as any).images;
+      delete (product as any).videos;
+      delete (product as any).specifications;
+
+      const savedProduct = await queryRunner.manager.save(Product, product);
+
+      // 3. Delete existing related data
+      await queryRunner.manager.delete(ProductImage, { productId: new ObjectId(id) });
+      await queryRunner.manager.delete(ProductVideo, { productId: new ObjectId(id) });
+      // Use deleteMany for MongoDB to ensure all specs are deleted
+      await queryRunner.manager.getMongoRepository(ProductSpecification).deleteMany({ 
+        productId: new ObjectId(id) 
+      });
+
+      // Load existing networks and preserve color images
+      const existingNetworks = await queryRunner.manager.find(ProductNetwork, {
+        where: { productId: new ObjectId(id) } as any,
+      });
+
+      // Create a map to store existing color images by network type and color name
+      const existingNetworkColorImages = new Map<string, Map<string, string>>();
+      
+      for (const network of existingNetworks) {
+        const networkColors = await queryRunner.manager.find(ProductColor, {
+          where: { networkId: new ObjectId(network.id) } as any,
+        });
+        
+        const colorImageMap = new Map<string, string>();
+        networkColors.forEach(color => {
+          if (color.colorImage) {
+            colorImageMap.set(color.colorName.toLowerCase().trim(), color.colorImage);
+          }
+        });
+        
+        if (colorImageMap.size > 0) {
+          existingNetworkColorImages.set(network.networkType.toLowerCase().trim(), colorImageMap);
+        }
+      }
+
+      // Delete existing networks and their related data (MongoDB-specific)
+      for (const network of existingNetworks) {
+        const networkObjectId = new ObjectId(network.id);
+        
+        // Delete default storages for network
+        const networkStorages = await queryRunner.manager.find(ProductStorage, {
+          where: { networkId: networkObjectId } as any,
+        });
+        
+        for (const storage of networkStorages) {
+          const storageObjectId = new ObjectId(storage.id);
+          await queryRunner.manager.getMongoRepository(ProductPrice).deleteMany({ 
+            storageId: storageObjectId 
+          });
+        }
+        
+        await queryRunner.manager.getMongoRepository(ProductStorage).deleteMany({ 
+          networkId: networkObjectId 
+        });
+
+        // Delete colors and their storages
+        const networkColors = await queryRunner.manager.find(ProductColor, {
+          where: { networkId: networkObjectId } as any,
+        });
+
+        for (const color of networkColors) {
+          const colorObjectId = new ObjectId(color.id);
+          
+          const colorStorages = await queryRunner.manager.find(ProductStorage, {
+            where: { colorId: colorObjectId } as any,
+          });
+          
+          for (const storage of colorStorages) {
+            const storageObjectId = new ObjectId(storage.id);
+            await queryRunner.manager.getMongoRepository(ProductPrice).deleteMany({ 
+              storageId: storageObjectId 
+            });
+          }
+          
+          await queryRunner.manager.getMongoRepository(ProductStorage).deleteMany({ 
+            colorId: colorObjectId 
+          });
+        }
+
+        await queryRunner.manager.getMongoRepository(ProductColor).deleteMany({ 
+          networkId: networkObjectId 
+        });
+      }
+
+      await queryRunner.manager.getMongoRepository(ProductNetwork).deleteMany({ 
+        productId: new ObjectId(id) 
+      });
+
+      // 4. Save new Images, Videos, Specs
+      if ((updateProductDto as any).images) {
+        const images = (updateProductDto as any).images.map((img: any) => {
+          const image = new ProductImage();
+          image.productId = savedProduct.id;
+          image.imageUrl = img.url;
+          image.isThumbnail = img.isThumbnail;
+          image.altText = img.altText;
+          image.displayOrder = img.displayOrder;
+          return image;
+        });
+        await queryRunner.manager.save(ProductImage, images);
+      }
+
+      if ((updateProductDto as any).videos) {
+        const videos = (updateProductDto as any).videos.map((vid: any) => {
+          const video = new ProductVideo();
+          video.productId = savedProduct.id;
+          video.videoUrl = vid.videoUrl;
+          video.videoType = vid.videoType;
+          video.displayOrder = vid.displayOrder;
+          return video;
+        });
+        await queryRunner.manager.save(ProductVideo, videos);
+      }
+
+      if ((updateProductDto as any).specifications) {
+        // Deduplicate specifications by specKey (keep last occurrence)
+        const specMap = new Map();
+        (updateProductDto as any).specifications.forEach((s: any) => {
+          if (s.specKey && s.specValue) {
+            specMap.set(s.specKey, s);
+          }
+        });
+        
+        const specs = Array.from(specMap.values()).map((s: any, index: number) => {
+          const spec = new ProductSpecification();
+          spec.productId = savedProduct.id;
+          spec.specKey = s.specKey;
+          spec.specValue = s.specValue;
+          spec.displayOrder = s.displayOrder ?? index;
+          return spec;
+        });
+        
+        if (specs.length > 0) {
+          await queryRunner.manager.save(ProductSpecification, specs);
+        }
+      }
+
+      // 5. Save new Networks
+      if (updateProductDto.networks) {
+        for (const n of updateProductDto.networks) {
+          const network = new ProductNetwork();
+          network.productId = savedProduct.id;
+          // Handle multiple field name variations from frontend
+          network.networkType = n.networkName || n.name || (n as any).networkType || '';
+          
+          // Validate networkType is not empty
+          if (!network.networkType || network.networkType.trim() === '') {
+            throw new BadRequestException('Network type/name is required');
+          }
+          
+          network.priceAdjustment = n.priceAdjustment;
+          network.isDefault = n.isDefault ?? false;
+          network.displayOrder = n.displayOrder ?? 0;
+
+          const savedNetwork = await queryRunner.manager.save(ProductNetwork, network);
+
+          // Save Default Storages for Network
+          if (n.defaultStorages) {
+            for (const ds of n.defaultStorages) {
+              const storage = new ProductStorage();
+              storage.networkId = savedNetwork.id;
+              storage.storageSize = ds.storageSize;
+              storage.isDefault = ds.isDefault ?? false;
+              storage.displayOrder = ds.displayOrder ?? 0;
+
+              const savedStorage = await queryRunner.manager.save(ProductStorage, storage);
+
+              const price = new ProductPrice();
+              price.storageId = savedStorage.id;
+              price.regularPrice = ds.regularPrice ?? 0;
+              price.comparePrice = ds.comparePrice;
+              price.discountPrice = ds.discountPrice;
+              price.discountPercent = (ds as any).discountPercent;
+              price.stockQuantity = ds.stockQuantity ?? 0;
+              price.lowStockAlert = ds.lowStockAlert ?? 0;
+
+              await queryRunner.manager.save(ProductPrice, price);
+            }
+          }
+
+          // Save Colors for Network
+          if (n.colors) {
+            for (const c of n.colors) {
+              const color = new ProductColor();
+              color.networkId = savedNetwork.id;
+              color.colorName = c.colorName;
+              // Preserve existing image if not provided in update
+              const networkKey = network.networkType.toLowerCase().trim();
+              const colorKey = c.colorName?.toLowerCase().trim();
+              const networkColorMap = existingNetworkColorImages.get(networkKey);
+              color.colorImage = c.colorImage || (networkColorMap && colorKey ? networkColorMap.get(colorKey) : undefined) || undefined;
+              color.hasStorage = (c as any).hasStorage ?? true;
+              color.useDefaultStorages = (c as any).useDefaultStorages ?? true;
+              color.singlePrice = c.regularPrice;
+              color.singleComparePrice = c.comparePrice;
+              color.singleStockQuantity = c.stockQuantity;
+              color.regularPrice = c.regularPrice;
+              color.discountPrice = c.discountPrice;
+              color.stockQuantity = c.stockQuantity;
+              color.isDefault = c.isDefault ?? false;
+              color.displayOrder = c.displayOrder ?? 0;
+
+              const savedColor = await queryRunner.manager.save(ProductColor, color);
+
+              // Save Custom Storages if not using defaults
+              if (c.storages && !color.useDefaultStorages) {
+                for (const s of c.storages) {
+                  const storage = new ProductStorage();
+                  storage.colorId = savedColor.id;
+                  storage.storageSize = s.storageSize;
+                  storage.isDefault = s.isDefault ?? false;
+                  storage.displayOrder = s.displayOrder ?? 0;
+
+                  const savedStorage = await queryRunner.manager.save(ProductStorage, storage);
+
+                  const price = new ProductPrice();
+                  price.storageId = savedStorage.id;
+                  price.regularPrice = s.regularPrice ?? 0;
+                  price.comparePrice = s.comparePrice;
+                  price.discountPrice = s.discountPrice;
+                  price.discountPercent = (s as any).discountPercent;
+                  price.stockQuantity = s.stockQuantity ?? 0;
+                  price.lowStockAlert = s.lowStockAlert ?? 0;
+
+                  await queryRunner.manager.save(ProductPrice, price);
+                }
+              }
+            }
+          }
+        }
+      }
+
+      await queryRunner.commitTransaction();
+      return this.findOne(savedProduct.slug);
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      if (err.code === 11000) {
+        throw new BadRequestException(this.extractDuplicateField(err));
+      }
+      throw new InternalServerErrorException(err.message);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  /**
+   * Update Region Product
+   */
+  async updateRegionProduct(id: string, updateProductDto: CreateRegionProductDto) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // 1. Find existing product
+      const product = await this.productRepository.findOne({
+        where: { _id: new ObjectId(id) } as any,
+      });
+
+      if (!product) {
+        throw new NotFoundException('Product not found');
+      }
+
+      if (product.productType !== 'region') {
+        throw new BadRequestException('Product is not a region product');
+      }
+
+      // 2. Update Product
+      Object.assign(product, updateProductDto);
+      product.productType = 'region';
+
+      // Handle multiple categories and brands
+      if ((updateProductDto as any).categoryIds) {
+        product.categoryIds = (updateProductDto as any).categoryIds.map((id: string) => new ObjectId(id));
+      }
+      if ((updateProductDto as any).brandIds) {
+        product.brandIds = (updateProductDto as any).brandIds.map((id: string) => new ObjectId(id));
+      }
+
+      delete (product as any).regions;
+      delete (product as any).images;
+      delete (product as any).videos;
+      delete (product as any).specifications;
+
+      const savedProduct = await queryRunner.manager.save(Product, product);
+
+      // 3. Delete existing related data
+      await queryRunner.manager.delete(ProductImage, { productId: new ObjectId(id) });
+      await queryRunner.manager.delete(ProductVideo, { productId: new ObjectId(id) });
+      // Use deleteMany for MongoDB to ensure all specs are deleted
+      await queryRunner.manager.getMongoRepository(ProductSpecification).deleteMany({ 
+        productId: new ObjectId(id) 
+      });
+
+      // Load existing regions and preserve color images
+      const existingRegions = await queryRunner.manager.find(ProductRegion, {
+        where: { productId: new ObjectId(id) } as any,
+      });
+
+      // Create a map to store existing color images by region name and color name
+      const existingRegionColorImages = new Map<string, Map<string, string>>();
+      
+      for (const region of existingRegions) {
+        const regionColors = await queryRunner.manager.find(ProductColor, {
+          where: { regionId: new ObjectId(region.id) } as any,
+        });
+        
+        const colorImageMap = new Map<string, string>();
+        regionColors.forEach(color => {
+          if (color.colorImage) {
+            colorImageMap.set(color.colorName.toLowerCase().trim(), color.colorImage);
+          }
+        });
+        
+        if (colorImageMap.size > 0) {
+          existingRegionColorImages.set(region.regionName.toLowerCase().trim(), colorImageMap);
+        }
+      }
+
+      // Delete existing regions and their related data (MongoDB-specific)
+      for (const region of existingRegions) {
+        const regionObjectId = new ObjectId(region.id);
+        
+        // Delete default storages for region
+        const regionStorages = await queryRunner.manager.find(ProductStorage, {
+          where: { regionId: regionObjectId } as any,
+        });
+
+        for (const storage of regionStorages) {
+          const storageObjectId = new ObjectId(storage.id);
+          await queryRunner.manager.getMongoRepository(ProductPrice).deleteMany({ 
+            storageId: storageObjectId 
+          });
+        }
+
+        await queryRunner.manager.getMongoRepository(ProductStorage).deleteMany({ 
+          regionId: regionObjectId 
+        });
+
+        // Delete colors and their storages
+        const regionColors = await queryRunner.manager.find(ProductColor, {
+          where: { regionId: regionObjectId } as any,
+        });
+
+        for (const color of regionColors) {
+          const colorObjectId = new ObjectId(color.id);
+          
+          const colorStorages = await queryRunner.manager.find(ProductStorage, {
+            where: { colorId: colorObjectId } as any,
+          });
+
+          for (const storage of colorStorages) {
+            const storageObjectId = new ObjectId(storage.id);
+            await queryRunner.manager.getMongoRepository(ProductPrice).deleteMany({ 
+              storageId: storageObjectId 
+            });
+          }
+
+          await queryRunner.manager.getMongoRepository(ProductStorage).deleteMany({ 
+            colorId: colorObjectId 
+          });
+        }
+
+        await queryRunner.manager.getMongoRepository(ProductColor).deleteMany({ 
+          regionId: regionObjectId 
+        });
+      }
+
+      await queryRunner.manager.getMongoRepository(ProductRegion).deleteMany({ 
+        productId: new ObjectId(id) 
+      });
+
+      // 4. Save new Images, Videos, Specs
+      if ((updateProductDto as any).images) {
+        const images = (updateProductDto as any).images.map((img: any) => {
+          const image = new ProductImage();
+          image.productId = savedProduct.id;
+          image.imageUrl = img.url;
+          image.isThumbnail = img.isThumbnail;
+          image.altText = img.altText;
+          image.displayOrder = img.displayOrder;
+          return image;
+        });
+        await queryRunner.manager.save(ProductImage, images);
+      }
+
+      if ((updateProductDto as any).videos) {
+        const videos = (updateProductDto as any).videos.map((vid: any) => {
+          const video = new ProductVideo();
+          video.productId = savedProduct.id;
+          video.videoUrl = vid.videoUrl;
+          video.videoType = vid.videoType;
+          video.displayOrder = vid.displayOrder;
+          return video;
+        });
+        await queryRunner.manager.save(ProductVideo, videos);
+      }
+
+      if ((updateProductDto as any).specifications) {
+        // Deduplicate specifications by specKey (keep last occurrence)
+        const specMap = new Map();
+        (updateProductDto as any).specifications.forEach((s: any) => {
+          if (s.specKey && s.specValue) {
+            specMap.set(s.specKey, s);
+          }
+        });
+        
+        const specs = Array.from(specMap.values()).map((s: any, index: number) => {
+          const spec = new ProductSpecification();
+          spec.productId = savedProduct.id;
+          spec.specKey = s.specKey;
+          spec.specValue = s.specValue;
+          spec.displayOrder = s.displayOrder ?? index;
+          return spec;
+        });
+        
+        if (specs.length > 0) {
+          await queryRunner.manager.save(ProductSpecification, specs);
+        }
+      }
+
+      // 5. Save new Regions
+      if (updateProductDto.regions) {
+        for (const r of updateProductDto.regions) {
+          const region = new ProductRegion();
+          region.productId = savedProduct.id;
+          // Handle multiple field name variations from frontend
+          region.regionName = r.regionName || r.name || (r as any).region || '';
+          
+          // Validate regionName is not empty
+          if (!region.regionName || region.regionName.trim() === '') {
+            throw new BadRequestException('Region name is required');
+          }
+          
+          region.isDefault = r.isDefault ?? false;
+          region.displayOrder = r.displayOrder ?? 0;
+
+          const savedRegion = await queryRunner.manager.save(ProductRegion, region);
+
+          // Save Default Storages for Region
+          if ((r as any).defaultStorages) {
+            for (const ds of (r as any).defaultStorages) {
+              const storage = new ProductStorage();
+              storage.regionId = savedRegion.id;
+              storage.storageSize = ds.storageSize;
+              storage.isDefault = ds.isDefault ?? false;
+              storage.displayOrder = ds.displayOrder ?? 0;
+
+              const savedStorage = await queryRunner.manager.save(ProductStorage, storage);
+
+              const price = new ProductPrice();
+              price.storageId = savedStorage.id;
+              price.regularPrice = ds.regularPrice ?? 0;
+              price.comparePrice = ds.comparePrice;
+              price.discountPrice = ds.discountPrice;
+              price.discountPercent = ds.discountPercent;
+              price.stockQuantity = ds.stockQuantity ?? 0;
+              price.lowStockAlert = ds.lowStockAlert ?? 0;
+
+              await queryRunner.manager.save(ProductPrice, price);
+            }
+          }
+
+          // Save Colors for Region
+          if ((r as any).colors) {
+            for (const c of (r as any).colors) {
+              const color = new ProductColor();
+              color.regionId = savedRegion.id;
+              color.colorName = c.colorName;
+              // Preserve existing image if not provided in update
+              const regionKey = region.regionName.toLowerCase().trim();
+              const colorKey = c.colorName?.toLowerCase().trim();
+              const regionColorMap = existingRegionColorImages.get(regionKey);
+              color.colorImage = c.colorImage || (regionColorMap && colorKey ? regionColorMap.get(colorKey) : undefined) || undefined;
+              color.hasStorage = c.hasStorage ?? true;
+              color.useDefaultStorages = c.useDefaultStorages ?? true;
+              color.singlePrice = c.singlePrice;
+              color.singleComparePrice = c.singleComparePrice;
+              color.singleStockQuantity = c.singleStockQuantity;
+              color.regularPrice = c.regularPrice ?? c.singlePrice;
+              color.discountPrice = c.discountPrice ?? c.singleDiscountPrice;
+              color.stockQuantity = c.stockQuantity ?? c.singleStockQuantity;
+              color.isDefault = c.isDefault ?? false;
+              color.displayOrder = c.displayOrder ?? 0;
+
+              const savedColor = await queryRunner.manager.save(ProductColor, color);
+
+              // Save Custom Storages if not using defaults
+              if (c.storages && !color.useDefaultStorages) {
+                for (const s of c.storages) {
+                  const storage = new ProductStorage();
+                  storage.colorId = savedColor.id;
+                  storage.storageSize = s.storageSize;
+                  storage.isDefault = s.isDefault ?? false;
+                  storage.displayOrder = s.displayOrder ?? 0;
+
+                  const savedStorage = await queryRunner.manager.save(ProductStorage, storage);
+
+                  const price = new ProductPrice();
+                  price.storageId = savedStorage.id;
+                  price.regularPrice = s.regularPrice ?? 0;
+                  price.comparePrice = s.comparePrice;
+                  price.discountPrice = s.discountPrice;
+                  price.discountPercent = s.discountPercent;
+                  price.stockQuantity = s.stockQuantity ?? 0;
+                  price.lowStockAlert = s.lowStockAlert ?? 0;
+
                   await queryRunner.manager.save(ProductPrice, price);
                 }
               }
@@ -1061,6 +1847,7 @@ async findAll(filters?: {
         name: color.colorName,
         image: color.colorImage,
         hasStorage: color.hasStorage,
+        isDefault: color.isDefault,
         singlePrice: color.singlePrice,
         singleComparePrice: color.singleComparePrice,
         singleDiscountPercent: color.singleDiscountPercent,
@@ -1077,6 +1864,7 @@ async findAll(filters?: {
           ? color.storages?.map((storage) => ({
               id: storage.id,
               size: storage.storageSize,
+              isDefault: storage.isDefault,
               price: {
                 regular: storage.price?.regularPrice,
                 compare: storage.price?.comparePrice,
@@ -1102,6 +1890,7 @@ async findAll(filters?: {
         defaultStorages: network.defaultStorages?.map((storage: any) => ({
           id: storage.id,
           size: storage.storageSize,
+          isDefault: storage.isDefault,
           price: {
             regular: storage.price?.regularPrice,
             compare: storage.price?.comparePrice,
@@ -1122,6 +1911,7 @@ async findAll(filters?: {
           name: color.colorName,
           image: color.colorImage,
           hasStorage: color.hasStorage,
+          isDefault: color.isDefault,
           singlePrice: color.singlePrice,
           singleComparePrice: color.singleComparePrice,
           singleStockQuantity: color.singleStockQuantity,
@@ -1135,6 +1925,7 @@ async findAll(filters?: {
             ? color.storages?.map((storage: any) => ({
                 id: storage.id,
                 size: storage.storageSize,
+                isDefault: storage.isDefault,
                 price: {
                   regular: storage.price?.regularPrice,
                   compare: storage.price?.comparePrice,
@@ -1160,6 +1951,7 @@ async findAll(filters?: {
         defaultStorages: region.defaultStorages?.map((storage: any) => ({
           id: storage.id,
           size: storage.storageSize,
+          isDefault: storage.isDefault,
           price: {
             regular: storage.price?.regularPrice,
             compare: storage.price?.comparePrice,
@@ -1181,6 +1973,7 @@ async findAll(filters?: {
           image: color.colorImage,
           hasStorage: color.hasStorage,
           useDefaultStorages: color.useDefaultStorages,
+          isDefault: color.isDefault,
           singlePrice: color.singlePrice,
           singleComparePrice: color.singleComparePrice,
           singleStockQuantity: color.singleStockQuantity,
@@ -1196,6 +1989,7 @@ async findAll(filters?: {
               ? color.storages?.map((storage: any) => ({
                   id: storage.id,
                   size: storage.storageSize,
+                  isDefault: storage.isDefault,
                   price: {
                     regular: storage.price?.regularPrice,
                     compare: storage.price?.comparePrice,

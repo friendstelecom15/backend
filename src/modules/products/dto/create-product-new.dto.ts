@@ -201,6 +201,11 @@ export class NetworkStorageDto {
   @IsString()
   storageSize: string;
 
+  @ApiPropertyOptional({ description: 'Is this the default storage?', example: false })
+  @IsOptional()
+  @IsBoolean()
+  isDefault?: boolean;
+
   @ApiPropertyOptional({ description: 'Display order', example: 1 })
   @IsOptional()
   @IsNumber()
@@ -271,6 +276,11 @@ export class NetworkColorDto {
   @IsNumber()
   @Min(1)
   lowStockAlert?: number;
+
+  @ApiPropertyOptional({ description: 'Is this the default color?', example: false })
+  @IsOptional()
+  @IsBoolean()
+  isDefault?: boolean;
 
   @ApiPropertyOptional({ description: 'Display order', example: 1 })
   @IsOptional()
@@ -584,6 +594,11 @@ export class CreateProductStorageDto {
   @IsString()
   storageSize: string;
 
+  @ApiPropertyOptional({ description: 'Is this the default storage?', example: false })
+  @IsOptional()
+  @IsBoolean()
+  isDefault?: boolean;
+
   @ApiPropertyOptional({ description: 'Display order', example: 1 })
   @IsOptional()
   @IsNumber()
@@ -655,6 +670,11 @@ export class CreateProductColorDto {
   @IsOptional()
   @IsNumber()
   lowStockAlert?: number;
+
+  @ApiPropertyOptional({ description: 'Is this the default color?', example: false })
+  @IsOptional()
+  @IsBoolean()
+  isDefault?: boolean;
 
   @ApiPropertyOptional({ description: 'Display order', example: 1 })
   @IsOptional()

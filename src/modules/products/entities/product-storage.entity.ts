@@ -48,6 +48,9 @@ export class ProductStorage {
   @Column()
   storageSize: string;
 
+  @Column({ default: false })
+  isDefault: boolean; // true = this storage will be shown by default in UI
+
   @Column({ default: 0 })
   displayOrder: number;
 

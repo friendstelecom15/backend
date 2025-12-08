@@ -119,6 +119,90 @@ export class ProductsController {
     return this.productsService.createRegionProduct(processedDto);
   }
 
+  @Patch('basic/:id')
+  // @UseGuards(JwtAuthGuard, RolesGuard)
+  // @Roles('admin', 'management')
+  // @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Update basic product',
+    description: 'Update an existing basic product with variants, pricing, images, and specs',
+  })
+  @ApiResponse({ status: 200, description: 'Product updated successfully' })
+  @ApiResponse({ status: 404, description: 'Product not found' })
+  @FileFieldsUpload(
+    [
+      { name: 'thumbnail', maxCount: 1 },
+      { name: 'galleryImages', maxCount: 20 },
+      ...Array.from({ length: 20 }, (_, i) => ({ name: `colors[${i}][colorImage]`, maxCount: 1 })),
+    ],
+    undefined,
+    UploadType.IMAGE,
+  )
+  async updateBasic(
+    @Param('id') id: string,
+    @Body() updateProductDto: CreateBasicProductDto,
+    @UploadedFiles() files: any,
+  ) {
+    const processedDto = await this.processFileUploads(updateProductDto, files);
+    return this.productsService.updateBasicProduct(id, processedDto);
+  }
+
+  @Patch('network/:id')
+  // @UseGuards(JwtAuthGuard, RolesGuard)
+  // @Roles('admin', 'management')
+  // @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Update network-based product',
+    description: 'Update an existing network-based product',
+  })
+  @ApiResponse({ status: 200, description: 'Product updated successfully' })
+  @ApiResponse({ status: 404, description: 'Product not found' })
+  @FileFieldsUpload(
+    [
+      { name: 'thumbnail', maxCount: 1 },
+      { name: 'galleryImages', maxCount: 20 },
+      { name: 'colors', maxCount: 20 },
+    ],
+    undefined,
+    UploadType.IMAGE,
+  )
+  async updateNetwork(
+    @Param('id') id: string,
+    @Body() updateProductDto: CreateNetworkProductDto,
+    @UploadedFiles() files: any,
+  ) {
+    const processedDto = await this.processFileUploads(updateProductDto, files);
+    return this.productsService.updateNetworkProduct(id, processedDto);
+  }
+
+  @Patch('region/:id')
+  // @UseGuards(JwtAuthGuard, RolesGuard)
+  // @Roles('admin', 'management')
+  // @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Update region-based product',
+    description: 'Update an existing region-based product',
+  })
+  @ApiResponse({ status: 200, description: 'Product updated successfully' })
+  @ApiResponse({ status: 404, description: 'Product not found' })
+  @FileFieldsUpload(
+    [
+      { name: 'thumbnail', maxCount: 1 },
+      { name: 'galleryImages', maxCount: 20 },
+      { name: 'colors', maxCount: 20 },
+    ],
+    undefined,
+    UploadType.IMAGE,
+  )
+  async updateRegion(
+    @Param('id') id: string,
+    @Body() updateProductDto: CreateRegionProductDto,
+    @UploadedFiles() files: any,
+  ) {
+    const processedDto = await this.processFileUploads(updateProductDto, files);
+    return this.productsService.updateRegionProduct(id, processedDto);
+  }
+
   /**
    * Helper to process file uploads and JSON parsing
    */

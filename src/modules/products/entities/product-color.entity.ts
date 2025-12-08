@@ -87,6 +87,9 @@ export class ProductColor {
   @Column({ type: 'simple-array', nullable: true })
   features?: string[]; // Color-specific features
 
+  @Column({ default: false })
+  isDefault: boolean; // true = this color's price will be shown by default in UI
+
   @Column({ default: 0 })
   displayOrder: number;
 

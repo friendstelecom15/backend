@@ -26,12 +26,40 @@ export class EmiService {
   }
 
   async getAllEmis() {
-    return this.emiRepository.find({ relations: ['bank'] });
+    const emis = await this.emiRepository.find();
+    const result: any[] = [];
+    for (const emi of emis) {
+      let bankName: string = '';
+      if (emi.bankId) {
+        let bankObjectId;
+        try {
+          bankObjectId = new ObjectId(emi.bankId);
+        } catch {
+          bankObjectId = emi.bankId;
+        }
+        const bank = await this.bankRepository.findOne({ where: { _id: bankObjectId } } as any);
+        bankName = bank?.bankname || '';
+      }
+      result.push({
+        ...emi,
+        bankName,
+      });
+    }
+    return result;
   }
 
   async getEmi(id: string) {
     const _id = typeof id === 'string' ? new ObjectId(id) : id;
-    return this.emiRepository.findOne({ where: { _id }, relations: ['bank'] } as any);
+    const emi = await this.emiRepository.findOne({ where: { _id } } as any);
+    let bankName: string = '';
+    if (emi?.bankId) {
+      const bank = await this.bankRepository.findOne({ where: { _id: emi.bankId } } as any);
+      bankName = bank?.bankname || '';
+    }
+    return {
+      ...emi,
+      bankName,
+    };
   }
 
   async removeEmi(id: string) {

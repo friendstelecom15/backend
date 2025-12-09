@@ -9,6 +9,7 @@ import {
 } from './dto/category.dto';
 import { Category } from './entities/category.entity';
 import { Subcategory } from './entities/subcategory.entity';
+import { Product } from '../products/entities/product-new.entity';
 import { ObjectId } from 'mongodb';
 
 @Injectable()
@@ -19,6 +20,8 @@ export class CategoriesService {
     private readonly categoryRepository: Repository<Category>,
     @InjectRepository(Subcategory)
     private readonly subcategoryRepository: Repository<Subcategory>,
+    @InjectRepository(Product)
+    private readonly productRepository: Repository<Product>,
   ) {}
 
   async getById(id: string): Promise<Category | null> {
@@ -81,8 +84,17 @@ export class CategoriesService {
   async findProducts(slug: string, filters?: CategoryFilterDto) {
     const category = await this.categoryRepository.findOne({ where: { slug } });
     if (!category) throw new NotFoundException('Category not found');
-    // Product lookup should be handled in ProductService
-    return [];
+    // Find products where categoryId or categoryIds contains category._id
+    const query: any = [
+      { categoryId: category.id },
+      { categoryIds: { $in: [category.id] } },
+    ];
+    // Merge filters if provided
+    let filterQuery: any = { $or: query };
+    if (filters) {
+      Object.assign(filterQuery, filters);
+    }
+    return this.productRepository.find({ where: filterQuery });
   }
 
 

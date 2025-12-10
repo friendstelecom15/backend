@@ -1,3 +1,4 @@
+// ...existing imports...
 import {
   Injectable,
   NotFoundException,
@@ -27,6 +28,7 @@ import { Brand } from '../brands/entities/brand.entity';
 
 @Injectable()
 export class ProductService {
+    
   constructor(
     @InjectRepository(Product)
     private readonly productRepository: Repository<Product>,
@@ -38,6 +40,29 @@ export class ProductService {
   /**
    * Create Basic Product
    */
+
+  async findByIds(ids: string[]): Promise<any[]> {
+    if (!ids || ids.length === 0) return [];
+    // Debug: Log input IDs
+    console.log('[findByIds] Input IDs:', ids);
+    const objectIds = ids.map(id => id.length === 24 ? new ObjectId(id) : id);
+    // Debug: Log converted ObjectIds
+    console.log('[findByIds] Converted ObjectIds:', objectIds);
+    // Query by '_id' for MongoDB using $in operator for compatibility
+    let products = await this.productRepository.find({ where: { _id: { $in: objectIds } } } as any);
+    // Debug: Log number of products found
+    console.log('[findByIds] Products found:', products.length);
+    // Load relations for each product
+    products = await Promise.all(
+      products.map(async (product) => {
+        await this.loadProductRelations(product);
+        return product;
+      })
+    );
+    return products;
+    }
+
+    
   async createBasicProduct(createProductDto: CreateBasicProductDto) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();

@@ -3,12 +3,14 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { HomeCategory } from './entities/homecategory.entity';
 import { ObjectId } from 'mongodb';
+import { ProductService } from '../products/products.service';
 
 @Injectable()
 export class HomecategoryService {
   constructor(
     @InjectRepository(HomeCategory)
     private readonly homeCategoryRepository: Repository<HomeCategory>,
+    private readonly productService: ProductService,
   ) { }
 
   // Create a new HomeCategory
@@ -32,7 +34,15 @@ export class HomecategoryService {
   // Get all HomeCategories (relations are manual, so just return the entity)
   async findAll() {
     const all = await this.homeCategoryRepository.find({ order: { priority: 'ASC' } });
-    return all.map(hc => ({ ...hc, id: String(hc.id) }));
+    return Promise.all(
+      all.map(async hc => {
+        let products: any[] = [];
+        if (hc.productIds && hc.productIds.length > 0) {
+          products = await this.productService.findByIds(hc.productIds);
+        }
+        return { ...hc, id: String(hc.id), products };
+      })
+    );
   }
 
 

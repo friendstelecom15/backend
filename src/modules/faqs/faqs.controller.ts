@@ -84,4 +84,14 @@ export class FaqsController {
   remove(@Param('id') id: string) {
     return this.faqsService.remove(id);
   }
+
+   @Get('product/:productId')
+  @ApiOperation({ summary: 'Get all FAQs for a specific product' })
+  async findByProduct(@Param('productId') productId: string) {
+    const faqs = await this.faqsService.findByProduct(productId);
+    return faqs.map(faq => ({
+      ...faq,
+      id: faq.id?.toString?.() ?? String(faq.id),
+    }));
+  }
 }

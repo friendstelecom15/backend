@@ -70,7 +70,7 @@ export class FaqsService {
 
   async findByProduct(productId: string) {
     return this.faqRepository.find({
-      where: { productIds: In([productId]) },
+      where: { productIds: productId },
       order: { createdAt: 'DESC' },
     });
   }

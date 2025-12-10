@@ -1623,8 +1623,7 @@ export class ProductService {
     }
 
     await this.loadProductRelations(product);
-
-    return this.formatProductResponse(product);
+    return product;
   }
 
   /**

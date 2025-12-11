@@ -72,6 +72,10 @@ export class ProductService {
       // 1. Create Product
       const product = new Product();
       Object.assign(product, createProductDto);
+      // Ensure ratingPoint is set if provided
+      if (typeof createProductDto.ratingPoint !== 'undefined') {
+        product.ratingPoint = createProductDto.ratingPoint;
+      }
       product.productType = 'basic';
 
       // Handle multiple categories and brands
@@ -213,6 +217,10 @@ export class ProductService {
       // 1. Create Product
       const product = new Product();
       Object.assign(product, createProductDto);
+      // Ensure ratingPoint is set if provided
+      if (typeof createProductDto.ratingPoint !== 'undefined') {
+        product.ratingPoint = createProductDto.ratingPoint;
+      }
       product.productType = 'network';
 
       // Handle multiple categories and brands
@@ -403,6 +411,10 @@ export class ProductService {
       // 1. Create Product
       const product = new Product();
       Object.assign(product, createProductDto);
+      // Ensure ratingPoint is set if provided
+      if (typeof createProductDto.ratingPoint !== 'undefined') {
+        product.ratingPoint = createProductDto.ratingPoint;
+      }
       product.productType = 'region';
 
       // Handle multiple categories and brands
@@ -608,6 +620,10 @@ export class ProductService {
 
       // 2. Update Product
       Object.assign(product, updateProductDto);
+      // Ensure ratingPoint is set if provided
+      if (typeof updateProductDto.ratingPoint !== 'undefined') {
+        product.ratingPoint = updateProductDto.ratingPoint;
+      }
       product.productType = 'basic';
 
       // Handle multiple categories and brands
@@ -839,6 +855,10 @@ export class ProductService {
 
       // 2. Update Product
       Object.assign(product, updateProductDto);
+      // Ensure ratingPoint is set if provided
+      if (typeof updateProductDto.ratingPoint !== 'undefined') {
+        product.ratingPoint = updateProductDto.ratingPoint;
+      }
       product.productType = 'network';
 
       // Handle multiple categories and brands
@@ -1171,6 +1191,10 @@ export class ProductService {
 
       // 2. Update Product
       Object.assign(product, updateProductDto);
+      // Ensure ratingPoint is set if provided
+      if (typeof updateProductDto.ratingPoint !== 'undefined') {
+        product.ratingPoint = updateProductDto.ratingPoint;
+      }
       product.productType = 'region';
 
       // Handle multiple categories and brands
@@ -1474,7 +1498,7 @@ export class ProductService {
   }
 
   async findAll(filters?: {
-    categoryId?: string;
+    categoryIds?: string;
     brandId?: string;
     isActive?: boolean;
     isOnline?: boolean;
@@ -1488,8 +1512,8 @@ export class ProductService {
   }) {
     const whereConditions: any = {};
 
-    if (filters?.categoryId) {
-      whereConditions.categoryId = new ObjectId(filters.categoryId);
+    if (filters?.categoryIds) {
+      whereConditions.categoryIds = new ObjectId(filters.categoryIds);
     }
     if (filters?.brandId) {
       whereConditions.brandId = new ObjectId(filters.brandId);

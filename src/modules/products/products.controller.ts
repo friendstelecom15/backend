@@ -342,7 +342,7 @@ export class ProductsController {
 
 @Get()
 @ApiOperation({ summary: 'Get all products with filters and pagination' })
-@ApiQuery({ name: 'categoryId', required: false, type: String })
+@ApiQuery({ name: 'categoryIds', required: false, type: String })
 @ApiQuery({ name: 'brandId', required: false, type: String })
 @ApiQuery({ name: 'isActive', required: false, type: Boolean })
 @ApiQuery({ name: 'isOnline', required: false, type: Boolean })
@@ -358,7 +358,7 @@ export class ProductsController {
   description: 'List of products',
 })
 findAll(
-  @Query('categoryId') categoryId?: string,
+  @Query('categoryIds') categoryIds?: string,
   @Query('brandId') brandId?: string,
   @Query('isActive') isActive?: boolean,
   @Query('isOnline') isOnline?: boolean,
@@ -371,7 +371,7 @@ findAll(
   @Query('fields') fields?: string,
 ) {
   return this.productsService.findAll({
-    categoryId,
+    categoryIds,
     brandId,
     isActive,
     isOnline,

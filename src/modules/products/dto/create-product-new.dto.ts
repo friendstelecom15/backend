@@ -128,11 +128,18 @@ export class CreateBasicProductDto {
   @IsBoolean()
   isEmi?: boolean;
 
+
   @ApiPropertyOptional({ description: 'Reward points', example: 1500 })
   @IsOptional()
   @IsNumber()
   @Min(0)
   rewardPoints?: number;
+
+  @ApiPropertyOptional({ description: 'Product rating point', example: 4.5 })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  ratingPoint?: number;
 
   @ApiPropertyOptional({
     description: 'Minimum booking price for pre-order',
@@ -603,11 +610,18 @@ export class UpdateProductNewDto extends PartialType(CreateBasicProductDto) {
   @IsBoolean()
   isEmi?: boolean;
 
+
   @ApiPropertyOptional({ description: 'Reward points', example: 1500 })
   @IsOptional()
   @IsNumber()
   @Min(0)
   rewardPoints?: number;
+
+  @ApiPropertyOptional({ description: 'Product rating point', example: 4.5 })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  ratingPoint?: number;
 
   @ApiPropertyOptional({
     description: 'Minimum booking price for pre-order',

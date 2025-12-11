@@ -25,7 +25,7 @@ export class Product {
   @Column()
   name: string;
 
-  @Column({ unique: true })
+  @Column({ unique: true, nullable: true })
   slug: string;
 
   @Column({ nullable: true })
@@ -85,8 +85,12 @@ export class Product {
   @Column({ nullable: true })
   easyReturns?: string;
 
+
   @Column({ default: 0 })
   rewardPoints: number;
+
+  @Column({ default: 0, nullable: true })
+  ratingPoint?: number;
 
   @Column({ default: 0 })
   minBookingPrice: number;

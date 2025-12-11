@@ -62,6 +62,28 @@ export class ProductService {
     return products;
     }
 
+    //product find by brandids
+    async findByBrandIds(brandIds: string[]): Promise<any[]> {
+      console.log('[findByBrandIds] Incoming brandIds:', brandIds);
+      if (!brandIds || brandIds.length === 0) return [];
+      const objectBrandIds = brandIds.map(id => id.length === 24 ? new ObjectId(id) : id);
+
+      // Use native MongoDB query for reliability
+      const mongoRepo = this.productRepository.manager.getMongoRepository(Product);
+   const query = { brandIds: { $in: objectBrandIds } };
+      console.log('[findByBrandIds] MongoDB Query:', JSON.stringify(query));
+      let products = await mongoRepo.find({ where: query });
+      console.log('[findByBrandIds] Products found:', products.length);
+
+      products = await Promise.all(
+        products.map(async (product) => {
+          await this.loadProductRelations(product);
+          return product;
+        })
+      );
+      return products;
+    }
+    
     
   async createBasicProduct(createProductDto: CreateBasicProductDto) {
     const queryRunner = this.dataSource.createQueryRunner();
@@ -1093,26 +1115,18 @@ export class ProductService {
               const color = new ProductColor();
               color.networkId = savedNetwork.id;
               color.colorName = c.colorName;
-              // Preserve existing image if not provided in update
-              const networkKey = network.networkType.toLowerCase().trim();
-              const colorKey = c.colorName?.toLowerCase().trim();
-              const networkColorMap =
-                existingNetworkColorImages.get(networkKey);
-              color.colorImage =
-                c.colorImage ||
-                (networkColorMap && colorKey
-                  ? networkColorMap.get(colorKey)
-                  : undefined) ||
-                undefined;
+              color.colorImage = c.colorImage;
               color.hasStorage = (c as any).hasStorage ?? true;
               color.useDefaultStorages = (c as any).useDefaultStorages ?? true;
               color.singlePrice = c.regularPrice;
               color.singleComparePrice = c.comparePrice;
               color.singleStockQuantity = c.stockQuantity;
+              // Map new fields
               color.regularPrice = c.regularPrice;
               color.discountPrice = c.discountPrice;
               color.stockQuantity = c.stockQuantity;
               color.isDefault = c.isDefault ?? false;
+
               color.displayOrder = c.displayOrder ?? 0;
 
               const savedColor = await queryRunner.manager.save(
@@ -1427,25 +1441,18 @@ export class ProductService {
               const color = new ProductColor();
               color.regionId = savedRegion.id;
               color.colorName = c.colorName;
-              // Preserve existing image if not provided in update
-              const regionKey = region.regionName.toLowerCase().trim();
-              const colorKey = c.colorName?.toLowerCase().trim();
-              const regionColorMap = existingRegionColorImages.get(regionKey);
-              color.colorImage =
-                c.colorImage ||
-                (regionColorMap && colorKey
-                  ? regionColorMap.get(colorKey)
-                  : undefined) ||
-                undefined;
+              color.colorImage = c.colorImage;
               color.hasStorage = c.hasStorage ?? true;
               color.useDefaultStorages = c.useDefaultStorages ?? true;
               color.singlePrice = c.singlePrice;
-              color.singleComparePrice = c.singleComparePrice;
+              color.singleComparePrice = c.comparePrice;
               color.singleStockQuantity = c.singleStockQuantity;
+              // Map new fields
               color.regularPrice = c.regularPrice ?? c.singlePrice;
               color.discountPrice = c.discountPrice ?? c.singleDiscountPrice;
               color.stockQuantity = c.stockQuantity ?? c.singleStockQuantity;
               color.isDefault = c.isDefault ?? false;
+
               color.displayOrder = c.displayOrder ?? 0;
 
               const savedColor = await queryRunner.manager.save(

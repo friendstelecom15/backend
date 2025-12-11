@@ -1,10 +1,11 @@
 
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CreateBrandDto, UpdateBrandDto } from './dto/brand.dto';
 import { Brand } from './entities/brand.entity';
 import { ObjectId } from 'mongodb';
+import { ProductService } from '../products/products.service';
 
 @Injectable()
 export class BrandsService {
@@ -12,7 +13,8 @@ export class BrandsService {
   constructor(
     @InjectRepository(Brand)
     private readonly brandRepository: Repository<Brand>,
-  ) { }
+    private readonly productService: ProductService,
+  ) {}
 
 
  async create(dto: CreateBrandDto) {
@@ -72,12 +74,13 @@ export class BrandsService {
   }
 
 
-  // To implement findProducts, use ProductRepository in controller/service if needed
+  // To implement findProducts, use ProductService to fetch products by brandId
   async findProducts(slug: string) {
     const brand = await this.brandRepository.findOne({ where: { slug } });
     if (!brand) throw new NotFoundException('Brand not found');
-    // Product lookup should be handled in ProductService
-    return [];
+    // Find products by brandId (MongoDB _id)
+    const products = await this.productService.findByBrandIds([brand.id?.toString?.() ?? String(brand.id)]);
+    return products || [];
   }
 
 

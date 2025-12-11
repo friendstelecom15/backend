@@ -8,6 +8,7 @@ import { CategoriesModule } from './modules/categories/categories.module';
 import { BrandsModule } from './modules/brands/brands.module';
 import { ProductsModule } from './modules/products/products.module';
 import { OrdersModule } from './modules/orders/orders.module';
+import { SslCommerzModule } from './modules/sslcommerz/sslcommerz.module';
 import { WarrantyModule } from './modules/warranty/warranty.module';
 import { GiveawaysModule } from './modules/giveaways/giveaways.module';
 import { PoliciesModule } from './modules/policies/policies.module';
@@ -36,6 +37,7 @@ import { EmiModule } from './modules/emi/emi.modul';
     BrandsModule,
     ProductsModule,
     OrdersModule,
+    SslCommerzModule,
     WarrantyModule,
     GiveawaysModule,
     PoliciesModule,

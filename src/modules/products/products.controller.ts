@@ -519,7 +519,7 @@ findAll(
     );
   }
 
-  @Delete(':id')
+  @Delete('delete/:id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   @ApiBearerAuth()

@@ -27,8 +27,18 @@ export class BlogService {
     });
     return { data, total, page, limit };
   }
+  async findOneById(id: string) {
+    console.log('Finding blog by ID:', id);
+    // Try both 'id' and '_id' for compatibility
+    let blog = await this.blogRepository.findOne({ where: { id: new ObjectId(id) } });
+    if (!blog) {
+      blog = await this.blogRepository.findOne({ where: { _id: new ObjectId(id) } } as any);
+    }
+    return blog;
+  }
 
   async findOneBySlug(slug: string) {
+    console.log('Finding blog by slug:', slug);
     return this.blogRepository.findOne({ where: { slug } });
   }
 
@@ -38,11 +48,25 @@ export class BlogService {
   }
 
   async update(id: string, blogData: Partial<Blog>) {
-    await this.blogRepository.update(id, blogData);
-    return this.blogRepository.findOne({ where: { id: new ObjectId(id) } });
+    // Try update by 'id' first, fallback to '_id'
+    let result = await this.blogRepository.update({ id: new ObjectId(id) } as any, blogData);
+    if (!result.affected) {
+      result = await this.blogRepository.update({ _id: new ObjectId(id) } as any, blogData);
+    }
+    // Return the updated blog
+    let blog = await this.blogRepository.findOne({ where: { id: new ObjectId(id) } });
+    if (!blog) {
+      blog = await this.blogRepository.findOne({ where: { _id: new ObjectId(id) } } as any);
+    }
+    return blog;
   }
 
   async remove(id: string) {
-    return this.blogRepository.delete(new ObjectId(id));
-  } 
+    // Try delete by 'id' first, fallback to '_id'
+    let result = await this.blogRepository.delete({ id: new ObjectId(id) } as any);
+    if (!result.affected) {
+      result = await this.blogRepository.delete({ _id: new ObjectId(id) } as any);
+    }
+    return result;
+  }
 }

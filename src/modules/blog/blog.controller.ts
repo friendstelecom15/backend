@@ -31,6 +31,12 @@ export class BlogController {
   ) {
     return this.blogService.findAll(page, limit, search, category);
   }
+_
+  //GET_BY_ID
+  @Get('id/:id')
+  async findOneById(@Param('id') id: string) {
+    return this.blogService.findOneById(id);
+  }
 
 
 
@@ -68,7 +74,25 @@ export class BlogController {
 
   @Put(':id')
   // @UseGuards(RolesGuard)
-  async update(@Param('id') id: string, @Body() blogData: Partial<Blog>) {
+  @FileFieldsUpload(
+    [{ name: 'image', maxCount: 1 }],
+    undefined,
+    UploadType.IMAGE,
+  )
+  async update(
+    @Param('id') id: string,
+    @Body() blogData: Partial<Blog>,
+    @UploadedFiles() files: { image?: Express.Multer.File[] },
+  ) {
+    if (files?.image?.length) {
+      const file = files.image[0];
+      try {
+        const upload = await this.cloudflareService.uploadImage(file.buffer, file.originalname);
+        blogData.image = upload.variants?.[0] || upload.id || upload.filename || '';
+      } catch (err) {
+        throw new Error(`Cloudflare image upload failed: ${err}`);
+      }
+    }
     return this.blogService.update(id, blogData);
   }
 

@@ -28,7 +28,6 @@ import { Brand } from '../brands/entities/brand.entity';
 
 @Injectable()
 export class ProductService {
-    
   constructor(
     @InjectRepository(Product)
     private readonly productRepository: Repository<Product>,
@@ -45,11 +44,15 @@ export class ProductService {
     if (!ids || ids.length === 0) return [];
     // Debug: Log input IDs
     console.log('[findByIds] Input IDs:', ids);
-    const objectIds = ids.map(id => id.length === 24 ? new ObjectId(id) : id);
+    const objectIds = ids.map((id) =>
+      id.length === 24 ? new ObjectId(id) : id,
+    );
     // Debug: Log converted ObjectIds
     console.log('[findByIds] Converted ObjectIds:', objectIds);
     // Query by '_id' for MongoDB using $in operator for compatibility
-    let products = await this.productRepository.find({ where: { _id: { $in: objectIds } } } as any);
+    let products = await this.productRepository.find({
+      where: { _id: { $in: objectIds } },
+    } as any);
     // Debug: Log number of products found
     console.log('[findByIds] Products found:', products.length);
     // Load relations for each product
@@ -57,34 +60,36 @@ export class ProductService {
       products.map(async (product) => {
         await this.loadProductRelations(product);
         return product;
-      })
+      }),
     );
     return products;
-    }
+  }
 
-    //product find by brandids
-    async findByBrandIds(brandIds: string[]): Promise<any[]> {
-      console.log('[findByBrandIds] Incoming brandIds:', brandIds);
-      if (!brandIds || brandIds.length === 0) return [];
-      const objectBrandIds = brandIds.map(id => id.length === 24 ? new ObjectId(id) : id);
+  //product find by brandids
+  async findByBrandIds(brandIds: string[]): Promise<any[]> {
+    console.log('[findByBrandIds] Incoming brandIds:', brandIds);
+    if (!brandIds || brandIds.length === 0) return [];
+    const objectBrandIds = brandIds.map((id) =>
+      id.length === 24 ? new ObjectId(id) : id,
+    );
 
-      // Use native MongoDB query for reliability
-      const mongoRepo = this.productRepository.manager.getMongoRepository(Product);
-   const query = { brandIds: { $in: objectBrandIds } };
-      console.log('[findByBrandIds] MongoDB Query:', JSON.stringify(query));
-      let products = await mongoRepo.find({ where: query });
-      console.log('[findByBrandIds] Products found:', products.length);
+    // Use native MongoDB query for reliability
+    const mongoRepo =
+      this.productRepository.manager.getMongoRepository(Product);
+    const query = { brandIds: { $in: objectBrandIds } };
+    console.log('[findByBrandIds] MongoDB Query:', JSON.stringify(query));
+    let products = await mongoRepo.find({ where: query });
+    console.log('[findByBrandIds] Products found:', products.length);
 
-      products = await Promise.all(
-        products.map(async (product) => {
-          await this.loadProductRelations(product);
-          return product;
-        })
-      );
-      return products;
-    }
-    
-    
+    products = await Promise.all(
+      products.map(async (product) => {
+        await this.loadProductRelations(product);
+        return product;
+      }),
+    );
+    return products;
+  }
+
   async createBasicProduct(createProductDto: CreateBasicProductDto) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -1750,70 +1755,129 @@ export class ProductService {
 
     // Delete all related data
     // Colors (direct)
-    await this.dataSource.getMongoRepository(ProductColor).deleteMany({ productId: new ObjectId(id) });
+    await this.dataSource
+      .getMongoRepository(ProductColor)
+      .deleteMany({ productId: new ObjectId(id) });
     // Images
-    await this.dataSource.getMongoRepository(ProductImage).deleteMany({ productId: new ObjectId(id) });
+    await this.dataSource
+      .getMongoRepository(ProductImage)
+      .deleteMany({ productId: new ObjectId(id) });
     // Videos
-    await this.dataSource.getMongoRepository(ProductVideo).deleteMany({ productId: new ObjectId(id) });
+    await this.dataSource
+      .getMongoRepository(ProductVideo)
+      .deleteMany({ productId: new ObjectId(id) });
     // Specifications
-    await this.dataSource.getMongoRepository(ProductSpecification).deleteMany({ productId: new ObjectId(id) });
+    await this.dataSource
+      .getMongoRepository(ProductSpecification)
+      .deleteMany({ productId: new ObjectId(id) });
     // Networks
-    const networks = await this.dataSource.getMongoRepository(ProductNetwork).find({ where: { productId: new ObjectId(id) } });
+    const networks = await this.dataSource
+      .getMongoRepository(ProductNetwork)
+      .find({ where: { productId: new ObjectId(id) } });
     for (const network of networks) {
       // Colors for network
-      const networkColors = await this.dataSource.getMongoRepository(ProductColor).find({ where: { networkId: network.id } });
+      const networkColors = await this.dataSource
+        .getMongoRepository(ProductColor)
+        .find({ where: { networkId: network.id } });
       for (const color of networkColors) {
         // Storages for color
-        const storages = await this.dataSource.getMongoRepository(ProductStorage).find({ where: { colorId: color.id } });
+        const storages = await this.dataSource
+          .getMongoRepository(ProductStorage)
+          .find({ where: { colorId: color.id } });
         for (const storage of storages) {
-          await this.dataSource.getMongoRepository(ProductPrice).deleteMany({ storageId: storage.id });
+          await this.dataSource
+            .getMongoRepository(ProductPrice)
+            .deleteMany({ storageId: storage.id });
         }
-        await this.dataSource.getMongoRepository(ProductStorage).deleteMany({ colorId: color.id });
+        await this.dataSource
+          .getMongoRepository(ProductStorage)
+          .deleteMany({ colorId: color.id });
       }
-      await this.dataSource.getMongoRepository(ProductColor).deleteMany({ networkId: network.id });
+      await this.dataSource
+        .getMongoRepository(ProductColor)
+        .deleteMany({ networkId: network.id });
       // Default storages for network
-      const defaultStorages = await this.dataSource.getMongoRepository(ProductStorage).find({ where: { networkId: network.id } });
+      const defaultStorages = await this.dataSource
+        .getMongoRepository(ProductStorage)
+        .find({ where: { networkId: network.id } });
       for (const storage of defaultStorages) {
-        await this.dataSource.getMongoRepository(ProductPrice).deleteMany({ storageId: storage.id });
+        await this.dataSource
+          .getMongoRepository(ProductPrice)
+          .deleteMany({ storageId: storage.id });
       }
-      await this.dataSource.getMongoRepository(ProductStorage).deleteMany({ networkId: network.id });
+      await this.dataSource
+        .getMongoRepository(ProductStorage)
+        .deleteMany({ networkId: network.id });
     }
-    await this.dataSource.getMongoRepository(ProductNetwork).deleteMany({ productId: new ObjectId(id) });
+    await this.dataSource
+      .getMongoRepository(ProductNetwork)
+      .deleteMany({ productId: new ObjectId(id) });
     // Regions
-    const regions = await this.dataSource.getMongoRepository(ProductRegion).find({ where: { productId: new ObjectId(id) } });
+    const regions = await this.dataSource
+      .getMongoRepository(ProductRegion)
+      .find({ where: { productId: new ObjectId(id) } });
     for (const region of regions) {
       // Colors for region
-      const regionColors = await this.dataSource.getMongoRepository(ProductColor).find({ where: { regionId: region.id } });
+      const regionColors = await this.dataSource
+        .getMongoRepository(ProductColor)
+        .find({ where: { regionId: region.id } });
       for (const color of regionColors) {
         // Storages for color
-        const storages = await this.dataSource.getMongoRepository(ProductStorage).find({ where: { colorId: color.id } });
+        const storages = await this.dataSource
+          .getMongoRepository(ProductStorage)
+          .find({ where: { colorId: color.id } });
         for (const storage of storages) {
-          await this.dataSource.getMongoRepository(ProductPrice).deleteMany({ storageId: storage.id });
+          await this.dataSource
+            .getMongoRepository(ProductPrice)
+            .deleteMany({ storageId: storage.id });
         }
-        await this.dataSource.getMongoRepository(ProductStorage).deleteMany({ colorId: color.id });
+        await this.dataSource
+          .getMongoRepository(ProductStorage)
+          .deleteMany({ colorId: color.id });
       }
-      await this.dataSource.getMongoRepository(ProductColor).deleteMany({ regionId: region.id });
+      await this.dataSource
+        .getMongoRepository(ProductColor)
+        .deleteMany({ regionId: region.id });
       // Default storages for region
-      const defaultStorages = await this.dataSource.getMongoRepository(ProductStorage).find({ where: { regionId: region.id } });
+      const defaultStorages = await this.dataSource
+        .getMongoRepository(ProductStorage)
+        .find({ where: { regionId: region.id } });
       for (const storage of defaultStorages) {
-        await this.dataSource.getMongoRepository(ProductPrice).deleteMany({ storageId: storage.id });
+        await this.dataSource
+          .getMongoRepository(ProductPrice)
+          .deleteMany({ storageId: storage.id });
       }
-      await this.dataSource.getMongoRepository(ProductStorage).deleteMany({ regionId: region.id });
+      await this.dataSource
+        .getMongoRepository(ProductStorage)
+        .deleteMany({ regionId: region.id });
     }
-    await this.dataSource.getMongoRepository(ProductRegion).deleteMany({ productId: new ObjectId(id) });
+    await this.dataSource
+      .getMongoRepository(ProductRegion)
+      .deleteMany({ productId: new ObjectId(id) });
     // Direct storages for direct colors
-    const directColors = await this.dataSource.getMongoRepository(ProductColor).find({ where: { productId: new ObjectId(id) } });
+    const directColors = await this.dataSource
+      .getMongoRepository(ProductColor)
+      .find({ where: { productId: new ObjectId(id) } });
     for (const color of directColors) {
-      const storages = await this.dataSource.getMongoRepository(ProductStorage).find({ where: { colorId: color.id } });
+      const storages = await this.dataSource
+        .getMongoRepository(ProductStorage)
+        .find({ where: { colorId: color.id } });
       for (const storage of storages) {
-        await this.dataSource.getMongoRepository(ProductPrice).deleteMany({ storageId: storage.id });
+        await this.dataSource
+          .getMongoRepository(ProductPrice)
+          .deleteMany({ storageId: storage.id });
       }
-      await this.dataSource.getMongoRepository(ProductStorage).deleteMany({ colorId: color.id });
+      await this.dataSource
+        .getMongoRepository(ProductStorage)
+        .deleteMany({ colorId: color.id });
     }
     // Finally, delete the product itself
     await this.productRepository.delete(id);
 
-    return { success: true, message: 'Product and all related data deleted successfully' };
+    return {
+      success: true,
+      message: 'Product and all related data deleted successfully',
+    };
   }
 
   /**

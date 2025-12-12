@@ -21,6 +21,7 @@ import { AdminModule } from './modules/admin/admin.module';
 import { HomecategoryModule } from './modules/homecategory/homecategory.module';
 import { HerobannerModule } from './modules/herobanner/herobanner.module';
 import { EmiModule } from './modules/emi/emi.modul';
+import { BlogModule } from './modules/blog/blog.module';
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { EmiModule } from './modules/emi/emi.modul';
     HomecategoryModule,
     HerobannerModule,
     EmiModule,
+    BlogModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -35,6 +35,11 @@ export class CreateUserDto {
   @IsArray()
   @IsString({ each: true })
   role?: string[] = ['user'];
+
+  @ApiProperty({ example: 'https://example.com/avatar.png', required: false })
+  @IsOptional()
+  @IsString()
+  image?: string;
 }
 
 export class UpdateUserDto extends PartialType(CreateUserDto) { }

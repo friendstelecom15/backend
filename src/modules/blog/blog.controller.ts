@@ -8,10 +8,14 @@ import {
   Body,
   Query,
   UseGuards,
+  BadRequestException,
 } from '@nestjs/common';
 import { BlogService } from './blog.service';
 import { Blog } from './entities/blog.entity';
-import { FileFieldsUpload, UploadType } from '../../common/decorators/file-upload.decorator';
+import {
+  FileFieldsUpload,
+  UploadType,
+} from '../../common/decorators/file-upload.decorator';
 import { CloudflareService } from 'src/config/cloudflare-video.service';
 import { UploadedFiles } from '@nestjs/common';
 
@@ -31,23 +35,21 @@ export class BlogController {
   ) {
     return this.blogService.findAll(page, limit, search, category);
   }
-_
+  _;
   //GET_BY_ID
   @Get('id/:id')
   async findOneById(@Param('id') id: string) {
     return this.blogService.findOneById(id);
   }
 
-
-
   @Get(':slug')
   async findOne(@Param('slug') slug: string) {
     return this.blogService.findOneBySlug(slug);
   }
 
-
   @Post()
-  @UseGuards(/*JwtAuthGuard,*/ /*RolesGuard*/)
+  @UseGuards(/*JwtAuthGuard,*/
+  /*RolesGuard*/)
   // Uncomment JwtAuthGuard and RolesGuard as needed
   // @Roles('admin', 'editor') // Uncomment and adjust roles as needed
   @FileFieldsUpload(
@@ -63,8 +65,12 @@ _
     if (files?.image?.length) {
       const file = files.image[0];
       try {
-        const upload = await this.cloudflareService.uploadImage(file.buffer, file.originalname);
-        blogData.image = upload.variants?.[0] || upload.id || upload.filename || '';
+        const upload = await this.cloudflareService.uploadImage(
+          file.buffer,
+          file.originalname,
+        );
+        blogData.image =
+          upload.variants?.[0] || upload.id || upload.filename || '';
       } catch (err) {
         throw new Error(`Cloudflare image upload failed: ${err}`);
       }
@@ -87,8 +93,12 @@ _
     if (files?.image?.length) {
       const file = files.image[0];
       try {
-        const upload = await this.cloudflareService.uploadImage(file.buffer, file.originalname);
-        blogData.image = upload.variants?.[0] || upload.id || upload.filename || '';
+        const upload = await this.cloudflareService.uploadImage(
+          file.buffer,
+          file.originalname,
+        );
+        blogData.image =
+          upload.variants?.[0] || upload.id || upload.filename || '';
       } catch (err) {
         throw new Error(`Cloudflare image upload failed: ${err}`);
       }
@@ -100,5 +110,26 @@ _
   // @UseGuards(RolesGuard)
   async remove(@Param('id') id: string) {
     return this.blogService.remove(id);
+  }
+
+  @Post('upload-image')
+  @FileFieldsUpload(
+    [{ name: 'image', maxCount: 1 }],
+    undefined,
+    UploadType.IMAGE,
+  )
+  async uploadImage(@UploadedFiles() files: { image?: Express.Multer.File[] }) {
+    if (!files?.image?.length) {
+      throw new BadRequestException('No image uploaded');
+    }
+    const file = files.image[0];
+    const upload = await this.cloudflareService.uploadImage(
+      file.buffer,
+      file.originalname,
+    );
+    console.log('Cloudflare upload response:', upload);
+    console.log('Image URL:', upload.variants?.[0] || upload.id || upload.filename);
+    // Return the public URL
+    return { url: upload.variants?.[0] || upload.id || upload.filename || '' };
   }
 }

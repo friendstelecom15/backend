@@ -3,22 +3,27 @@ import { IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 import { NotificationType } from '../entities/notification.entity';
 
 export class CreateNotificationDto {
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
-  userId: string;
+  userId?: string;
 
   @IsEnum(NotificationType)
   type: NotificationType;
 
-  @IsNotEmpty()
-  @IsString()
-  title: string;
 
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
-  message: string;
+  title?: string;
+
+  @IsOptional()
+  @IsString()
+  message?: string;
 
   @IsOptional()
   @IsString()
   link?: string;
+
+  @IsOptional()
+  @IsString()
+  productId?: string;
 }

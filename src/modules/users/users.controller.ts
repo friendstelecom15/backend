@@ -10,19 +10,25 @@ import {
   HttpStatus,
   UseGuards,
   BadRequestException,
+  UploadedFiles,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { UsersService } from './users.service';
+import { CloudflareService } from 'src/config/cloudflare-video.service';
 import { CreateUserDto, UpdateUserDto, UserResponseDto } from './dto/user.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { User } from './entities/user.entity';
+import { FileFieldsUpload, UploadType } from 'src/common/decorators/file-upload.decorator';
 
 @ApiBearerAuth()
 @ApiTags('users')
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly cloudflareService: CloudflareService,
+  ) {}
 
   // =======================
   // UTIL
@@ -86,12 +92,31 @@ export class UsersController {
   // =======================
   @Patch(':id')
   @UseGuards(JwtAuthGuard)
-  async update(@Param('id') id: string, @Body() dto: UpdateUserDto) {
+  @FileFieldsUpload(
+      [{ name: 'image', maxCount: 1 }],
+      undefined,
+      UploadType.IMAGE,
+    )
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdateUserDto,
+    @UploadedFiles() files: { image?: Express.Multer.File[] },
+  ) {
     this.validateMongoId(id);
 
     const maybeRole = (dto as { role?: unknown }).role;
     if (typeof maybeRole === 'string') {
       return this.usersService.updateRole(id, maybeRole);
+    }
+
+    if (files?.image?.length) {
+      const file = files.image[0];
+      try {
+        const upload = await this.cloudflareService.uploadImage(file.buffer, file.originalname);
+        dto.image = upload.variants?.[0] || upload.id || upload.filename || '';
+      } catch (err) {
+        throw new Error(`Cloudflare image upload failed: ${err}`);
+      }
     }
 
     const updated = await this.usersService.update(id, dto);

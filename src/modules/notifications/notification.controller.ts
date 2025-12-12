@@ -1,4 +1,8 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, NotFoundException } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, NotFoundException, Query, UseGuards } from '@nestjs/common';
+import { ApiQuery } from '@nestjs/swagger';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { User } from '../users/entities/user.entity';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { NotificationService } from './notification.service';
 import { CreateNotificationDto } from './dto/create-notification.dto';
 import { UpdateNotificationReadDto } from './dto/update-notification-read.dto';
@@ -7,6 +11,39 @@ import { UpdateNotificationReadDto } from './dto/update-notification-read.dto';
 export class NotificationController {
   constructor(private readonly notificationService: NotificationService) { }
 
+  // GET /notifications/by?userId=xxx&productId=yyy - Fetch notifications by userId and/or productId (both optional)
+  @Get('by')
+  @ApiQuery({ name: 'userId', required: false, type: String })
+  @ApiQuery({ name: 'productId', required: false, type: String })
+  async getAllByUserAndProduct(
+    @Query('userId') userId?: string,
+    @Query('productId') productId?: string,
+  ) {
+    const notifications = await this.notificationService.findAllByUserAndProduct(userId, productId);
+    return notifications.map(n => ({
+      ...n,
+      id: n.id?.toString?.() ?? String(n.id),
+    }));
+  }
+
+    // GET /notifications - Fetch all notifications (no filter)
+  @Get()
+  async getAllNotifications() {
+    const notifications = await this.notificationService.findAll();
+    return notifications.map(n => ({
+      ...n,
+      id: n.id?.toString?.() ?? String(n.id),
+    }));
+  }
+  // PATCH /notifications/:id/resolve - Mark notification as resolved
+  @Patch(':id/resolve')
+  async markAsResolved(@Param('id') id: string) {
+    const notification = await this.notificationService.markAsResolved(id);
+    return {
+      ...notification,
+      id: notification.id?.toString?.() ?? String(notification.id),
+    };
+  }
   // GET /notifications/:userId - Fetch all notifications for a user
   @Get(':userId')
   async getAll(@Param('userId') userId: string) {
@@ -37,10 +74,27 @@ export class NotificationController {
     };
   }
 
+
   // PATCH /notifications/:id/read - Mark notification as read
   @Patch(':id/read')
   async markAsRead(@Param('id') id: string) {
     const notification = await this.notificationService.markAsRead(id);
+    return {
+      ...notification,
+      id: notification.id?.toString?.() ?? String(notification.id),
+    };
+  }
+
+  // POST /notifications/stock-out - Create stock out notification (productId in body, user from @CurrentUser)
+  @Post('stock-out')
+  @UseGuards(JwtAuthGuard)
+  async createStockOutNotification(
+    @Body() body: { productId?: string },
+    @CurrentUser() user: User,
+  ) {
+    const productId = body.productId;
+    const userId = user?.id?.toString?.();
+    const notification = await this.notificationService.createStockOutNotification(productId, userId);
     return {
       ...notification,
       id: notification.id?.toString?.() ?? String(notification.id),

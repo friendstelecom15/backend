@@ -6,10 +6,11 @@ import { User } from './entities/user.entity';
 import { Wishlist } from './entities/wishlist.entity';
 import { Compare } from './entities/compare.entity';
 import { Order } from '../orders/entities/order.entity';
+import { CloudflareService } from 'src/config/cloudflare-video.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([User, Wishlist, Compare, Order])],
-  providers: [UsersService],
+  providers: [UsersService, CloudflareService],
   controllers: [UsersController],
   exports: [UsersService],
 })

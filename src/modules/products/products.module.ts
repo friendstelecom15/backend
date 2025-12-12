@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ProductCare } from './entities/product.care.entity';
-import { NotifyProduct } from './entities/notifyproduct.entity';
 import { CloudflareService } from 'src/config/cloudflare-video.service';
 
 import { Product as ProductNew } from './entities/product-new.entity';
@@ -20,7 +19,6 @@ import { ProductsController } from './products.controller';
   imports: [
     TypeOrmModule.forFeature([
       ProductCare,
-      NotifyProduct,
       ProductNew,
       ProductRegion,
       ProductNetwork,

@@ -6,6 +6,7 @@ export enum NotificationType {
     PROMOTION = 'PROMOTION',
     GIVEAWAY = 'GIVEAWAY',
     SYSTEM = 'SYSTEM',
+    PRODUCT_STOCK_OUT = 'PRODUCT_STOCK_OUT',
 }
 
 @Entity('notifications')
@@ -13,23 +14,34 @@ export class Notification {
     @ObjectIdColumn()
     id: ObjectId;
 
-    @Column()
-    userId: string;
+    @Column({ nullable: true })
+    userId?: string;
 
     @Column({ type: 'enum', enum: NotificationType })
-    type: NotificationType;
+    type?: NotificationType;
 
-    @Column()
-    title: string;
+    @Column({ nullable: true })
+    title?: string;
 
-    @Column()
-    message: string;
+    @Column({ nullable: true })
+    message?: string;
+
+
+    @Column({ nullable: true })
+    productId?: string;
 
     @Column({ nullable: true })
     link?: string;
 
+
     @Column({ default: false })
-    read: boolean;
+    read?: boolean;
+
+    @Column({ default: false })
+    resolved?: boolean;
+
+    @Column({ nullable: true })
+    status?: string;
 
     @CreateDateColumn()
     createdAt: Date;

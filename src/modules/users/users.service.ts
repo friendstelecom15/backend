@@ -143,9 +143,11 @@ export class UsersService {
   async update(id: string | ObjectId, payload: Partial<CreateUserDto>) {
     const _id = this.toObjectId(id);
 
-    const user = await this.userRepository.findOne({
-      where: { id: _id },
-    });
+    // Try both 'id' and '_id' for MongoDB compatibility
+    let user = await this.userRepository.findOne({ where: { id: _id } });
+    if (!user) {
+      user = await this.userRepository.findOne({ where: { _id: _id } } as any);
+    }
 
     if (!user) throw new NotFoundException('User not found');
 

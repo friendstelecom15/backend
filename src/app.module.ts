@@ -23,6 +23,7 @@ import { HerobannerModule } from './modules/herobanner/herobanner.module';
 import { EmiModule } from './modules/emi/emi.modul';
 import { BlogModule } from './modules/blog/blog.module';
 import { NotificationModule } from './modules/notifications/notification.module';
+import { DeliveryMethodModule } from './modules/delivery-method/delivery-method.module';
 
 @Module({
   imports: [
@@ -54,6 +55,7 @@ import { NotificationModule } from './modules/notifications/notification.module'
     EmiModule,
     BlogModule,
     NotificationModule,
+    DeliveryMethodModule,
   ],
   controllers: [AppController],
   providers: [AppService],

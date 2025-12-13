@@ -1,4 +1,3 @@
-
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -13,15 +12,14 @@ import { ObjectId } from 'mongodb';
 
 @Injectable()
 export class OrdersService {
-
   constructor(
     @InjectRepository(Order)
     private readonly orderRepository: Repository<Order>,
     @InjectRepository(OrderItem)
     private readonly orderItemRepository: Repository<OrderItem>,
-  ) { }
+  ) {}
 
-  async create(dto: CreateOrderDto) {
+  async create(dto: CreateOrderDto): Promise<Order> {
     const orderNumber = 'ORD-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
     const order = this.orderRepository.create({
       customer: dto.customer,
@@ -31,26 +29,30 @@ export class OrdersService {
       paymentStatus: 'pending',
     });
     const savedOrder = await this.orderRepository.save(order);
+
     if (dto.orderItems && dto.orderItems.length > 0) {
-      const items = dto.orderItems.map(item => this.orderItemRepository.create({ ...item, orderId: savedOrder.id }));
-      // ensure we pass a flat array to TypeORM save (guard against nested arrays)
-      const itemsToSave = Array.isArray(items[0]) ? (items as any).flat() : items;
-      const savedItems = await this.orderItemRepository.save(itemsToSave);
+      const items = dto.orderItems.map(item =>
+        this.orderItemRepository.create({ ...item, orderId: String(savedOrder.id) })
+      );
+      const savedItems = await this.orderItemRepository.save(items as any[]);
       savedOrder.orderItems = savedItems;
+    } else {
+      savedOrder.orderItems = [];
     }
     return savedOrder;
   }
 
-  async findAll() {
+  async findAll(): Promise<Order[]> {
     const orders = await this.orderRepository.find({ order: { createdAt: 'DESC' } });
-    for (const order of orders) {
-      order.orderItems = await this.orderItemRepository.find({ where: { orderId: String(order.id) } });
-    }
+    await Promise.all(
+      orders.map(async order => {
+        order.orderItems = await this.orderItemRepository.find({ where: { orderId: String(order.id) } });
+      })
+    );
     return orders;
   }
 
-
-  async findOne(id: string | ObjectId) {
+  async findOne(id: string | ObjectId): Promise<Order> {
     const _id = typeof id === 'string' ? new ObjectId(id) : id;
     const order = await this.orderRepository.findOne({ where: { id: _id } });
     if (!order) throw new NotFoundException('Order not found');
@@ -58,8 +60,7 @@ export class OrdersService {
     return order;
   }
 
-
-  async updateStatus(id: string | ObjectId, dto: UpdateOrderStatusDto) {
+  async updateStatus(id: string | ObjectId, dto: UpdateOrderStatusDto): Promise<Order> {
     const _id = typeof id === 'string' ? new ObjectId(id) : id;
     await this.orderRepository.update(_id, { status: dto.status });
     return this.findOne(_id);

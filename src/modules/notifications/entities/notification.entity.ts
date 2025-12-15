@@ -7,6 +7,7 @@ export enum NotificationType {
     GIVEAWAY = 'GIVEAWAY',
     SYSTEM = 'SYSTEM',
     PRODUCT_STOCK_OUT = 'PRODUCT_STOCK_OUT',
+    ADMIN_ORDER_PLACED = 'ADMIN_ORDER_PLACED',
 }
 
 @Entity('notifications')

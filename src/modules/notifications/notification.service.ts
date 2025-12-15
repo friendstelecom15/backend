@@ -1,5 +1,3 @@
-
-
 import { Injectable, NotFoundException, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -21,7 +19,22 @@ export class NotificationService {
     @Inject(forwardRef(() => ProductService))
     private readonly productService: ProductService,
   ) {}
+  // Get only unread notifications for a all read=false
+  async findUnreadNotifications() {
+    return this.notificationRepository.find({
+      where: { read: false },
+      order: { createdAt: 'DESC' },
+    });
+  }
 
+  // Update a notification as read (auto-update to true)
+  async markNotificationAsRead(id: string | ObjectId) {
+    const _id = typeof id === 'string' ? new ObjectId(id) : id;
+    const notification = await this.notificationRepository.findOne({ where: { id: _id } });
+    if (!notification) throw new NotFoundException('Notification not found');
+    notification.read = true;
+    return this.notificationRepository.save(notification);
+  }
 
   async create(createNotificationDto: CreateNotificationDto) {
     const notification = this.notificationRepository.create(createNotificationDto);

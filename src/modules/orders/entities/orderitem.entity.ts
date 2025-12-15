@@ -6,11 +6,11 @@ export class OrderItem {
     @ObjectIdColumn()
     id: ObjectId;
 
-    @Column({ nullable: true })
-    productName?: string;
+    @Column()
+    productName: string;
 
-    @Column({ nullable: true })
-    price?: number;
+    @Column()
+    price: number;
 
     @Column({ default: 1 })
     quantity: number;
@@ -19,7 +19,13 @@ export class OrderItem {
     color?: string;
 
     @Column({ nullable: true })
+    colorName?: string;  // NEW FIELD
+
+    @Column({ nullable: true })
     storage?: string;
+
+    @Column({ nullable: true })
+    storageName?: string;  // NEW FIELD
 
     @Column({ nullable: true })
     RAM?: string;
@@ -34,14 +40,23 @@ export class OrderItem {
     region?: string;
 
     @Column({ nullable: true })
+    regionName?: string;  // NEW FIELD
+
+    @Column({ nullable: true })
+    priceType?: string;  // NEW FIELD (offer/regular)
+
+    @Column({ nullable: true })
     image?: string;
 
     @Column({ type: 'json', nullable: true })
     dynamicInputs?: any;
 
+    @Column({ type: 'json', nullable: true })
+    selectedVariants?: any;  // NEW FIELD - full variant object store korar jonno
+
     @Column()
     orderId: string;
 
-    @Column({ nullable: true })
-    productId?: string;
+    @Column()
+    productId: string;
 }

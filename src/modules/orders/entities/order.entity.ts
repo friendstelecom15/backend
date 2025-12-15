@@ -6,54 +6,54 @@ export class Order {
   @ObjectIdColumn()
   id: ObjectId;
 
-    @Column({ type: 'json', nullable: true })
-    customer?: any;
+  @Column({ type: 'json', nullable: true })
+  customer?: any;
 
-    @Column({ type: 'json', nullable: true })
-    orderItems?: any[];
+  // Delivery fields
+  @Column({ nullable: true })
+  fullName?: string;
+  @Column({ nullable: true })
+  email?: string;
+  @Column({ nullable: true })
+  phone?: string;
+  @Column({ nullable: true })
+  division?: string;
+  @Column({ nullable: true })
+  district?: string;
+  @Column({ nullable: true })
+  upzila?: string;
+  @Column({ nullable: true })
+  postCode?: string;
+  @Column({ nullable: true })
+  address?: string;
+  @Column({ nullable: true })
+  paymentMethod?: string;
+  @Column({ nullable: true })
+  deliveryMethod?: string;
 
-    @Column()
-    total: number;
+  // Order items will be loaded via service, not stored as JSON
+  orderItems?: any[];
 
-    @Column({ nullable: true })
-    productName?: string;
+  @Column()
+  total: number;
 
-    @Column({ nullable: true })
-    basePrice?: number;
 
-    @Column({ nullable: true })
-    quantity?: number;
+  @Column({ default: 'pending' })
+  status: string;
 
-    @Column({ nullable: true })
-    image?: string;
+  // Track all status changes for timeline
+  @Column({ type: 'json', default: [] })
+  statusHistory: { status: string; date: Date }[];
 
-    @Column({ nullable: true })
-    color?: string;
+  @Column({ default: 'pending' })
+  paymentStatus: string;
 
-    @Column({ nullable: true })
-    storage?: string;
+  @Column({ nullable: true, unique: true })
+  orderNumber?: string;
 
-    @Column({ nullable: true })
-    RAM?: string;
+  @CreateDateColumn()
+  createdAt: Date;
 
-    @Column({ nullable: true })
-    sim?: string;
-
-    @Column({ type: 'json', nullable: true })
-    dynamicInputs?: any;
-
-    @Column({ default: 'pending' })
-    status: string;
-
-    @Column({ default: 'pending' })
-    paymentStatus: string;
-
-    @Column({ nullable: true, unique: true })
-    orderNumber?: string;
-
-    @CreateDateColumn()
-    createdAt: Date;
-
-    @UpdateDateColumn()
-    updatedAt: Date;
+  @UpdateDateColumn()
+  updatedAt: Date;
 }

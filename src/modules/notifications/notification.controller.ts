@@ -26,6 +26,25 @@ export class NotificationController {
     }));
   }
 
+    // Get only unread notifications for a all read=false
+    @Get('unread')
+    async getUnreadNotifications() {
+      const notifications = await this.notificationService.findUnreadNotifications();
+      return notifications.map(n => ({
+        ...n,
+        id: n.id?.toString?.() ?? String(n.id),
+      }));
+    }
+
+      // Update a notification as read (auto-update to true)
+  @Patch(':id/read')
+  async markNotificationAsRead(@Param('id') id: string) {
+    const notification = await this.notificationService.markNotificationAsRead(id);
+    return {
+      ...notification,
+      id: notification.id?.toString?.() ?? String(notification.id),
+    };
+  }
     // GET /notifications - Fetch all notifications (no filter)
   @Get()
   async getAllNotifications() {

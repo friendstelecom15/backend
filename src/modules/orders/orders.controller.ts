@@ -21,7 +21,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 @ApiTags('orders')
 @Controller('orders')
 export class OrdersController {
-  constructor(private readonly ordersService: OrdersService) { }
+  constructor(private readonly ordersService: OrdersService) {}
 
   @Post()
   @ApiOperation({ summary: 'Create order' })
@@ -36,13 +36,14 @@ export class OrdersController {
   @ApiOperation({ summary: 'Get all orders (Admin/Management)' })
   async findAll() {
     const orders = await this.ordersService.findAll();
-    return orders.map(order => ({
+    return orders.map((order) => ({
       ...order,
       id: order.id?.toString?.() ?? String(order.id),
-      orderItems: order.orderItems?.map(item => ({
-        ...item,
-        id: item.id?.toString?.() ?? String(item.id),
-      })) ?? [],
+      orderItems:
+        order.orderItems?.map((item) => ({
+          ...item,
+          id: item.id?.toString?.() ?? String(item.id),
+        })) ?? [],
     }));
   }
 
@@ -53,11 +54,18 @@ export class OrdersController {
     return {
       ...order,
       id: order.id?.toString?.() ?? String(order.id),
-      orderItems: order.orderItems?.map(item => ({
-        ...item,
-        id: item.id?.toString?.() ?? String(item.id),
-      })) ?? [],
+      orderItems:
+        order.orderItems?.map((item) => ({
+          ...item,
+          id: item.id?.toString?.() ?? String(item.id),
+        })) ?? [],
     };
+  }
+
+  @Get('tracking/:orderNumber')
+  @ApiOperation({ summary: 'Get order tracking info by order number (User)' })
+  async getOrderTracking(@Param('orderNumber') orderNumber: string) {
+    return this.ordersService.getOrderTracking(orderNumber);
   }
 
   @Patch(':id/status')

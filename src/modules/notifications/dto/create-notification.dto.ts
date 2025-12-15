@@ -26,4 +26,20 @@ export class CreateNotificationDto {
   @IsOptional()
   @IsString()
   productId?: string;
+
+  @IsOptional()
+  read?: boolean;
+
+  @IsOptional()
+  resolved?: boolean;
+
+  @IsOptional()
+  createdAt?: Date;
+
+  @IsOptional()
+  updatedAt?: Date;
+
+  @IsOptional()
+  @IsString()
+  status?: string;
 }

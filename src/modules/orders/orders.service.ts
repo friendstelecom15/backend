@@ -9,6 +9,8 @@ import {
 import { Order } from './entities/order.entity';
 import { OrderItem } from './entities/orderitem.entity';
 import { ObjectId } from 'mongodb';
+import { NotificationService } from '../notifications/notification.service';
+import { NotificationType } from '../notifications/entities/notification.entity';
 
 @Injectable()
 export class OrdersService {
@@ -17,36 +19,127 @@ export class OrdersService {
     private readonly orderRepository: Repository<Order>,
     @InjectRepository(OrderItem)
     private readonly orderItemRepository: Repository<OrderItem>,
+
+    private readonly notificationService: NotificationService,
   ) {}
 
-  async create(dto: CreateOrderDto): Promise<Order> {
-    const orderNumber = 'ORD-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
-    const order = this.orderRepository.create({
-      customer: dto.customer,
-      total: dto.total,
-      orderNumber,
-      status: 'pending',
-      paymentStatus: 'pending',
-    });
-    const savedOrder = await this.orderRepository.save(order);
+async create(dto: CreateOrderDto): Promise<Order> {
+  const orderNumber = 'ORD-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+  
+  // Order create
+  const order = this.orderRepository.create({
+    customer: {
+      fullName: dto.fullName,
+      email: dto.email,
+      phone: dto.phone,
+      division: dto.division,
+      district: dto.district,
+      upzila: dto.upzila,
+      postCode: dto.postCode,
+      address: dto.address,
+      paymentMethod: dto.paymentMethod,
+      deliveryMethod: dto.deliveryMethod,
+    },
+    total: dto.total,
+    orderNumber,
+    status: 'pending',
+    paymentStatus: 'pending',
+    // Delivery fields direct order entity teo store korte paren (optional)
+    fullName: dto.fullName,
+    email: dto.email,
+    phone: dto.phone,
+    division: dto.division,
+    district: dto.district,
+    upzila: dto.upzila,
+    postCode: dto.postCode,
+    address: dto.address,
+    paymentMethod: dto.paymentMethod,
+    deliveryMethod: dto.deliveryMethod,
+    statusHistory: [
+      { status: 'pending', date: new Date() }
+    ],
+  });
+  
+  const savedOrder = await this.orderRepository.save(order);
 
-    if (dto.orderItems && dto.orderItems.length > 0) {
-      const items = dto.orderItems.map(item =>
-        this.orderItemRepository.create({ ...item, orderId: String(savedOrder.id) })
-      );
-      const savedItems = await this.orderItemRepository.save(items as any[]);
-      savedOrder.orderItems = savedItems;
-    } else {
-      savedOrder.orderItems = [];
-    }
-    return savedOrder;
+  // Order Items create with ALL data from frontend
+  if (dto.orderItems && dto.orderItems.length > 0) {
+    const items = dto.orderItems.map(item => {
+      // Create order item with ALL properties from frontend
+      return this.orderItemRepository.create({
+        productId: item.productId,
+        productName: item.productName,
+        price: item.price,
+        quantity: item.quantity,
+        color: item.color,
+        colorName: item.colorName,  // Store color name
+        storage: item.storage,
+        storageName: item.storageName,  // Store storage name
+        region: item.region,
+        regionName: item.regionName,  // Store region name
+        priceType: item.priceType,  // Store price type
+        image: item.image,
+        dynamicInputs: item.dynamicInputs || {},
+        selectedVariants: item.selectedVariants || {}, // Store complete variant info
+        orderId: String(savedOrder.id)
+      });
+    });
+    
+    await this.orderItemRepository.save(items);
   }
+  
+  // Load saved order items
+  savedOrder.orderItems = await this.orderItemRepository.find({ 
+    where: { orderId: String(savedOrder.id) } 
+  });
+  
+  // Create notification for new order (user)
+  try {
+    // User notification
+    await this.notificationService.create({
+      userId: savedOrder.customer?.id,
+      type: NotificationType.ORDER_UPDATE,
+      title: 'Order Placed',
+      message: `Your order ${savedOrder.orderNumber} has been placed successfully!`,
+      link: `/account/orders/${savedOrder.id}`,
+      status: 'pending',
+      read: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    // Admin notification (no userId field)
+    await this.notificationService.create({
+      type: NotificationType.ADMIN_ORDER_PLACED,
+      title: 'New Order Placed',
+      message: `A new order (${savedOrder.orderNumber}) has been placed by ${savedOrder.customer?.fullName || 'a customer'}.`,
+      link: `/admin/orders/${savedOrder.id}`,
+      status: 'pending',
+      read: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  } catch (e) {
+    // Optionally log notification error
+  }
+  return savedOrder;
+}
 
   async findAll(): Promise<Order[]> {
     const orders = await this.orderRepository.find({ order: { createdAt: 'DESC' } });
     await Promise.all(
       orders.map(async order => {
-        order.orderItems = await this.orderItemRepository.find({ where: { orderId: String(order.id) } });
+        const items = await this.orderItemRepository.find({ where: { orderId: String(order.id) } });
+        // Only pick important fields for admin
+        order.orderItems = items.map(item => ({
+          productName: item.productName,
+          price: item.price,
+          quantity: item.quantity,
+          colorName: item.colorName,
+          storageName: item.storageName,
+          regionName: item.regionName,
+          priceType: item.priceType,
+          image: item.image,
+        }));
       })
     );
     return orders;
@@ -56,13 +149,130 @@ export class OrdersService {
     const _id = typeof id === 'string' ? new ObjectId(id) : id;
     const order = await this.orderRepository.findOne({ where: { id: _id } });
     if (!order) throw new NotFoundException('Order not found');
-    order.orderItems = await this.orderItemRepository.find({ where: { orderId: String(order.id) } });
+    const items = await this.orderItemRepository.find({ where: { orderId: String(order.id) } });
+    order.orderItems = items.map(item => ({
+      productName: item.productName,
+      price: item.price,
+      quantity: item.quantity,
+      colorName: item.colorName,
+      storageName: item.storageName,
+      regionName: item.regionName,
+      priceType: item.priceType,
+      image: item.image,
+    }));
     return order;
+  }
+
+  //order get by user id
+  async findByUserId(userId: string): Promise<Order[]> {
+    const orders = await this.orderRepository.find({ where: { customer: { id: userId } }, order: { createdAt: 'DESC' } });
+    await Promise.all(
+      orders.map(async order => {
+        const items = await this.orderItemRepository.find({ where: { orderId: String(order.id) } });
+        // Only pick important fields for user
+        order.orderItems = items.map(item => ({
+          productName: item.productName,
+          price: item.price,
+          quantity: item.quantity,
+          colorName: item.colorName,
+          storageName: item.storageName,
+          regionName: item.regionName,
+          priceType: item.priceType,
+          image: item.image,
+        }));
+      })
+    );
+    return orders;
+  }
+
+  //get order tracking info by order number
+   // Get order tracking info by order number
+  async getOrderTracking(id: string) {
+    // Only treat as ObjectId if valid 24-char hex string
+    let _id: ObjectId;
+    if (/^[a-fA-F0-9]{24}$/.test(id)) {
+      _id = new ObjectId(id);
+    } else {
+      throw new NotFoundException('Order not found');
+    }
+    // Try both 'id' and '_id' fields for compatibility
+    let order = await this.orderRepository.findOne({ where: { id: _id } });
+    if (!order) {
+      order = await this.orderRepository.findOne({ where: { _id: _id } } as any);
+    }
+    if (!order) throw new NotFoundException('Order not found');
+
+    // Timeline events (example, you can expand with more status/timestamps if you store them)
+    // For now, we use createdAt for placed, and status for current state
+    const timeline = [
+      {
+        label: 'Order Placed',
+        date: order.createdAt,
+        completed: true,
+      },
+      {
+        label: 'Order Confirmed',
+        date: ['confirmed', 'processing', 'shipped', 'out-for-delivery', 'delivered'].includes(order.status) ? order.createdAt : null,
+        completed: ['confirmed', 'processing', 'shipped', 'out-for-delivery', 'delivered'].includes(order.status),
+      },
+      {
+        label: 'Shipped',
+        date: ['shipped', 'out-for-delivery', 'delivered'].includes(order.status) ? order.createdAt : null,
+        completed: ['shipped', 'out-for-delivery', 'delivered'].includes(order.status),
+      },
+      {
+        label: 'Out for Delivery',
+        date: ['out-for-delivery', 'delivered'].includes(order.status) ? order.createdAt : null,
+        completed: ['out-for-delivery', 'delivered'].includes(order.status),
+      },
+      {
+        label: 'Delivered',
+        date: order.status === 'delivered' ? order.createdAt : null,
+        completed: order.status === 'delivered',
+      },
+    ];
+
+    // Shipping address
+    const shippingAddress = {
+      fullName: order.fullName,
+      address: order.address,
+      division: order.division,
+      district: order.district,
+      upzila: order.upzila,
+      postCode: order.postCode,
+      phone: order.phone,
+      email: order.email,
+    };
+
+    // Payment summary (expand as needed)
+    const paymentSummary = {
+      subtotal: order.total, // You can split subtotal, tax, discount if you store them
+      shipping: order.deliveryMethod === 'free' ? 'FREE' : order.deliveryMethod,
+      tax: 0, // Add tax if you store it
+      discount: 0, // Add discount if you store it
+      total: order.total,
+      paymentMethod: order.paymentMethod,
+      paymentStatus: order.paymentStatus,
+    };
+
+    return {
+      orderNumber: order.orderNumber,
+      status: order.status,
+      timeline,
+      shippingAddress,
+      paymentSummary,
+    };
   }
 
   async updateStatus(id: string | ObjectId, dto: UpdateOrderStatusDto): Promise<Order> {
     const _id = typeof id === 'string' ? new ObjectId(id) : id;
-    await this.orderRepository.update(_id, { status: dto.status });
+    // Fetch the order first
+    const order = await this.orderRepository.findOne({ where: { id: _id } });
+    if (!order) throw new NotFoundException('Order not found');
+    // Update status and push to statusHistory
+    const newStatusEntry = { status: dto.status, date: new Date() };
+    const updatedHistory = Array.isArray(order.statusHistory) ? [...order.statusHistory, newStatusEntry] : [newStatusEntry];
+    await this.orderRepository.update(_id, { status: dto.status, statusHistory: updatedHistory });
     return this.findOne(_id);
   }
 
@@ -81,9 +291,10 @@ export class OrdersService {
     };
   }
 
-  async generateInvoice(id: string | ObjectId) {
-    const _id = typeof id === 'string' ? new ObjectId(id) : id;
-    const order = await this.findOne(_id);
+  async generateInvoice(orderNumber: string) {
+    // Find order by orderNumber
+    const order = await this.orderRepository.findOne({ where: { orderNumber } });
+    if (!order) throw new NotFoundException('Order not found');
     return {
       ...order,
       invoiceNumber: 'INV-' + order.orderNumber,

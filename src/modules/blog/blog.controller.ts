@@ -127,8 +127,7 @@ export class BlogController {
       file.buffer,
       file.originalname,
     );
-    console.log('Cloudflare upload response:', upload);
-    console.log('Image URL:', upload.variants?.[0] || upload.id || upload.filename);
+  
     // Return the public URL
     return { url: upload.variants?.[0] || upload.id || upload.filename || '' };
   }

@@ -28,7 +28,6 @@ export class BlogService {
     return { data, total, page, limit };
   }
   async findOneById(id: string) {
-    console.log('Finding blog by ID:', id);
     // Try both 'id' and '_id' for compatibility
     let blog = await this.blogRepository.findOne({ where: { id: new ObjectId(id) } });
     if (!blog) {
@@ -38,7 +37,6 @@ export class BlogService {
   }
 
   async findOneBySlug(slug: string) {
-    console.log('Finding blog by slug:', slug);
     return this.blogRepository.findOne({ where: { slug } });
   }
 

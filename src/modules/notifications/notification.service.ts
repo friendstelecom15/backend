@@ -65,7 +65,6 @@ export class NotificationService {
 
 // get all notifications for a userid and/or productid (both optional)
 async findAllByUserAndProduct(userId?: string, productId?: string) {
-  console.log('Finding notifications by userId and productId:', userId, productId);
     const where: any = {};
     if (userId && userId !== 'null' && userId !== '') where.userId = userId;
     if (productId && productId !== 'null' && productId !== '') where.productId = productId;

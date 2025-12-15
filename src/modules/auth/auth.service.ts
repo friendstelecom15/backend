@@ -112,7 +112,6 @@ export class AuthService {
 
   async loginWithCredentials(email: string, password: string) {
     const valid = await this.validateUser(email, password);
-    console.log('Validated user:', valid);
     if (!valid) throw new UnauthorizedException('Invalid credentials');
     return this.login({ ...valid, id: valid.id?.toString?.() ?? String(valid.id) });
   }

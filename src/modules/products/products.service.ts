@@ -42,20 +42,14 @@ export class ProductService {
 
   async findByIds(ids: string[]): Promise<any[]> {
     if (!ids || ids.length === 0) return [];
-    // Debug: Log input IDs
-    console.log('[findByIds] Input IDs:', ids);
     const objectIds = ids.map((id) =>
       id.length === 24 ? new ObjectId(id) : id,
     );
-    // Debug: Log converted ObjectIds
-    console.log('[findByIds] Converted ObjectIds:', objectIds);
-    // Query by '_id' for MongoDB using $in operator for compatibility
+
     let products = await this.productRepository.find({
       where: { _id: { $in: objectIds } },
     } as any);
-    // Debug: Log number of products found
-    console.log('[findByIds] Products found:', products.length);
-    // Load relations for each product
+
     products = await Promise.all(
       products.map(async (product) => {
         await this.loadProductRelations(product);
@@ -67,7 +61,6 @@ export class ProductService {
 
   //product find by brandids
   async findByBrandIds(brandIds: string[]): Promise<any[]> {
-    console.log('[findByBrandIds] Incoming brandIds:', brandIds);
     if (!brandIds || brandIds.length === 0) return [];
     const objectBrandIds = brandIds.map((id) =>
       id.length === 24 ? new ObjectId(id) : id,
@@ -77,9 +70,7 @@ export class ProductService {
     const mongoRepo =
       this.productRepository.manager.getMongoRepository(Product);
     const query = { brandIds: { $in: objectBrandIds } };
-    console.log('[findByBrandIds] MongoDB Query:', JSON.stringify(query));
     let products = await mongoRepo.find({ where: query });
-    console.log('[findByBrandIds] Products found:', products.length);
 
     products = await Promise.all(
       products.map(async (product) => {
@@ -2490,7 +2481,6 @@ export class ProductService {
     const errorMessage = error.message || '';
     const errorString = JSON.stringify(error);
 
-    console.log('Duplicate error details:', { errorMessage, errorString });
 
     // Check for slug duplicate
     if (
@@ -2546,15 +2536,12 @@ export class ProductService {
   //find by id
   async findById(id: string) {
     try {
-      console.log('Finding product by ID:', id);
       const objectId = new ObjectId(id);
-      console.log('ObjectId created:', objectId);
 
       const product = await this.productRepository.findOne({
         where: { _id: objectId } as any,
       });
 
-      console.log('Product found:', product ? 'Yes' : 'No');
 
       if (!product) {
         return null;

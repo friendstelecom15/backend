@@ -96,7 +96,6 @@ export class UsersService {
   async findOne(id: string | ObjectId) {
     const _id = this.toObjectId(id);
 
-    console.log('Finding user with ID:', _id);
 
     // Use raw query for MongoDB compatibility
     const user = await this.userRepository.findOne({

@@ -93,6 +93,136 @@ async create(dto: CreateOrderDto): Promise<Order> {
     where: { orderId: String(savedOrder.id) } 
   });
   
+  // Decrement stock for each order item
+  try {
+    const productPriceRepo = this.orderRepository.manager.getRepository('ProductPrice');
+    const productColorRepo = this.orderRepository.manager.getRepository('ProductColor');
+    const productRepo = this.orderRepository.manager.getRepository('Product');
+    const { ObjectId } = require('mongodb');
+    for (const item of savedOrder.orderItems) {
+      if (item.storage) {
+        // Query ProductPrice by storageId, not id
+        let storageId = item.storage;
+        if (typeof storageId === 'string' && storageId.length === 24) {
+          try { storageId = new ObjectId(storageId); } catch (e) { console.log('Invalid ObjectId for storage:', item.storage); }
+        }
+        console.log('Looking for ProductPrice with storageId:', storageId, 'type:', typeof storageId);
+        const price = await productPriceRepo.findOne({ where: { storageId } });
+        if (price && price.stockQuantity != null) {
+          console.log(`Before: ProductPrice ${price.id} (storageId: ${item.storage}) stockQuantity = ${price.stockQuantity}, decrement by ${item.quantity}`);
+          price.stockQuantity = Math.max(0, price.stockQuantity - item.quantity);
+          await productPriceRepo.save(price);
+          console.log(`After: ProductPrice ${price.id} stockQuantity = ${price.stockQuantity}`);
+        } else {
+          console.log(`No ProductPrice found for storageId: ${item.storage}`);
+        }
+      } else if (item.color) {
+        // Find ProductColor by region/network/productId+colorName if present, else by id
+        let colorQuery: any = {};
+        let color: any = null;
+        if (item.region) {
+          let regionId = item.region;
+          if (typeof regionId === 'string' && regionId.length === 24) {
+            try { regionId = new ObjectId(regionId); } catch (e) { console.log('Invalid ObjectId for region:', item.region); }
+          }
+          colorQuery = { regionId, colorName: item.colorName };
+          console.log('Looking for ProductColor with regionId and colorName:', regionId, item.colorName);
+          color = await productColorRepo.findOne({ where: colorQuery });
+          if (!color) {
+            // Try fallback: productId + colorName
+            let productId = item.productId;
+            if (typeof productId === 'string' && productId.length === 24) {
+              try { productId = new ObjectId(productId); } catch (e) { console.log('Invalid ObjectId for product:', item.productId); }
+            }
+            const fallbackQuery = { productId, colorName: item.colorName };
+            console.log('Fallback: Looking for ProductColor with productId and colorName:', productId, item.colorName);
+            color = await productColorRepo.findOne({ where: fallbackQuery });
+          }
+        } else if (item.network) {
+          let networkId = item.network;
+          if (typeof networkId === 'string' && networkId.length === 24) {
+            try { networkId = new ObjectId(networkId); } catch (e) { console.log('Invalid ObjectId for network:', item.network); }
+          }
+          colorQuery = { networkId, colorName: item.colorName };
+          console.log('Looking for ProductColor with networkId and colorName:', networkId, item.colorName);
+          color = await productColorRepo.findOne({ where: colorQuery });
+          if (!color) {
+            // Try fallback: productId + colorName
+            let productId = item.productId;
+            if (typeof productId === 'string' && productId.length === 24) {
+              try { productId = new ObjectId(productId); } catch (e) { console.log('Invalid ObjectId for product:', item.productId); }
+            }
+            const fallbackQuery = { productId, colorName: item.colorName };
+            console.log('Fallback: Looking for ProductColor with productId and colorName:', productId, item.colorName);
+            color = await productColorRepo.findOne({ where: fallbackQuery });
+          }
+        } else if (item.productId && item.colorName) {
+          let productId = item.productId;
+          if (typeof productId === 'string' && productId.length === 24) {
+            try { productId = new ObjectId(productId); } catch (e) { console.log('Invalid ObjectId for product:', item.productId); }
+          }
+          colorQuery = { productId, colorName: item.colorName };
+          console.log('Looking for ProductColor with productId and colorName:', productId, item.colorName);
+          color = await productColorRepo.findOne({ where: colorQuery });
+        } else {
+          let colorId = item.color;
+          if (typeof colorId === 'string' && colorId.length === 24) {
+            try { colorId = new ObjectId(colorId); } catch (e) { console.log('Invalid ObjectId for color:', item.color); }
+          }
+          colorQuery = { id: colorId };
+          console.log('Looking for ProductColor with id:', colorId, 'type:', typeof colorId);
+          color = await productColorRepo.findOne({ where: colorQuery });
+        }
+        if (color && color.singleStockQuantity != null) {
+          console.log(`Before: ProductColor ${color.id} (colorName: ${color.colorName}) singleStockQuantity = ${color.singleStockQuantity}, decrement by ${item.quantity}`);
+          color.singleStockQuantity = Math.max(0, color.singleStockQuantity - item.quantity);
+          await productColorRepo.save(color);
+          console.log(`After: ProductColor ${color.id} singleStockQuantity = ${color.singleStockQuantity}`);
+        } else if (color && color.stockQuantity != null) {
+          // Fallback: decrement stockQuantity if singleStockQuantity is null
+          console.log(`Before: ProductColor ${color.id} (colorName: ${color.colorName}) stockQuantity = ${color.stockQuantity}, decrement by ${item.quantity}`);
+          color.stockQuantity = Math.max(0, color.stockQuantity - item.quantity);
+          await productColorRepo.save(color);
+          console.log(`After: ProductColor ${color.id} stockQuantity = ${color.stockQuantity}`);
+        } else {
+          // If no ProductColor found, try to decrement main Product stock (for basic products)
+          let productId = item.productId;
+          if (typeof productId === 'string' && productId.length === 24) {
+            try { productId = new ObjectId(productId); } catch (e) { console.log('Invalid ObjectId for product:', item.productId); }
+          }
+          console.log(`No ProductColor found for`, colorQuery, '. Trying to decrement Product stock for productId:', productId);
+          const product = await productRepo.findOne({ where: { id: productId } });
+          if (product && product.stockQuantity != null) {
+            console.log(`Before: Product ${product.id} stockQuantity = ${product.stockQuantity}, decrement by ${item.quantity}`);
+            product.stockQuantity = Math.max(0, product.stockQuantity - item.quantity);
+            await productRepo.save(product);
+            console.log(`After: Product ${product.id} stockQuantity = ${product.stockQuantity}`);
+          } else {
+            console.log(`No Product found for id: ${item.productId}`);
+          }
+        }
+      } else {
+        // If neither storage nor color, try to decrement main Product stock
+        let productId = item.productId;
+        if (typeof productId === 'string' && productId.length === 24) {
+          try { productId = new ObjectId(productId); } catch (e) { console.log('Invalid ObjectId for product:', item.productId); }
+        }
+        console.log(`Order item ${item.id} has neither storage nor color for stock decrement. Trying to decrement Product stock for productId:`, productId);
+        const product = await productRepo.findOne({ where: { id: productId } });
+        if (product && product.stockQuantity != null) {
+          console.log(`Before: Product ${product.id} stockQuantity = ${product.stockQuantity}, decrement by ${item.quantity}`);
+          product.stockQuantity = Math.max(0, product.stockQuantity - item.quantity);
+          await productRepo.save(product);
+          console.log(`After: Product ${product.id} stockQuantity = ${product.stockQuantity}`);
+        } else {
+          console.log(`No Product found for id: ${item.productId}`);
+        }
+      }
+    }
+  } catch (e) {
+    console.log('Stock update error:', e);
+  }
+
   // Create notification for new order (user)
   try {
     // User notification

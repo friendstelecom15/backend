@@ -30,8 +30,8 @@ export class OrdersController {
   }
 
   @Get()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin', 'management')
+  // @UseGuards(JwtAuthGuard, RolesGuard)
+  // @Roles('admin', 'management')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all orders (Admin/Management)' })
   async findAll() {

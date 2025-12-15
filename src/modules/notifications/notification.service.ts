@@ -30,8 +30,14 @@ export class NotificationService {
 
   // Update a notification as read (auto-update to true)
   async markNotificationAsRead(id: string | ObjectId) {
+    console.log('markNotificationAsRead called with id:', id);
     const _id = typeof id === 'string' ? new ObjectId(id) : id;
-    const notification = await this.notificationRepository.findOne({ where: { id: _id } });
+    console.log('markNotificationAsRead - id:', id, ' _id:', _id);
+    // Try both _id and id fields for compatibility
+    let notification = await this.notificationRepository.findOne({ where: { _id } } as any);
+    if (!notification) {
+      notification = await this.notificationRepository.findOne({ where: { id: _id } } as any);
+    }
     if (!notification) throw new NotFoundException('Notification not found');
     notification.read = true;
     return this.notificationRepository.save(notification);

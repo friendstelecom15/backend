@@ -4,8 +4,10 @@ import { Repository } from 'typeorm';
 import { CorporateDeal } from './entities/corporate-deal.entity';
 import { CreateCorporateDealDto } from './dto/corporate-deal.dto';
 import { ObjectId } from 'mongodb';
-import { Notification, NotificationType } from '../notifications/entities/notification.entity';
-
+import {
+  Notification,
+  NotificationType,
+} from '../notifications/entities/notification.entity';
 
 @Injectable()
 export class CorporateDealService {
@@ -21,13 +23,19 @@ export class CorporateDealService {
   }
 
   async findOne(id: string): Promise<CorporateDeal> {
-    const deal = await this.corporateDealRepository.findOneBy({ id: new ObjectId(id) });
+    const deal = await this.corporateDealRepository.findOneBy({
+      id: new ObjectId(id),
+    });
     if (!deal) throw new NotFoundException('Corporate deal not found');
     return deal;
   }
 
   async create(dto: CreateCorporateDealDto): Promise<CorporateDeal> {
-    const deal = this.corporateDealRepository.create({ ...dto, createdAt: new Date(), status: 'new' });
+    const deal = this.corporateDealRepository.create({
+      ...dto,
+      createdAt: new Date(),
+      status: 'new',
+    });
     const savedDeal = await this.corporateDealRepository.save(deal);
 
     // Create notification for new corporate deal
@@ -37,6 +45,8 @@ export class CorporateDealService {
       message: `A new corporate deal has been submitted by ${savedDeal.fullName} (${savedDeal.companyName}).`,
       resolved: false,
       read: false,
+      isAdmin: true,
+      link: '/admin/corporate',
       createdAt: new Date(),
       updatedAt: new Date(),
     });

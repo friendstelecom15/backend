@@ -241,7 +241,7 @@ async create(dto: CreateOrderDto): Promise<Order> {
       type: NotificationType.ADMIN_ORDER_PLACED,
       title: 'New Order Placed',
       message: `A new order (${savedOrder.orderNumber}) has been placed by ${savedOrder.customer?.fullName || 'a customer'}.`,
-      link: `/admin/orders/${savedOrder.id}`,
+      link: `/admin/orders`,
       status: 'pending',
       read: false,
       createdAt: new Date(),

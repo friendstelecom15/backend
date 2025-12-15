@@ -44,7 +44,6 @@ async create(dto: CreateOrderDto): Promise<Order> {
     orderNumber,
     status: 'pending',
     paymentStatus: 'pending',
-    // Delivery fields direct order entity teo store korte paren (optional)
     fullName: dto.fullName,
     email: dto.email,
     phone: dto.phone,

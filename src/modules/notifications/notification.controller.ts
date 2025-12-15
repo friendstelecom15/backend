@@ -1,3 +1,4 @@
+
 import { Controller, Get, Post, Patch, Delete, Param, Body, NotFoundException, Query, UseGuards } from '@nestjs/common';
 import { ApiQuery } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -8,8 +9,27 @@ import { CreateNotificationDto } from './dto/create-notification.dto';
 import { UpdateNotificationReadDto } from './dto/update-notification-read.dto';
 
 @Controller('notifications')
+
 export class NotificationController {
   constructor(private readonly notificationService: NotificationService) { }
+
+  // GET /notifications/header?userId=xxx&isAdmin=true - Get latest 10 notifications for bell (user or admin)
+  @Get('header')
+  @ApiQuery({ name: 'userId', required: false, type: String })
+  @ApiQuery({ name: 'isAdmin', required: false, type: Boolean })
+  async getHeaderNotifications(
+    @Query('userId') userId?: string,
+    @Query('isAdmin') isAdmin?: string,
+  ) {
+    // Convert isAdmin to boolean (query params are strings)
+    const isAdminBool = isAdmin === 'true';
+    console.log('Controller getHeaderNotifications', { userId, isAdmin, isAdminBool });
+    const notifications = await this.notificationService.getHeaderNotifications(userId, isAdminBool);
+    return notifications.map(n => ({
+      ...n,
+      id: n.id?.toString?.() ?? String(n.id),
+    }));
+  }
 
   // GET /notifications/by?userId=xxx&productId=yyy - Fetch notifications by userId and/or productId (both optional)
   @Get('by')
@@ -126,19 +146,4 @@ export class NotificationController {
     return this.notificationService.remove(id);
   }
 
-    @Get('header')
-  @ApiQuery({ name: 'userId', required: false, type: String })
-  @ApiQuery({ name: 'isAdmin', required: false, type: Boolean })
-  async getHeaderNotifications(
-    @Query('userId') userId?: string,
-    @Query('isAdmin') isAdmin?: string,
-  ) {
-    // Convert isAdmin to boolean (query params are strings)
-    const isAdminBool = isAdmin === 'true';
-    const notifications = await this.notificationService.getHeaderNotifications(userId, isAdminBool);
-    return notifications.map(n => ({
-      ...n,
-      id: n.id?.toString?.() ?? String(n.id),
-    }));
-  }
 }

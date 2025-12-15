@@ -191,22 +191,19 @@ async findAllByUserAndProduct(userId?: string, productId?: string) {
 
 
    // For notification bell: get latest 10 notifications for user (or all if admin)
-  async getHeaderNotifications(userId?: string, isAdmin: boolean = false) {
-    let notifications;
+  async getHeaderNotifications(userId?: string, isAdmin?: boolean) {
+    const where: any = {};
     if (isAdmin) {
-      notifications = await this.notificationRepository.find({
-        order: { createdAt: 'DESC' },
-        take: 10,
-      });
+      where.isAdmin = true;
     } else if (userId) {
-      notifications = await this.notificationRepository.find({
-        where: { userId },
-        order: { createdAt: 'DESC' },
-        take: 10,
-      });
-    } else {
-      notifications = [];
+      where.userId = userId;
     }
+    console.log('Header Notifications - where clause:', where);
+    const notifications = await this.notificationRepository.find({
+      where,
+      order: { createdAt: 'DESC' },
+      take: 10,
+    });
     // Only return fields needed for bell
     return notifications.map(n => ({
       id: n.id,

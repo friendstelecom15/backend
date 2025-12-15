@@ -125,4 +125,20 @@ export class NotificationController {
   async remove(@Param('id') id: string) {
     return this.notificationService.remove(id);
   }
+
+    @Get('header')
+  @ApiQuery({ name: 'userId', required: false, type: String })
+  @ApiQuery({ name: 'isAdmin', required: false, type: Boolean })
+  async getHeaderNotifications(
+    @Query('userId') userId?: string,
+    @Query('isAdmin') isAdmin?: string,
+  ) {
+    // Convert isAdmin to boolean (query params are strings)
+    const isAdminBool = isAdmin === 'true';
+    const notifications = await this.notificationService.getHeaderNotifications(userId, isAdminBool);
+    return notifications.map(n => ({
+      ...n,
+      id: n.id?.toString?.() ?? String(n.id),
+    }));
+  }
 }

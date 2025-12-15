@@ -1,3 +1,4 @@
+ 
 import { Injectable, NotFoundException, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -45,6 +46,7 @@ export class NotificationService {
   async createStockOutNotification(productId?: string, userId?: string,) {
     return this.create({
       userId,
+      isAdmin: true, // If no userId, treat as admin/global notification
       type: NotificationType.PRODUCT_STOCK_OUT as NotificationType,
       title: 'Product Stock Out',
       message: 'A product you are interested in is out of stock.',
@@ -186,5 +188,35 @@ async findAllByUserAndProduct(userId?: string, productId?: string) {
       message,
       link,
     });
+  }
+
+
+   // For notification bell: get latest 10 notifications for user (or all if admin)
+  async getHeaderNotifications(userId?: string, isAdmin: boolean = false) {
+    let notifications;
+    if (isAdmin) {
+      notifications = await this.notificationRepository.find({
+        order: { createdAt: 'DESC' },
+        take: 10,
+      });
+    } else if (userId) {
+      notifications = await this.notificationRepository.find({
+        where: { userId },
+        order: { createdAt: 'DESC' },
+        take: 10,
+      });
+    } else {
+      notifications = [];
+    }
+    // Only return fields needed for bell
+    return notifications.map(n => ({
+      id: n.id,
+      title: n.title,
+      message: n.message,
+      link: n.link,
+      read: n.read,
+      createdAt: n.createdAt,
+      type: n.type,
+    }));
   }
 }

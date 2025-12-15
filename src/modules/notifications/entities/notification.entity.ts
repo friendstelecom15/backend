@@ -15,8 +15,12 @@ export class Notification {
     @ObjectIdColumn()
     id: ObjectId;
 
+
     @Column({ nullable: true })
     userId?: string;
+
+    @Column({ default: false })
+    isAdmin?: boolean;
 
     @Column({ type: 'enum', enum: NotificationType })
     type?: NotificationType;

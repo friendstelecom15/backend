@@ -42,4 +42,7 @@ export class CreateNotificationDto {
   @IsOptional()
   @IsString()
   status?: string;
+
+  @IsOptional()
+  isAdmin?: boolean;
 }

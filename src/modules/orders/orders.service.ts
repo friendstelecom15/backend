@@ -117,6 +117,7 @@ async create(dto: CreateOrderDto): Promise<Order> {
       read: false,
       createdAt: new Date(),
       updatedAt: new Date(),
+      isAdmin: true,
     });
   } catch (e) {
     // Optionally log notification error

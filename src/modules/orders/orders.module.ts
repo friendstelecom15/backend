@@ -4,7 +4,6 @@ import { OrdersController } from './orders.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Order } from './entities/order.entity';
 import { OrderItem } from './entities/orderitem.entity';
-import { NotificationService } from '../notifications/notification.service';
 import { NotificationModule } from '../notifications/notification.module';
 
 @Module({

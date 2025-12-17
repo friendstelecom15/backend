@@ -1,7 +1,7 @@
 import { Entity, ObjectIdColumn, Column } from 'typeorm';
 import { ObjectId } from 'mongodb';
 
-@Entity('middlebanners')
+@Entity('givebanners')
 export class GiveBanner {
     @ObjectIdColumn()
     id: ObjectId;

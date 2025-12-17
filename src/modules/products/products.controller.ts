@@ -206,139 +206,179 @@ export class ProductsController {
   /**
    * Helper to process file uploads and JSON parsing
    */
-  private async processFileUploads(dto: any, files: any) {
-    // 1. Parse JSON fields
-    const jsonFields = ['specifications', 'seoKeywords', 'tags', 'videos', 'colors', 'networks', 'regions', 'categoryIds', 'brandIds'];
-    
-    for (const field of jsonFields) {
-      if (typeof dto[field] === 'string') {
-        try {
-          dto[field] = JSON.parse(dto[field]);
-        } catch (e) {
-          throw new BadRequestException(`Invalid JSON format for field: ${field}`);
-        }
-      }
-    }
-
-    // 2. Handle Thumbnail
-    if (files?.thumbnail?.length) {
+private async processFileUploads(dto: any, files: any) {
+  // 1. Parse JSON fields
+  const jsonFields = ['specifications', 'seoKeywords', 'tags', 'videos', 'colors', 'networks', 'regions', 'categoryIds', 'brandIds', 'images', 'keepImageIds'];
+  
+  for (const field of jsonFields) {
+    if (typeof dto[field] === 'string') {
       try {
-        const upload = await this.cloudflareService.uploadImage(
-          files.thumbnail[0].buffer,
-          files.thumbnail[0].originalname,
-        );
-        
-        dto.images = dto.images || [];
-        dto.images.unshift({
-          url: upload.variants?.[0] || upload.id || '',
-          isThumbnail: true,
-          altText: files.thumbnail[0].originalname,
-          displayOrder: 0,
-        });
-      } catch (err) {
-        throw new InternalServerErrorException(`Thumbnail upload failed: ${err.message}`);
-      }
-    }
-
-    // 3. Handle Gallery Images
-    if (files?.galleryImages?.length) {
-      try {
-        const uploadedGallery = await Promise.all(
-          files.galleryImages.map(async (file: any, index: number) => {
-            const upload = await this.cloudflareService.uploadImage(
-              file.buffer,
-              file.originalname,
-            );
-            return {
-              url: upload.variants?.[0] || upload.id || '',
-              isThumbnail: false,
-              altText: file.originalname,
-              displayOrder: index + 1,
-            };
-          }),
-        );
-        
-        dto.images = [...(dto.images || []), ...uploadedGallery];
-      } catch (err) {
-        throw new InternalServerErrorException(`Gallery upload failed: ${err.message}`);
-      }
-    }
-
-    // 4. Handle Color Images (Basic Product)
-    // Note: For complex nested file uploads (networks/regions), 
-    // we might need a more robust strategy or direct S3/Cloudflare upload from FE.
-    // Here we assume basic color images are mapped by index if sent as `colors[i][colorImage]`
-    if (files && dto.colors) {
-      for (let i = 0; i < dto.colors.length; i++) {
-        const fileKey = `colors[${i}][colorImage]`;
-        if (files[fileKey]?.length) {
-           try {
-            const upload = await this.cloudflareService.uploadImage(
-              files[fileKey][0].buffer,
-              files[fileKey][0].originalname,
-            );
-            dto.colors[i].colorImage = upload.variants?.[0] || upload.id || '';
-          } catch (err) {
-            console.error(`Color image upload failed for index ${i}`, err);
-          }
+        dto[field] = JSON.parse(dto[field]);
+      } catch (e) {
+        if (field === 'keepImageIds' && Array.isArray(dto[field])) {
+          continue;
         }
+        throw new BadRequestException(`Invalid JSON format for field: ${field}`);
       }
     }
-
-    // 5. Handle Network/Region Product Color Images (sent as 'colors' array)
-    if (files?.colors?.length) {
-      try {
-        // Upload all color images first
-        const uploadedColorImages = await Promise.all(
-          files.colors.map(async (file: any) => {
-            const upload = await this.cloudflareService.uploadImage(
-              file.buffer,
-              file.originalname,
-            );
-            return upload.variants?.[0] || upload.id || '';
-          }),
-        );
-
-        // Map uploaded images to network colors using colorImageIndex
-        if (dto.networks) {
-          for (const network of dto.networks) {
-            if (network.colors) {
-              for (const color of network.colors) {
-                // Check if color has colorImageIndex
-                if (typeof (color as any).colorImageIndex === 'number') {
-                  const index = (color as any).colorImageIndex;
-                  if (index >= 0 && index < uploadedColorImages.length) {
-                    color.colorImage = uploadedColorImages[index];
-                  }
-                }
-              }
-            }
-          }
-        }
-
-        // Map uploaded images to region colors using colorImageIndex
-        if (dto.regions) {
-          for (const region of dto.regions) {
-            if (region.colors) {
-              for (const color of region.colors) {
-                // Check if color has colorImageIndex
-                if (typeof (color as any).colorImageIndex === 'number') {
-                  const index = (color as any).colorImageIndex;
-                  if (index >= 0 && index < uploadedColorImages.length) {
-                    color.colorImage = uploadedColorImages[index];
-                  }
-                }
-              }
-            }
-          }
-        }
-      } catch (err) {
-        console.error('Network/Region color images upload failed', err);
-      }
-    }
-
-    return dto;
   }
+
+  // Get existing images from dto (if any)
+  const existingImages = dto.images || [];
+  const keepImageIds = dto.keepImageIds || [];
+
+  // Separate thumbnail and gallery images
+  const existingThumbnail = existingImages.find((img: any) => img.isThumbnail);
+  const existingGalleryImages = existingImages.filter((img: any) => !img.isThumbnail);
+
+  // Filter gallery images to keep (based on keepImageIds)
+  const galleryImagesToKeep = existingGalleryImages.filter((img: any) => 
+    img.id && keepImageIds.includes(img.id)
+  );
+
+  // Initialize result images array
+  const resultImages: any[] = [];
+
+  // 2. Handle Thumbnail (CRITICAL - must be first)
+  if (files?.thumbnail?.length) {
+    try {
+      const upload = await this.cloudflareService.uploadImage(
+        files.thumbnail[0].buffer,
+        files.thumbnail[0].originalname,
+      );
+      
+      // Add/Update thumbnail as first image
+      resultImages.push({
+        url: upload.variants?.[0] || upload.id || '',
+        isThumbnail: true,
+        altText: files.thumbnail[0].originalname,
+        displayOrder: 0,
+        // Preserve ID if updating existing thumbnail
+        id: existingThumbnail?.id || undefined
+      });
+    } catch (err) {
+      throw new InternalServerErrorException(`Thumbnail upload failed: ${err.message}`);
+    }
+  } else if (existingThumbnail) {
+    // No new thumbnail, but keep existing one
+    resultImages.push({
+      ...existingThumbnail,
+      displayOrder: 0,
+      isThumbnail: true // Ensure it's marked as thumbnail
+    });
+  }
+
+  // 3. Add kept gallery images
+  galleryImagesToKeep.forEach((img: any, index: number) => {
+    resultImages.push({
+      ...img,
+      isThumbnail: false, // Ensure it's NOT thumbnail
+      displayOrder: resultImages.length
+    });
+  });
+
+  // 4. Handle new Gallery Images upload
+  if (files?.galleryImages?.length) {
+    try {
+      const uploadedGallery = await Promise.all(
+        files.galleryImages.map(async (file: any, index: number) => {
+          const upload = await this.cloudflareService.uploadImage(
+            file.buffer,
+            file.originalname,
+          );
+          return {
+            url: upload.variants?.[0] || upload.id || '',
+            isThumbnail: false,
+            altText: file.originalname,
+            displayOrder: resultImages.length + index,
+          };
+        }),
+      );
+      
+      // Add new gallery images to result
+      resultImages.push(...uploadedGallery);
+    } catch (err) {
+      throw new InternalServerErrorException(`Gallery upload failed: ${err.message}`);
+    }
+  }
+
+  // 5. Ensure proper display order for all images
+  resultImages.forEach((img, index) => {
+    img.displayOrder = index;
+  });
+
+  // 6. Update dto.images with the complete array
+  dto.images = resultImages;
+
+  // 7. Handle Color Images (Basic Product)
+  if (files && dto.colors) {
+    for (let i = 0; i < dto.colors.length; i++) {
+      const fileKey = `colors[${i}][colorImage]`;
+      if (files[fileKey]?.length) {
+        try {
+          const upload = await this.cloudflareService.uploadImage(
+            files[fileKey][0].buffer,
+            files[fileKey][0].originalname,
+          );
+          dto.colors[i].colorImage = upload.variants?.[0] || upload.id || '';
+        } catch (err) {
+          console.error(`Color image upload failed for index ${i}`, err);
+        }
+      }
+    }
+  }
+
+  // 8. Handle Network/Region Product Color Images
+  if (files?.colors?.length) {
+    try {
+      const uploadedColorImages = await Promise.all(
+        files.colors.map(async (file: any) => {
+          const upload = await this.cloudflareService.uploadImage(
+            file.buffer,
+            file.originalname,
+          );
+          return upload.variants?.[0] || upload.id || '';
+        }),
+      );
+
+      // Map uploaded images to network colors using colorImageIndex
+      if (dto.networks) {
+        for (const network of dto.networks) {
+          if (network.colors) {
+            for (const color of network.colors) {
+              if (typeof (color as any).colorImageIndex === 'number') {
+                const index = (color as any).colorImageIndex;
+                if (index >= 0 && index < uploadedColorImages.length) {
+                  color.colorImage = uploadedColorImages[index];
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Map uploaded images to region colors using colorImageIndex
+      if (dto.regions) {
+        for (const region of dto.regions) {
+          if (region.colors) {
+            for (const color of region.colors) {
+              if (typeof (color as any).colorImageIndex === 'number') {
+                const index = (color as any).colorImageIndex;
+                if (index >= 0 && index < uploadedColorImages.length) {
+                  color.colorImage = uploadedColorImages[index];
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Network/Region color images upload failed', err);
+    }
+  }
+
+  return dto;
+}
 
 @Get()
 @ApiOperation({ summary: 'Get all products with filters and pagination' })

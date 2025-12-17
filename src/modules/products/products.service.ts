@@ -552,7 +552,7 @@ export class ProductService {
               color.hasStorage = c.hasStorage ?? true;
               color.useDefaultStorages = c.useDefaultStorages ?? true;
               color.singlePrice = c.singlePrice;
-              color.singleComparePrice = c.singleComparePrice;
+              color.singleComparePrice = c.comparePrice;
               color.singleStockQuantity = c.singleStockQuantity;
               // Map new fields
               color.regularPrice = c.regularPrice ?? c.singlePrice;
@@ -586,7 +586,7 @@ export class ProductService {
                   price.regularPrice = s.regularPrice ?? 0;
                   price.comparePrice = s.comparePrice;
                   price.discountPrice = s.discountPrice;
-                  price.discountPercent = s.discountPercent;
+                  price.discountPercent = (s as any).discountPercent;
                   price.stockQuantity = s.stockQuantity ?? 0;
                   price.lowStockAlert = s.lowStockAlert ?? 0;
 
@@ -614,237 +614,198 @@ export class ProductService {
   /**
    * Update Basic Product
    */
-  async updateBasicProduct(
-    id: string,
-    updateProductDto: CreateBasicProductDto,
-  ) {
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
+async updateBasicProduct(
+  id: string,
+  updateProductDto: CreateBasicProductDto,
+) {
+  const queryRunner = this.dataSource.createQueryRunner();
+  await queryRunner.connect();
+  await queryRunner.startTransaction();
 
-    try {
-      // 1. Find existing product
-      const product = await this.productRepository.findOne({
-        where: { _id: new ObjectId(id) } as any,
-      });
+  try {
+    const productObjectId = new ObjectId(id);
 
-      if (!product) {
-        throw new NotFoundException('Product not found');
-      }
+    // 1️⃣ Find product
+    const product = await this.productRepository.findOne({
+      where: { _id: productObjectId } as any,
+    });
 
-      if (product.productType !== 'basic') {
-        throw new BadRequestException('Product is not a basic product');
-      }
+    if (!product) throw new NotFoundException('Product not found');
+    if (product.productType !== 'basic')
+      throw new BadRequestException('Product is not basic');
 
-      // 2. Update Product
-      Object.assign(product, updateProductDto);
-      // Ensure ratingPoint is set if provided
-      if (typeof updateProductDto.ratingPoint !== 'undefined') {
-        product.ratingPoint = updateProductDto.ratingPoint;
-      }
-      product.productType = 'basic';
+    // 2️⃣ Update main product fields
+    Object.assign(product, updateProductDto);
+    product.productType = 'basic';
 
-      // Handle multiple categories and brands
-      if ((updateProductDto as any).categoryIds) {
-        product.categoryIds = (updateProductDto as any).categoryIds.map(
-          (id: string) => new ObjectId(id),
-        );
-      }
-      if ((updateProductDto as any).brandIds) {
-        product.brandIds = (updateProductDto as any).brandIds.map(
-          (id: string) => new ObjectId(id),
-        );
-      }
+    if ((updateProductDto as any).categoryIds) {
+      product.categoryIds = (updateProductDto as any).categoryIds.map(
+        (c: string) => new ObjectId(c),
+      );
+    }
 
-      delete (product as any).colors;
-      delete (product as any).images;
-      delete (product as any).videos;
-      delete (product as any).specifications;
+    if ((updateProductDto as any).brandIds) {
+      product.brandIds = (updateProductDto as any).brandIds.map(
+        (b: string) => new ObjectId(b),
+      );
+    }
 
-      const savedProduct = await queryRunner.manager.save(Product, product);
+    // Remove nested arrays; we will handle them separately
+    delete (product as any).images;
+    delete (product as any).videos;
+    delete (product as any).specifications;
+    delete (product as any).colors;
 
-      // 3. Delete existing related data
-      await queryRunner.manager.delete(ProductImage, {
-        productId: new ObjectId(id),
-      });
-      await queryRunner.manager.delete(ProductVideo, {
-        productId: new ObjectId(id),
-      });
-      // Use deleteMany for MongoDB to ensure all specs are deleted
-      await queryRunner.manager
-        .getMongoRepository(ProductSpecification)
-        .deleteMany({
-          productId: new ObjectId(id),
+    await queryRunner.manager.save(Product, product);
+
+    // 3️⃣ IMAGES - FIXED LOGIC
+    const imagesInput = (updateProductDto as any).images || [];
+    const keepImageIds: string[] = Array.isArray((updateProductDto as any).keepImageIds)
+      ? (updateProductDto as any).keepImageIds
+      : [];
+
+    console.log('Images input:', imagesInput);
+    console.log('Keep Image IDs:', keepImageIds);
+
+    // Separate existing and new images
+    const existingImagesWithIds = imagesInput.filter(img => img.id);
+    const newImagesWithoutIds = imagesInput.filter(img => !img.id);
+
+    // For existing images: fetch and update
+    const existingImagesToUpdate: ProductImage[] = [];
+    
+    if (existingImagesWithIds.length > 0) {
+      const existingIds = existingImagesWithIds.map(img => new ObjectId(img.id));
+      
+      // Fetch existing images from database
+      const existingDbImages = await queryRunner.manager
+        .getMongoRepository(ProductImage)
+        .find({
+          where: { 
+            _id: { $in: existingIds },
+            productId: productObjectId 
+          } as any,
         });
 
-      // Load and preserve existing color images before deletion
-      const existingColors = await queryRunner.manager.find(ProductColor, {
-        where: { productId: new ObjectId(id) } as any,
-      });
-
-      // Create a map of existing color images by color name
-      const existingColorImages = new Map<string, string>();
-      existingColors.forEach((color) => {
-        if (color.colorImage) {
-          existingColorImages.set(
-            color.colorName.toLowerCase().trim(),
-            color.colorImage,
-          );
-        }
-      });
-
-      // Delete existing colors and their related data (MongoDB-specific)
-      for (const color of existingColors) {
-        const colorObjectId = new ObjectId(color.id);
-
-        const existingStorages = await queryRunner.manager.find(
-          ProductStorage,
-          {
-            where: { colorId: colorObjectId } as any,
-          },
+      // Map input to database images
+      for (const imgInput of existingImagesWithIds) {
+        const existingImage = existingDbImages.find(
+          dbImg => dbImg.id.toString() === imgInput.id
         );
-
-        for (const storage of existingStorages) {
-          const storageObjectId = new ObjectId(storage.id);
-          await queryRunner.manager
-            .getMongoRepository(ProductPrice)
-            .deleteMany({
-              storageId: storageObjectId,
-            });
-        }
-
-        await queryRunner.manager
-          .getMongoRepository(ProductStorage)
-          .deleteMany({
-            colorId: colorObjectId,
-          });
-      }
-
-      await queryRunner.manager.getMongoRepository(ProductColor).deleteMany({
-        productId: new ObjectId(id),
-      });
-
-      // 4. Save new Images
-      if ((updateProductDto as any).images) {
-        const images = (updateProductDto as any).images.map((img: any) => {
+        
+        if (existingImage) {
+          // Update existing image
+          existingImage.imageUrl = imgInput.url || existingImage.imageUrl;
+          existingImage.isThumbnail = imgInput.isThumbnail ?? existingImage.isThumbnail;
+          existingImage.altText = imgInput.altText ?? existingImage.altText;
+          existingImage.displayOrder = imgInput.displayOrder ?? existingImage.displayOrder;
+          existingImagesToUpdate.push(existingImage);
+        } else {
+          // Image ID exists in input but not in DB - treat as new
           const image = new ProductImage();
-          image.productId = savedProduct.id;
-          image.imageUrl = img.url;
-          image.isThumbnail = img.isThumbnail;
-          image.altText = img.altText;
-          image.displayOrder = img.displayOrder;
-          return image;
-        });
-        await queryRunner.manager.save(ProductImage, images);
+          image.productId = productObjectId;
+          image.imageUrl = imgInput.url;
+          image.isThumbnail = imgInput.isThumbnail ?? false;
+          image.altText = imgInput.altText ?? '';
+          image.displayOrder = imgInput.displayOrder ?? existingImagesToUpdate.length;
+          existingImagesToUpdate.push(image);
+        }
       }
+    }
 
-      // 5. Save new Videos
-      if ((updateProductDto as any).videos) {
-        const videos = (updateProductDto as any).videos.map((vid: any) => {
-          const video = new ProductVideo();
-          video.productId = savedProduct.id;
-          video.videoUrl = vid.videoUrl;
-          video.videoType = vid.videoType;
-          video.displayOrder = vid.displayOrder;
-          return video;
-        });
+    // For new images: create fresh
+    const newImagesToCreate = newImagesWithoutIds.map((imgInput, index) => {
+      const image = new ProductImage();
+      image.productId = productObjectId;
+      image.imageUrl = imgInput.url;
+      image.isThumbnail = imgInput.isThumbnail ?? false;
+      image.altText = imgInput.altText ?? '';
+      image.displayOrder = imgInput.displayOrder ?? (existingImagesToUpdate.length + index);
+      return image;
+    });
+
+    // Combine all images to save
+    const allImagesToSave = [...existingImagesToUpdate, ...newImagesToCreate];
+
+    // Delete images that are not in the input (but respect keepImageIds if provided)
+    if (keepImageIds.length > 0) {
+      // Delete images not in keepImageIds AND not in our new images list
+      const keepObjectIds = keepImageIds.map(id => new ObjectId(id));
+      const imageIdsToKeep = [
+        ...keepObjectIds,
+        ...newImagesToCreate.map(img => img.id).filter(id => id) // Newly created image IDs
+      ];
+      
+      await queryRunner.manager.getMongoRepository(ProductImage).deleteMany({
+        productId: productObjectId,
+        _id: { $nin: imageIdsToKeep }
+      } as any);
+    } else {
+      // If no keepImageIds provided, delete all existing images and recreate
+      await queryRunner.manager.getMongoRepository(ProductImage).deleteMany({
+        productId: productObjectId
+      });
+    }
+
+    // Save all images
+    if (allImagesToSave.length > 0) {
+      await queryRunner.manager.save(ProductImage, allImagesToSave);
+    }
+
+    // 4️⃣ VIDEOS
+    await queryRunner.manager
+      .getMongoRepository(ProductVideo)
+      .deleteMany({ productId: productObjectId });
+
+    if ((updateProductDto as any).videos) {
+      const videos = (updateProductDto as any).videos.map((v: any, idx: number) => {
+        const video = new ProductVideo();
+        video.productId = productObjectId;
+        video.videoUrl = v.videoUrl;
+        video.videoType = v.videoType;
+        video.displayOrder = v.displayOrder ?? idx;
+        return video;
+      });
+      if (videos.length > 0) {
         await queryRunner.manager.save(ProductVideo, videos);
       }
-
-      // 6. Save new Specifications
-      if ((updateProductDto as any).specifications) {
-        // Deduplicate specifications by specKey (keep last occurrence)
-        const specMap = new Map();
-        (updateProductDto as any).specifications.forEach((s: any) => {
-          if (s.specKey && s.specValue) {
-            specMap.set(s.specKey, s);
-          }
-        });
-
-        const specs = Array.from(specMap.values()).map(
-          (s: any, index: number) => {
-            const spec = new ProductSpecification();
-            spec.productId = savedProduct.id;
-            spec.specKey = s.specKey;
-            spec.specValue = s.specValue;
-            spec.displayOrder = s.displayOrder ?? index;
-            return spec;
-          },
-        );
-
-        if (specs.length > 0) {
-          await queryRunner.manager.save(ProductSpecification, specs);
-        }
-      }
-
-      // 7. Save new Colors
-      if ((updateProductDto as any).colors) {
-        for (const c of (updateProductDto as any).colors) {
-          const color = new ProductColor();
-          color.productId = savedProduct.id;
-          color.colorName = c.colorName;
-          // Preserve existing image if not provided in update
-          const colorKey = c.colorName?.toLowerCase().trim();
-          color.colorImage =
-            c.colorImage ||
-            (colorKey ? existingColorImages.get(colorKey) : undefined) ||
-            undefined;
-          color.hasStorage = c.hasStorage ?? false;
-          color.singlePrice = c.singlePrice;
-          color.singleComparePrice = c.singleComparePrice;
-          color.singleStockQuantity = c.singleStockQuantity;
-          color.regularPrice = c.regularPrice ?? c.singlePrice;
-          color.discountPrice = c.discountPrice ?? c.singleDiscountPrice;
-          color.stockQuantity = c.stockQuantity ?? c.singleStockQuantity;
-          color.isDefault = c.isDefault ?? false;
-          color.displayOrder = c.displayOrder ?? 0;
-
-          const savedColor = await queryRunner.manager.save(
-            ProductColor,
-            color,
-          );
-
-          // Save Storages for this Color
-          if (c.storages && c.storages.length > 0) {
-            for (const s of c.storages) {
-              const storage = new ProductStorage();
-              storage.colorId = savedColor.id;
-              storage.storageSize = s.storageSize;
-              storage.isDefault = s.isDefault ?? false;
-              storage.displayOrder = s.displayOrder ?? 0;
-
-              const savedStorage = await queryRunner.manager.save(
-                ProductStorage,
-                storage,
-              );
-
-              const price = new ProductPrice();
-              price.storageId = savedStorage.id;
-              price.regularPrice = s.regularPrice ?? 0;
-              price.comparePrice = s.comparePrice;
-              price.discountPrice = s.discountPrice;
-              price.discountPercent = s.discountPercent;
-              price.stockQuantity = s.stockQuantity ?? 0;
-              price.lowStockAlert = s.lowStockAlert ?? 0;
-
-              await queryRunner.manager.save(ProductPrice, price);
-            }
-          }
-        }
-      }
-
-      await queryRunner.commitTransaction();
-      return this.findOne(savedProduct.slug);
-    } catch (err) {
-      await queryRunner.rollbackTransaction();
-      if (err.code === 11000) {
-        throw new BadRequestException(this.extractDuplicateField(err));
-      }
-      throw new InternalServerErrorException(err.message);
-    } finally {
-      await queryRunner.release();
     }
+
+    // 5️⃣ SPECIFICATIONS
+    await queryRunner.manager
+      .getMongoRepository(ProductSpecification)
+      .deleteMany({ productId: productObjectId });
+
+    if ((updateProductDto as any).specifications) {
+      const specs = (updateProductDto as any).specifications.map(
+        (s: any, index: number) => {
+          const spec = new ProductSpecification();
+          spec.productId = productObjectId;
+          spec.specKey = s.specKey;
+          spec.specValue = s.specValue;
+          spec.displayOrder = s.displayOrder ?? index;
+          return spec;
+        },
+      );
+      if (specs.length > 0) {
+        await queryRunner.manager.save(ProductSpecification, specs);
+      }
+    }
+
+    await queryRunner.commitTransaction();
+    return this.findOne(product.slug);
+  } catch (err) {
+    await queryRunner.rollbackTransaction();
+    console.error('Update basic product error:', err);
+    throw new InternalServerErrorException(err.message);
+  } finally {
+    await queryRunner.release();
   }
+}
+
+
+
+
 
   /**
    * Update Network Product
@@ -1004,18 +965,84 @@ export class ProductService {
         productId: new ObjectId(id),
       });
 
-      // 4. Save new Images, Videos, Specs
-      if ((updateProductDto as any).images) {
-        const images = (updateProductDto as any).images.map((img: any) => {
-          const image = new ProductImage();
-          image.productId = savedProduct.id;
-          image.imageUrl = img.url;
-          image.isThumbnail = img.isThumbnail;
-          image.altText = img.altText;
-          image.displayOrder = img.displayOrder;
-          return image;
+      // 4. Save new Images (upsert/delete logic)
+      const imagesInput = (updateProductDto as any).images || [];
+      const keepImageIds: string[] = Array.isArray((updateProductDto as any).keepImageIds)
+        ? (updateProductDto as any).keepImageIds
+        : [];
+
+      // Separate existing and new images
+      const existingImagesWithIds = imagesInput.filter((img: any) => img.id);
+      const newImagesWithoutIds = imagesInput.filter((img: any) => !img.id);
+
+      // For existing images: fetch and update
+      const existingImagesToUpdate: ProductImage[] = [];
+      if (existingImagesWithIds.length > 0) {
+        const existingIds = existingImagesWithIds.map((img: any) => new ObjectId(img.id));
+        const existingDbImages = await queryRunner.manager
+          .getMongoRepository(ProductImage)
+          .find({
+            where: {
+              _id: { $in: existingIds },
+              productId: savedProduct.id,
+            } as any,
+          });
+        for (const imgInput of existingImagesWithIds) {
+          const existingImage = existingDbImages.find(
+            (dbImg) => dbImg.id.toString() === imgInput.id
+          );
+          if (existingImage) {
+            existingImage.imageUrl = imgInput.url || existingImage.imageUrl;
+            existingImage.isThumbnail = imgInput.isThumbnail ?? existingImage.isThumbnail;
+            existingImage.altText = imgInput.altText ?? existingImage.altText;
+            existingImage.displayOrder = imgInput.displayOrder ?? existingImage.displayOrder;
+            existingImagesToUpdate.push(existingImage);
+          } else {
+            // Image ID exists in input but not in DB - treat as new
+            const image = new ProductImage();
+            image.productId = savedProduct.id;
+            image.imageUrl = imgInput.url;
+            image.isThumbnail = imgInput.isThumbnail ?? false;
+            image.altText = imgInput.altText ?? '';
+            image.displayOrder = imgInput.displayOrder ?? existingImagesToUpdate.length;
+            existingImagesToUpdate.push(image);
+          }
+        }
+      }
+
+      // For new images: create fresh
+      const newImagesToCreate = newImagesWithoutIds.map((imgInput: any, index: number) => {
+        const image = new ProductImage();
+        image.productId = savedProduct.id;
+        image.imageUrl = imgInput.url;
+        image.isThumbnail = imgInput.isThumbnail ?? false;
+        image.altText = imgInput.altText ?? '';
+        image.displayOrder = imgInput.displayOrder ?? (existingImagesToUpdate.length + index);
+        return image;
+      });
+
+      // Combine all images to save
+      const allImagesToSave = [...existingImagesToUpdate, ...newImagesToCreate];
+
+      // Delete images that are not in the input (but respect keepImageIds if provided)
+      if (keepImageIds.length > 0) {
+        const keepObjectIds = keepImageIds.map((id) => new ObjectId(id));
+        const imageIdsToKeep = [
+          ...keepObjectIds,
+          ...newImagesToCreate.map((img) => img.id).filter((id) => id),
+        ];
+        await queryRunner.manager.getMongoRepository(ProductImage).deleteMany({
+          productId: savedProduct.id,
+          _id: { $nin: imageIdsToKeep },
+        } as any);
+      } else {
+        await queryRunner.manager.getMongoRepository(ProductImage).deleteMany({
+          productId: savedProduct.id,
         });
-        await queryRunner.manager.save(ProductImage, images);
+      }
+
+      if (allImagesToSave.length > 0) {
+        await queryRunner.manager.save(ProductImage, allImagesToSave);
       }
 
       if ((updateProductDto as any).videos) {
@@ -2481,7 +2508,6 @@ export class ProductService {
     const errorMessage = error.message || '';
     const errorString = JSON.stringify(error);
 
-
     // Check for slug duplicate
     if (
       errorMessage.includes('slug') ||
@@ -2541,7 +2567,6 @@ export class ProductService {
       const product = await this.productRepository.findOne({
         where: { _id: objectId } as any,
       });
-
 
       if (!product) {
         return null;

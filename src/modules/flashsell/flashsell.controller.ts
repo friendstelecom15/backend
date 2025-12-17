@@ -60,7 +60,36 @@ export class FlashsellController {
   }
 
   @Patch(':id')
-  async update(@Param('id') id: string, @Body() data: Partial<Flashsell>) {
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'management')
+  @FileFieldsUpload(
+    [{ name: 'bannerImg', maxCount: 1 }],
+    undefined,
+    UploadType.IMAGE,
+  )
+  async update(
+    @Param('id') id: string,
+    @Body() data: Partial<Flashsell>,
+    @CurrentUser() user: User,
+    @UploadedFiles() files: { bannerImg?: Express.Multer.File[] },
+  ) {
+    if (!user || !user.id) {
+      throw new InternalServerErrorException('Authentication required');
+    }
+    if (files?.bannerImg?.length) {
+      const file = files.bannerImg[0];
+      try {
+        const upload = await this.cloudflareService.uploadImage(
+          file.buffer,
+          file.originalname,
+        );
+        data.bannerImg = upload.variants?.[0] || upload.id || upload.filename || '';
+      } catch (err) {
+        throw new InternalServerErrorException(
+          `Cloudflare image upload failed: ${err}`,
+        );
+      }
+    }
     return await this.flashsellService.update(id, data);
   }
 

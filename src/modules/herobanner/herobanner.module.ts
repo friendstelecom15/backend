@@ -6,9 +6,10 @@ import { HeroBanner } from './entities/herobanner.entity';
 import { BottomBanner } from './entities/botombanner.entity';
 import { MiddleBanner } from './entities/middelbanner.entity';
 import { CloudflareService } from 'src/config/cloudflare-video.service';
+import { GiveBanner } from './entities/givebanner.entity';
 
 @Module({
-    imports: [TypeOrmModule.forFeature([HeroBanner, BottomBanner, MiddleBanner])],
+    imports: [TypeOrmModule.forFeature([HeroBanner, BottomBanner, MiddleBanner, GiveBanner])],
     controllers: [HerobannerController],
     providers: [HerobannerService, CloudflareService],
     exports: [HerobannerService],

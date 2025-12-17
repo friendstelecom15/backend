@@ -25,6 +25,7 @@ import { BlogModule } from './modules/blog/blog.module';
 import { NotificationModule } from './modules/notifications/notification.module';
 import { DeliveryMethodModule } from './modules/delivery-method/delivery-method.module';
 import { CorporateDealModule } from './modules/corporate-deal/corporate-deal.module';
+import { FlashsellModule } from './modules/flashsell/flashsell.module';
 
 @Module({
   imports: [
@@ -58,6 +59,7 @@ import { CorporateDealModule } from './modules/corporate-deal/corporate-deal.mod
     NotificationModule,
     DeliveryMethodModule,
     CorporateDealModule,
+    FlashsellModule,
   ],
   controllers: [AppController],
   providers: [AppService],

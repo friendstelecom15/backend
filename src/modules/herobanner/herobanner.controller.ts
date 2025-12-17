@@ -32,133 +32,171 @@ import { CloudflareService } from 'src/config/cloudflare-video.service';
 // @ApiBearerAuth()
 @Controller('herobanner')
 export class HerobannerController {
-    // BottomBanner Endpoints
-    @Post('bottom')
-    @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles('admin', 'management')
-    @FileFieldsUpload(
-      [{ name: 'img', maxCount: 10 }],
-      undefined,
-      UploadType.IMAGE,
-    )
-    async createBottom(
-      @Body() dto: CreateHerobannerDto,
-      @CurrentUser() user: User,
-      @UploadedFiles() files: { img?: Express.Multer.File[] },
-    ) {
-      if (!user || !user.id) throw new UnauthorizedException('Authentication required');
-      if (files?.img?.length) {
-        const file = files.img[0];
-        try {
-          const upload = await this.cloudflareService.uploadImage(file.buffer, file.originalname);
-          dto.img = upload.variants?.[0] || upload.id || upload.filename || '';
-        } catch (err) {
-          throw new InternalServerErrorException(`Cloudflare image upload failed: ${err}`);
-        }
+  // BottomBanner Endpoints
+  @Post('bottom')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'management')
+  @FileFieldsUpload(
+    [{ name: 'img', maxCount: 10 }],
+    undefined,
+    UploadType.IMAGE,
+  )
+  async createBottom(
+    @Body() dto: CreateHerobannerDto,
+    @CurrentUser() user: User,
+    @UploadedFiles() files: { img?: Express.Multer.File[] },
+  ) {
+    if (!user || !user.id)
+      throw new UnauthorizedException('Authentication required');
+    if (files?.img?.length) {
+      const file = files.img[0];
+      try {
+        const upload = await this.cloudflareService.uploadImage(
+          file.buffer,
+          file.originalname,
+        );
+        dto.img = upload.variants?.[0] || upload.id || upload.filename || '';
+      } catch (err) {
+        throw new InternalServerErrorException(
+          `Cloudflare image upload failed: ${err}`,
+        );
       }
-      return await this.herobannerService.createBottomBanner(dto);
     }
+    return await this.herobannerService.createBottomBanner(dto);
+  }
 
-    @Get('bottom')
-    async findAllBottom() {
-      const all = await this.herobannerService.findAllBottomBanners();
-      return all.map(b => ({ ...b, id: b.id?.toString?.() ?? String(b.id) }));
-    }
+  @Get('bottom')
+  async findAllBottom() {
+    const all = await this.herobannerService.findAllBottomBanners();
+    return all.map((b) => ({ ...b, id: b.id?.toString?.() ?? String(b.id) }));
+  }
 
-    @Get('bottom/:id')
-    async findOneBottom(@Param('id') id: string) {
-      const banner = await this.herobannerService.findOneBottomBanner(id);
-      return { ...banner, id: banner.id?.toString?.() ?? String(banner.id) };
-    }
+  @Get('bottom/:id')
+  async findOneBottom(@Param('id') id: string) {
+    const banner = await this.herobannerService.findOneBottomBanner(id);
+    return { ...banner, id: banner.id?.toString?.() ?? String(banner.id) };
+  }
 
-    @Patch('bottom/:id')
-    @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles('admin', 'management')
-    @FileUpload('img', 1, { storage: memoryStorage() }, UploadType.IMAGE)
-    async updateBottom(@Param('id') id: string, @UploadedFile() file: Express.Multer.File) {
-      let updateData = {};
-      if (file && file.buffer) {
-        try {
-          const upload = await this.cloudflareService.uploadImage(file.buffer, file.originalname);
-          updateData = { img: upload.variants?.[0] || upload.id || upload.filename || '' };
-        } catch (err) {
-          throw new InternalServerErrorException(`Cloudflare image upload failed: ${err}`);
-        }
+  @Patch('bottom/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'management')
+  @FileUpload('img', 1, { storage: memoryStorage() }, UploadType.IMAGE)
+  async updateBottom(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    let updateData = {};
+    if (file && file.buffer) {
+      try {
+        const upload = await this.cloudflareService.uploadImage(
+          file.buffer,
+          file.originalname,
+        );
+        updateData = {
+          img: upload.variants?.[0] || upload.id || upload.filename || '',
+        };
+      } catch (err) {
+        throw new InternalServerErrorException(
+          `Cloudflare image upload failed: ${err}`,
+        );
       }
-      const banner = await this.herobannerService.updateBottomBanner(id, updateData);
-      return { ...banner, id: banner.id?.toString?.() ?? String(banner.id) };
     }
+    const banner = await this.herobannerService.updateBottomBanner(
+      id,
+      updateData,
+    );
+    return { ...banner, id: banner.id?.toString?.() ?? String(banner.id) };
+  }
 
-    @Delete('bottom/:id')
-    @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles('admin', 'management')
-    async removeBottom(@Param('id') id: string) {
-      return await this.herobannerService.removeBottomBanner(id);
-    }
+  @Delete('bottom/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'management')
+  async removeBottom(@Param('id') id: string) {
+    return await this.herobannerService.removeBottomBanner(id);
+  }
 
-    // MiddleBanner Endpoints
-    @Post('middle')
-    @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles('admin', 'management')
-    @FileFieldsUpload(
-      [{ name: 'img', maxCount: 10 }],
-      undefined,
-      UploadType.IMAGE,
-    )
-    async createMiddle(
-      @Body() dto: CreateHerobannerDto,
-      @CurrentUser() user: User,
-      @UploadedFiles() files: { img?: Express.Multer.File[] },
-    ) {
-      if (!user || !user.id) throw new UnauthorizedException('Authentication required');
-      if (files?.img?.length) {
-        const file = files.img[0];
-        try {
-          const upload = await this.cloudflareService.uploadImage(file.buffer, file.originalname);
-          dto.img = upload.variants?.[0] || upload.id || upload.filename || '';
-        } catch (err) {
-          throw new InternalServerErrorException(`Cloudflare image upload failed: ${err}`);
-        }
+  // MiddleBanner Endpoints
+  @Post('middle')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'management')
+  @FileFieldsUpload(
+    [{ name: 'img', maxCount: 10 }],
+    undefined,
+    UploadType.IMAGE,
+  )
+  async createMiddle(
+    @Body() dto: CreateHerobannerDto,
+    @CurrentUser() user: User,
+    @UploadedFiles() files: { img?: Express.Multer.File[] },
+  ) {
+    if (!user || !user.id)
+      throw new UnauthorizedException('Authentication required');
+    if (files?.img?.length) {
+      const file = files.img[0];
+      try {
+        const upload = await this.cloudflareService.uploadImage(
+          file.buffer,
+          file.originalname,
+        );
+        dto.img = upload.variants?.[0] || upload.id || upload.filename || '';
+      } catch (err) {
+        throw new InternalServerErrorException(
+          `Cloudflare image upload failed: ${err}`,
+        );
       }
-      return await this.herobannerService.createMiddleBanner(dto);
     }
+    return await this.herobannerService.createMiddleBanner(dto);
+  }
 
-    @Get('middle')
-    async findAllMiddle() {
-      const all = await this.herobannerService.findAllMiddleBanners();
-      return all.map(b => ({ ...b, id: b.id?.toString?.() ?? String(b.id) }));
-    }
+  @Get('middle')
+  async findAllMiddle() {
+    const all = await this.herobannerService.findAllMiddleBanners();
+    return all.map((b) => ({ ...b, id: b.id?.toString?.() ?? String(b.id) }));
+  }
 
-    @Get('middle/:id')
-    async findOneMiddle(@Param('id') id: string) {
-      const banner = await this.herobannerService.findOneMiddleBanner(id);
-      return { ...banner, id: banner.id?.toString?.() ?? String(banner.id) };
-    }
+  @Get('middle/:id')
+  async findOneMiddle(@Param('id') id: string) {
+    const banner = await this.herobannerService.findOneMiddleBanner(id);
+    return { ...banner, id: banner.id?.toString?.() ?? String(banner.id) };
+  }
 
-    @Patch('middle/:id')
-    @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles('admin', 'management')
-    @FileUpload('img', 1, { storage: memoryStorage() }, UploadType.IMAGE)
-    async updateMiddle(@Param('id') id: string, @UploadedFile() file: Express.Multer.File) {
-      let updateData = {};
-      if (file && file.buffer) {
-        try {
-          const upload = await this.cloudflareService.uploadImage(file.buffer, file.originalname);
-          updateData = { img: upload.variants?.[0] || upload.id || upload.filename || '' };
-        } catch (err) {
-          throw new InternalServerErrorException(`Cloudflare image upload failed: ${err}`);
-        }
+  @Patch('middle/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'management')
+  @FileUpload('img', 1, { storage: memoryStorage() }, UploadType.IMAGE)
+  async updateMiddle(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    let updateData = {};
+    if (file && file.buffer) {
+      try {
+        const upload = await this.cloudflareService.uploadImage(
+          file.buffer,
+          file.originalname,
+        );
+        updateData = {
+          img: upload.variants?.[0] || upload.id || upload.filename || '',
+        };
+      } catch (err) {
+        throw new InternalServerErrorException(
+          `Cloudflare image upload failed: ${err}`,
+        );
       }
-      const banner = await this.herobannerService.updateMiddleBanner(id, updateData);
-      return { ...banner, id: banner.id?.toString?.() ?? String(banner.id) };
     }
+    const banner = await this.herobannerService.updateMiddleBanner(
+      id,
+      updateData,
+    );
+    return { ...banner, id: banner.id?.toString?.() ?? String(banner.id) };
+  }
 
-    @Delete('middle/:id')
-    @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles('admin', 'management')
-    async removeMiddle(@Param('id') id: string) {
-      return await this.herobannerService.removeMiddleBanner(id);
-    }
+  @Delete('middle/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'management')
+  async removeMiddle(@Param('id') id: string) {
+    return await this.herobannerService.removeMiddleBanner(id);
+  }
   constructor(
     private readonly herobannerService: HerobannerService,
     private readonly cloudflareService: CloudflareService,
@@ -250,5 +288,88 @@ export class HerobannerController {
   @Roles('admin', 'management')
   async remove(@Param('id') id: string) {
     return await this.herobannerService.remove(id);
+  }
+
+  // GiveBanner Endpoints
+  @Post('give')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'management')
+  @FileFieldsUpload(
+    [{ name: 'img', maxCount: 10 }],
+    undefined,
+    UploadType.IMAGE,
+  )
+  async createGive(
+    @Body() dto: CreateHerobannerDto,
+    @CurrentUser() user: User,
+    @UploadedFiles() files: { img?: Express.Multer.File[] },
+  ) {
+    if (!user || !user.id)
+      throw new UnauthorizedException('Authentication required');
+    if (files?.img?.length) {
+      const file = files.img[0];
+      try {
+        const upload = await this.cloudflareService.uploadImage(
+          file.buffer,
+          file.originalname,
+        );
+        dto.img = upload.variants?.[0] || upload.id || upload.filename || '';
+      } catch (err) {
+        throw new InternalServerErrorException(
+          `Cloudflare image upload failed: ${err}`,
+        );
+      }
+    }
+    return await this.herobannerService.createGiveBanner(dto);
+  }
+
+  @Get('give')
+  async findAllGive() {
+    const all = await this.herobannerService.findAllGiveBanners();
+    return all.map((b) => ({ ...b, id: b.id?.toString?.() ?? String(b.id) }));
+  }
+
+  @Get('give/:id')
+  async findOneGive(@Param('id') id: string) {
+    const banner = await this.herobannerService.findOneGiveBanner(id);
+    return { ...banner, id: banner.id?.toString?.() ?? String(banner.id) };
+  }
+
+  @Patch('give/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'management')
+  @FileUpload('img', 1, { storage: memoryStorage() }, UploadType.IMAGE)
+  async updateGive(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    let updateData = {};
+    if (file && file.buffer) {
+      try {
+        const upload = await this.cloudflareService.uploadImage(
+          file.buffer,
+          file.originalname,
+        );
+        updateData = {
+          img: upload.variants?.[0] || upload.id || upload.filename || '',
+        };
+      } catch (err) {
+        throw new InternalServerErrorException(
+          `Cloudflare image upload failed: ${err}`,
+        );
+      }
+    }
+    const banner = await this.herobannerService.updateGiveBanner(
+      id,
+      updateData,
+    );
+    return { ...banner, id: banner.id?.toString?.() ?? String(banner.id) };
+  }
+
+  @Delete('give/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'management')
+  async removeGive(@Param('id') id: string) {
+    return await this.herobannerService.removeGiveBanner(id);
   }
 }

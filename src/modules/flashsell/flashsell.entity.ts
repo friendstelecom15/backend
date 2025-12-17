@@ -10,7 +10,7 @@ export class Flashsell {
   bannerImg: string;
 
   @Column()
-  productId: string;
+  productIds: string[];
 
   @Column()
   startTime: Date;

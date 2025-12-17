@@ -248,6 +248,12 @@ export class HerobannerController {
     }));
   }
 
+  @Get('give')
+  async findAllGive() {
+    const all = await this.herobannerService.findAllGiveBanners();
+    return all.map((b) => ({ ...b, id: b.id?.toString?.() ?? String(b.id) }));
+  }
+
   @Get(':id')
   async findOne(@Param('id') id: string) {
     const banner = await this.herobannerService.findOne(id);
@@ -321,12 +327,6 @@ export class HerobannerController {
       }
     }
     return await this.herobannerService.createGiveBanner(dto);
-  }
-
-  @Get('give')
-  async findAllGive() {
-    const all = await this.herobannerService.findAllGiveBanners();
-    return all.map((b) => ({ ...b, id: b.id?.toString?.() ?? String(b.id) }));
   }
 
   @Get('give/:id')

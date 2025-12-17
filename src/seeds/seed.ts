@@ -190,7 +190,7 @@ async function seed() {
             expiryDate: faker.date.future(),
             status: faker.helpers.arrayElement(['active', 'expired', 'pending']),
             activatedBy: users[faker.number.int({ min: 0, max: users.length - 1 })].id.toString(),
-            orderId: orders[faker.number.int({ min: 0, max: orders.length - 1 })].id.toString(),
+            orderNumber: orders[faker.number.int({ min: 0, max: orders.length - 1 })].id.toString(),
         }));
         await warrantyRepo.save(warrantyRecords);
     }

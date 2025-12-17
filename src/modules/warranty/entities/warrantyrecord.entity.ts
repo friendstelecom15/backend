@@ -31,7 +31,7 @@ export class WarrantyRecord {
   activatedBy?: string;
 
   @Column({ nullable: true })
-  orderId?: string;
+  orderNumber?: string;
 
   @CreateDateColumn()
   createdAt: Date;

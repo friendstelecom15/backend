@@ -6,8 +6,7 @@ export class Flashsell {
   @ObjectIdColumn()
   id: ObjectId;
 
-
-    @Column()
+  @Column()
   title: string;
 
   @Column()
@@ -23,7 +22,7 @@ export class Flashsell {
   endTime: Date;
 
   @Column()
-  discountPrice: number;
+  discountpercentage : number;
 
   @Column()
   stock: number;

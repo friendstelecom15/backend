@@ -6,6 +6,10 @@ export class Flashsell {
   @ObjectIdColumn()
   id: ObjectId;
 
+
+    @Column()
+  title: string;
+
   @Column()
   bannerImg: string;
 

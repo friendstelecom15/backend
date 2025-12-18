@@ -1,3 +1,4 @@
+
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -55,14 +56,58 @@ export class WarrantyService {
   }
 
   async lookup(dto: WarrantyLookupDto) {
-    const warranty = await this.warrantyRepo.findOne({ where: { imei: dto.imei } });
+    let warranty: WarrantyRecord | undefined;
+    if (dto.imei) {
+      warranty = (await this.warrantyRepo.findOne({ where: { imei: dto.imei, phone: dto.phone } })) || undefined;
+    } else if (dto.serial) {
+      warranty = (await this.warrantyRepo.findOne({ where: { serial: dto.serial, phone: dto.phone } })) ?? undefined;
+    }
     if (!warranty) throw new NotFoundException('Warranty not found');
     const logs = await this.logRepo.find({ where: { warrantyId: String(warranty.id) } });
+    // Calculate remaining days
+    let remainingDays: number | null = null;
+    if (warranty.expiryDate) {
+      const today = new Date();
+      const expiry = new Date(warranty.expiryDate);
+      remainingDays = Math.max(0, Math.ceil((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)));
+    }
     return {
       ...warranty,
       id: String(warranty.id),
+      startDate: warranty.purchaseDate,
+      endDate: warranty.expiryDate,
+      remainingDays,
       logs,
     };
+  }
+
+    async update(id: string, dto: Partial<ActivateWarrantyDto>, adminUsername?: string) {
+    const warranty = await this.warrantyRepo.findOne({ where: { id: new ObjectId(id) } });
+    if (!warranty) throw new NotFoundException('Warranty not found');
+    Object.assign(warranty, dto);
+    const saved = await this.warrantyRepo.save(warranty);
+    const log = this.logRepo.create({
+      warrantyId: String(saved.id),
+      action: 'updated',
+      changes: this.toJsonValue(dto),
+      admin: adminUsername || 'system',
+    });
+    await this.logRepo.save(log);
+    return { ...saved, id: String(saved.id) };
+  }
+
+  async delete(id: string, adminUsername?: string) {
+    const warranty = await this.warrantyRepo.findOne({ where: { id: new ObjectId(id) } });
+    if (!warranty) throw new NotFoundException('Warranty not found');
+    await this.warrantyRepo.delete({ id: new ObjectId(id) });
+    const log = this.logRepo.create({
+      warrantyId: String(id),
+      action: 'deleted',
+      changes: this.toJsonValue(warranty),
+      admin: adminUsername || 'system',
+    });
+    await this.logRepo.save(log);
+    return { success: true };
   }
 
   async getLogs(id: string | ObjectId) {

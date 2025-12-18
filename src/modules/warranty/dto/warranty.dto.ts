@@ -25,8 +25,17 @@ export class ActivateWarrantyDto {
   orderId?: string;
 }
 
+
 export class WarrantyLookupDto {
+  @ApiProperty({ required: false })
+  @IsString()
+  imei?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  serial?: string;
+
   @ApiProperty()
   @IsString()
-  imei: string;
+  phone: string;
 }

@@ -9,6 +9,6 @@ import { WarrantyLog } from './entities/warrantylog.entity';
   imports: [TypeOrmModule.forFeature([WarrantyRecord, WarrantyLog])],
   controllers: [WarrantyController],
   providers: [WarrantyService],
-  exports: [WarrantyService],
+  exports: [WarrantyService], // Make WarrantyService available for other modules
 })
-export class WarrantyModule { }
+export class WarrantyModule {}

@@ -9,18 +9,21 @@ import {
 import { Order } from './entities/order.entity';
 import { OrderItem } from './entities/orderitem.entity';
 import { ObjectId } from 'mongodb';
+
 import { NotificationService } from '../notifications/notification.service';
 import { NotificationType } from '../notifications/entities/notification.entity';
+import { WarrantyService } from '../warranty/warranty.service';
 
 @Injectable()
+
 export class OrdersService {
   constructor(
     @InjectRepository(Order)
     private readonly orderRepository: Repository<Order>,
     @InjectRepository(OrderItem)
     private readonly orderItemRepository: Repository<OrderItem>,
-
     private readonly notificationService: NotificationService,
+    private readonly warrantyService: WarrantyService,
   ) {}
 
 async create(dto: CreateOrderDto): Promise<Order> {
@@ -403,6 +406,25 @@ async create(dto: CreateOrderDto): Promise<Order> {
     const newStatusEntry = { status: dto.status, date: new Date() };
     const updatedHistory = Array.isArray(order.statusHistory) ? [...order.statusHistory, newStatusEntry] : [newStatusEntry];
     await this.orderRepository.update(_id, { status: dto.status, statusHistory: updatedHistory });
+
+    // অর্ডার delivered হলে অটো ওয়ারেন্টি এন্ট্রি
+    if (dto.status === 'delivered') {
+      // একাধিক অর্ডার আইটেম থাকলে প্রত্যেকটির জন্য ওয়ারেন্টি এন্ট্রি
+      const updatedOrder = await this.findOne(_id);
+      for (const item of updatedOrder.orderItems || []) {
+        try {
+          await this.warrantyService.activate({
+            productId: item.productId,
+            imei: item.dynamicInputs?.imei || '',
+            serial: item.dynamicInputs?.serial || '',
+            phone: updatedOrder.phone ?? '',
+            orderId: String(updatedOrder.id),
+          }, 'system');
+        } catch (e) {
+          // ডুপ্লিকেট বা অন্য error হলে skip
+        }
+      }
+    }
     return this.findOne(_id);
   }
 

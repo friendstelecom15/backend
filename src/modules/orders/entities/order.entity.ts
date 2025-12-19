@@ -1,4 +1,10 @@
-import { Entity, Column, CreateDateColumn, UpdateDateColumn, ObjectIdColumn } from 'typeorm';
+import {
+  Entity,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ObjectIdColumn,
+} from 'typeorm';
 import { ObjectId } from 'mongodb';
 
 @Entity('orders')
@@ -36,7 +42,6 @@ export class Order {
 
   @Column()
   total: number;
-
 
   @Column({ default: 'pending' })
   status: string;

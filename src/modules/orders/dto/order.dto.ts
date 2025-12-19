@@ -52,6 +52,7 @@ export enum OrderStatus {
   SHIPPED = 'shipped',
   DELIVERED = 'delivered',
   CANCELLED = 'cancelled',
+  RETURNED = 'returned',
 }
 
 export enum PaymentStatus {
@@ -59,6 +60,7 @@ export enum PaymentStatus {
   PAID = 'paid',
   FAILED = 'failed',
   REFUNDED = 'refunded',
+  VOID = 'void',
 }
 
 export class CreateOrderDto {

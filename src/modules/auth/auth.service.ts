@@ -26,6 +26,7 @@ export class AuthService {
     private readonly userRepo: Repository<User>,
   ) { }
 
+
   async decodeAuthCode(token: string): Promise<any> {
     try {
       // This both verifies and decodes the token
@@ -133,12 +134,23 @@ export class AuthService {
     if (!user) throw new UnauthorizedException('User creation failed');
 
     const authUser: AuthUser = {
-      id: user.id?.toString?.() ?? String(user.id),
+	  id: user.id?.toString?.() ?? String(user.id),
       email: user.email,
       name: user.name,
       role: user.role,
       image: user.image ?? undefined,
     };
     return this.login(authUser);
+  }
+
+  /**
+   * Logout method for JWT-based authentication.
+   * For stateless JWT, logout is handled on the client by removing the token.
+   * If token blacklisting is implemented, add the token to a blacklist here.
+   */
+  async logout(token?: string): Promise<{ message: string }> {
+    // For stateless JWT, just instruct the client to delete the token.
+    // If you implement token blacklisting, add logic here to store the token in a blacklist.
+    return { message: 'Logged out successfully' };
   }
 }

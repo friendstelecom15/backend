@@ -1,3 +1,4 @@
+ 
 import { Body, Controller, Param, Post, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
@@ -38,6 +39,13 @@ export class AuthController {
   @ApiOperation({ summary: 'Login with social provider (Google/Facebook)' })
   async socialLogin(@Body() dto: SocialLoginDto) {
     return this.authService.socialLogin(dto);
+  }
+
+   @Post('logout')
+  @ApiOperation({ summary: 'Logout user (client should remove token)' })
+  async logout() {
+    // Optionally, you can extract the token from headers if you want to support blacklisting
+    return this.authService.logout();
   }
   
 }

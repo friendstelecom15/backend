@@ -16,7 +16,6 @@ import { ProductVideo } from './product-video.entity';
 import { ProductSpecification } from './product-specification.entity';
 import { ProductNetwork } from './product-network.entity';
 
-
 @Entity('products')
 export class Product {
   @ObjectIdColumn()
@@ -85,7 +84,6 @@ export class Product {
   @Column({ nullable: true })
   easyReturns?: string;
 
-
   @Column({ default: 0 })
   rewardPoints: number;
 
@@ -127,22 +125,34 @@ export class Product {
   @Column({ nullable: true })
   tags?: string[];
 
-  @OneToMany(() => ProductRegion, (r) => r.product, { cascade: ['insert','update'] })
+  @OneToMany(() => ProductRegion, (r) => r.product, {
+    cascade: ['insert', 'update'],
+  })
   regions: ProductRegion[]; // Optional: For region-based variants
 
-  @OneToMany(() => ProductNetwork, (n) => n.product, { cascade: ['insert','update'] })
+  @OneToMany(() => ProductNetwork, (n) => n.product, {
+    cascade: ['insert', 'update'],
+  })
   networks: ProductNetwork[]; // Optional: For network-based variants (WiFi, WiFi+Cellular)
 
-  @OneToMany(() => ProductColor, (c) => c.product, { cascade: ['insert','update'] })
+  @OneToMany(() => ProductColor, (c) => c.product, {
+    cascade: ['insert', 'update'],
+  })
   directColors: ProductColor[]; // Optional: For direct color variants
 
-  @OneToMany(() => ProductImage, (i) => i.product, { cascade: ['insert','update'] })
+  @OneToMany(() => ProductImage, (i) => i.product, {
+    cascade: ['insert', 'update'],
+  })
   images: ProductImage[];
 
-  @OneToMany(() => ProductVideo, (v) => v.product, { cascade: ['insert','update'] })
+  @OneToMany(() => ProductVideo, (v) => v.product, {
+    cascade: ['insert', 'update'],
+  })
   videos: ProductVideo[];
 
-  @OneToMany(() => ProductSpecification, (s) => s.product, { cascade: ['insert','update'] })
+  @OneToMany(() => ProductSpecification, (s) => s.product, {
+    cascade: ['insert', 'update'],
+  })
   specifications: ProductSpecification[];
 
   @CreateDateColumn()
@@ -156,4 +166,10 @@ export class Product {
 
   @Column({ nullable: true })
   faqIds?: ObjectId[];
+
+  @Column({ nullable: true })
+  serial?: string;
+
+  @Column({ nullable: true })
+  imei?: string;
 }

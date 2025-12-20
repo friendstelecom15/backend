@@ -20,6 +20,16 @@ export class CreateBasicProductDto {
   @IsNotEmpty()
   name: string;
 
+  @ApiPropertyOptional({ description: 'Serial number', example: 'SN123456789' })
+  @IsOptional()
+  @IsString()
+  serial?: string;
+
+  @ApiPropertyOptional({ description: 'IMEI number', example: '356789123456789' })
+  @IsOptional()
+  @IsString()
+  imei?: string;
+
   @ApiProperty({
     description: 'URL-friendly slug',
     example: 'iphone-15-pro-max',
@@ -506,6 +516,15 @@ export class CreateRegionProductDto extends CreateBasicProductDto {
 import { PartialType } from '@nestjs/swagger';
 
 export class UpdateProductNewDto extends PartialType(CreateBasicProductDto) {
+  @ApiPropertyOptional({ description: 'Serial number', example: 'SN123456789' })
+  @IsOptional()
+  @IsString()
+  serial?: string;
+
+  @ApiPropertyOptional({ description: 'IMEI number', example: '356789123456789' })
+  @IsOptional()
+  @IsString()
+  imei?: string;
   @ApiPropertyOptional({
     description: 'Product name',
     example: 'Updated iPhone 15 Pro Max',

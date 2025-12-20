@@ -80,6 +80,8 @@ export class OrdersService {
           regionName: item.regionName, // Store region name
           priceType: item.priceType, // Store price type
           image: item.image,
+          imei: item.imei,
+          serial: item.serial,
           dynamicInputs: item.dynamicInputs || {},
           selectedVariants: item.selectedVariants || {}, // Store complete variant info
           orderId: String(savedOrder.id),
@@ -510,45 +512,66 @@ export class OrdersService {
     // অর্ডার delivered হলে অটো ওয়ারেন্টি এন্ট্রি এবং reward points যোগ
     if (dto.status === 'delivered') {
       // একাধিক অর্ডার আইটেম থাকলে প্রত্যেকটির জন্য ওয়ারেন্টি এন্ট্রি
-      const updatedOrder = await this.findOne(_id);
-      for (const item of updatedOrder.orderItems || []) {
+      // Always use _id for MongoDB
+      const updatedOrder = await this.orderRepository.findOne({ where: { _id: _id } } as any);
+      console.log('[Warranty] updatedOrder:', updatedOrder);
+      if (!updatedOrder || !updatedOrder.id) {
+        console.error('[Warranty] Cannot process warranty: updatedOrder or updatedOrder.id missing. _id:', _id, 'updatedOrder:', updatedOrder);
+        // Return the original order object after update
+        return order;
+      } else {
+        console.log('[Warranty] updatedOrder.id:', updatedOrder.id, 'typeof:', typeof updatedOrder.id);
+        const orderIdStr = String(updatedOrder.id);
+        const fullOrderItems = await this.orderItemRepository.find({ where: { orderId: orderIdStr } });
+        for (const item of fullOrderItems || []) {
+          try {
+            // Prefer direct fields, fallback to dynamicInputs
+            const dynamicInputs = item.dynamicInputs && typeof item.dynamicInputs === 'object' ? item.dynamicInputs : {};
+            const imei = item.imei || dynamicInputs.imei || '';
+            const serial = item.serial || dynamicInputs.serial || '';
+            console.log('[Warranty] Creating for productId:', item.productId, 'IMEI:', imei, 'Serial:', serial, 'OrderId:', orderIdStr);
+            if (!item.productId) {
+              console.warn('[Warranty] Skipping: productId missing for item:', item);
+              continue;
+            }
+            if (!imei && !serial) {
+              console.warn('[Warranty] Skipping: Both IMEI and Serial missing for item:', item);
+              continue;
+            }
+            await this.warrantyService.activate(
+              {
+                productId: item.productId,
+                imei,
+                serial,
+                phone: updatedOrder.phone ?? '',
+                orderId: orderIdStr,
+              },
+              'system',
+            );
+            console.log('[Warranty] Created successfully for productId:', item.productId);
+          } catch (e) {
+            console.error('[Warranty] Error creating for productId:', item.productId, e);
+          }
+        }
+        // Reward points যোগ করা
         try {
-          // Ensure dynamicInputs is always an object
-          const dynamicInputs = item.dynamicInputs && typeof item.dynamicInputs === 'object' ? item.dynamicInputs : {};
-          console.log('[Warranty] Creating for productId:', item.productId, 'IMEI:', dynamicInputs.imei, 'Serial:', dynamicInputs.serial, 'OrderId:', updatedOrder.id);
-          await this.warrantyService.activate(
-            {
-              productId: item.productId,
-              imei: dynamicInputs.imei || '',
-              serial: dynamicInputs.serial || '',
-              phone: updatedOrder.phone ?? '',
-              orderId: String(updatedOrder.id),
-            },
-            'system',
-          );
-          console.log('[Warranty] Created successfully for productId:', item.productId);
+          // User repository lazily loaded to avoid circular dependency
+          const userRepo = this.orderRepository.manager.getRepository('User');
+          // Find user by email (from order)
+          const user = await userRepo.findOne({ where: { email: updatedOrder.email } });
+          if (user) {
+            const currentPoints = user.myrewardPoints || 0;
+            const orderPoints = updatedOrder.totalRewardPoints || 0;
+            user.myrewardPoints = currentPoints + orderPoints;
+            await userRepo.save(user);
+            console.log('[RewardPoints] Added', orderPoints, 'to user', user.email, 'Total now:', user.myrewardPoints);
+          } else {
+            console.warn('[RewardPoints] No user found for email:', updatedOrder.email);
+          }
         } catch (e) {
-          console.error('[Warranty] Error creating for productId:', item.productId, e);
+          console.error('[RewardPoints] Error updating user points:', e);
         }
-      }
-
-      // Reward points যোগ করা
-      try {
-        // User repository lazily loaded to avoid circular dependency
-        const userRepo = this.orderRepository.manager.getRepository('User');
-        // Find user by email (from order)
-        const user = await userRepo.findOne({ where: { email: updatedOrder.email } });
-        if (user) {
-          const currentPoints = user.myrewardPoints || 0;
-          const orderPoints = updatedOrder.totalRewardPoints || 0;
-          user.myrewardPoints = currentPoints + orderPoints;
-          await userRepo.save(user);
-          console.log('[RewardPoints] Added', orderPoints, 'to user', user.email, 'Total now:', user.myrewardPoints);
-        } else {
-          console.warn('[RewardPoints] No user found for email:', updatedOrder.email);
-        }
-      } catch (e) {
-        console.error('[RewardPoints] Error updating user points:', e);
+        return this.findOne(_id);
       }
     }
     return this.findOne(_id);

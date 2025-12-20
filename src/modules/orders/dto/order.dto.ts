@@ -43,6 +43,12 @@ export class OrderItemDto {
 
   @ApiProperty({ required: false })
   selectedVariants?: any;
+
+  @ApiProperty({ required: false })
+  imei?: string;
+
+  @ApiProperty({ required: false })
+  serial?: string;
 }
 
 export enum OrderStatus {
@@ -99,7 +105,7 @@ export class CreateOrderDto {
 
   @ApiProperty({ required: false })
   totalRewardPoints?: number;
-  
+
   @ApiProperty({ required: false })
   address?: string;
 
@@ -109,14 +115,16 @@ export class CreateOrderDto {
   @ApiProperty({ required: false })
   deliveryMethod?: string;
 
+
+
   @ApiProperty({
     required: false,
     type: 'array',
     description: 'Order status history for timeline',
     example: [
       { status: 'pending', date: '2025-12-15T12:00:00Z' },
-      { status: 'confirmed', date: '2025-12-15T13:00:00Z' }
-    ]
+      { status: 'confirmed', date: '2025-12-15T13:00:00Z' },
+    ],
   })
   statusHistory?: { status: string; date: Date }[];
 }

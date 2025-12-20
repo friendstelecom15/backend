@@ -513,18 +513,22 @@ export class OrdersService {
       const updatedOrder = await this.findOne(_id);
       for (const item of updatedOrder.orderItems || []) {
         try {
+          // Ensure dynamicInputs is always an object
+          const dynamicInputs = item.dynamicInputs && typeof item.dynamicInputs === 'object' ? item.dynamicInputs : {};
+          console.log('[Warranty] Creating for productId:', item.productId, 'IMEI:', dynamicInputs.imei, 'Serial:', dynamicInputs.serial, 'OrderId:', updatedOrder.id);
           await this.warrantyService.activate(
             {
               productId: item.productId,
-              imei: item.dynamicInputs?.imei || '',
-              serial: item.dynamicInputs?.serial || '',
+              imei: dynamicInputs.imei || '',
+              serial: dynamicInputs.serial || '',
               phone: updatedOrder.phone ?? '',
               orderId: String(updatedOrder.id),
             },
             'system',
           );
+          console.log('[Warranty] Created successfully for productId:', item.productId);
         } catch (e) {
-          // ডুপ্লিকেট বা অন্য error হলে skip
+          console.error('[Warranty] Error creating for productId:', item.productId, e);
         }
       }
 
@@ -539,9 +543,12 @@ export class OrdersService {
           const orderPoints = updatedOrder.totalRewardPoints || 0;
           user.myrewardPoints = currentPoints + orderPoints;
           await userRepo.save(user);
+          console.log('[RewardPoints] Added', orderPoints, 'to user', user.email, 'Total now:', user.myrewardPoints);
+        } else {
+          console.warn('[RewardPoints] No user found for email:', updatedOrder.email);
         }
       } catch (e) {
-        // Optionally log error
+        console.error('[RewardPoints] Error updating user points:', e);
       }
     }
     return this.findOne(_id);

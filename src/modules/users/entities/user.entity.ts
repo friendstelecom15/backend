@@ -36,6 +36,9 @@ export class User {
     image?: string;
 
 
+    @Column({ nullable: true })
+    myrewardPoints?: number;
+
     @CreateDateColumn()
     createdAt: Date;
 

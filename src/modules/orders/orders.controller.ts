@@ -23,6 +23,20 @@ import { Roles } from '../../common/decorators/roles.decorator';
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
+  @Get('by-customer-email/:email')
+  @ApiOperation({ summary: 'Get orders by customer email' })
+  async getOrdersByCustomerEmail(@Param('email') email: string) {
+    const orders = await this.ordersService.getOrdersByCustomerEmail(email);
+    return orders.map((order) => ({
+      ...order,
+      id: order.id?.toString?.() ?? String(order.id),
+      orderItems:
+        order.orderItems?.map((item) => ({
+          ...item,
+          id: item.id?.toString?.() ?? String(item.id),
+        })) ?? [],
+    }));
+  }
   @Post()
   @ApiOperation({ summary: 'Create order' })
   create(@Body() dto: CreateOrderDto) {

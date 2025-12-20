@@ -19,7 +19,10 @@ import { CreateUserDto, UpdateUserDto, UserResponseDto } from './dto/user.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { User } from './entities/user.entity';
-import { FileFieldsUpload, UploadType } from 'src/common/decorators/file-upload.decorator';
+import {
+  FileFieldsUpload,
+  UploadType,
+} from 'src/common/decorators/file-upload.decorator';
 
 @ApiBearerAuth()
 @ApiTags('users')
@@ -65,6 +68,11 @@ export class UsersController {
     const foundUser = await this.usersService.findOne(user.id.toString());
     return this.mapUser(foundUser);
   }
+  @Get('reward-points')
+  @UseGuards(JwtAuthGuard)
+  async getMyRewardPoints(@CurrentUser() user: User) {
+    return this.usersService.getMyRewardPoints(user.id.toString());
+  }
 
   // =======================
   // GET ALL
@@ -73,7 +81,7 @@ export class UsersController {
   @UseGuards(JwtAuthGuard)
   async findAll() {
     const users = await this.usersService.findAll();
-    return users.map(user => this.mapUser(user));
+    return users.map((user) => this.mapUser(user));
   }
 
   // =======================
@@ -93,10 +101,10 @@ export class UsersController {
   @Patch(':id')
   @UseGuards(JwtAuthGuard)
   @FileFieldsUpload(
-      [{ name: 'image', maxCount: 1 }],
-      undefined,
-      UploadType.IMAGE,
-    )
+    [{ name: 'image', maxCount: 1 }],
+    undefined,
+    UploadType.IMAGE,
+  )
   async update(
     @Param('id') id: string,
     @Body() dto: UpdateUserDto,
@@ -112,7 +120,10 @@ export class UsersController {
     if (files?.image?.length) {
       const file = files.image[0];
       try {
-        const upload = await this.cloudflareService.uploadImage(file.buffer, file.originalname);
+        const upload = await this.cloudflareService.uploadImage(
+          file.buffer,
+          file.originalname,
+        );
         dto.image = upload.variants?.[0] || upload.id || upload.filename || '';
       } catch (err) {
         throw new Error(`Cloudflare image upload failed: ${err}`);

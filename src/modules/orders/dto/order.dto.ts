@@ -98,6 +98,9 @@ export class CreateOrderDto {
   postCode?: string;
 
   @ApiProperty({ required: false })
+  totalRewardPoints?: number;
+  
+  @ApiProperty({ required: false })
   address?: string;
 
   @ApiProperty({ required: false })

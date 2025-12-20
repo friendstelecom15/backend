@@ -45,7 +45,7 @@ export class OrdersService {
       },
       total: dto.total,
       orderNumber,
-      status: 'order placedr',
+      status: 'order placed',
       paymentStatus: 'pending',
       fullName: dto.fullName,
       email: dto.email,
@@ -58,6 +58,7 @@ export class OrdersService {
       paymentMethod: dto.paymentMethod,
       deliveryMethod: dto.deliveryMethod,
       statusHistory: [{ status: 'pending', date: new Date() }],
+      totalRewardPoints: dto.totalRewardPoints || 0,
     });
 
     const savedOrder = await this.orderRepository.save(order);
@@ -108,33 +109,19 @@ export class OrdersService {
           if (typeof storageId === 'string' && storageId.length === 24) {
             try {
               storageId = new ObjectId(storageId);
-            } catch (e) {
-              console.log('Invalid ObjectId for storage:', item.storage);
-            }
+            } catch (e) {}
           }
-          console.log(
-            'Looking for ProductPrice with storageId:',
-            storageId,
-            'type:',
-            typeof storageId,
-          );
+
           const price = await productPriceRepo.findOne({
             where: { storageId },
           });
           if (price && price.stockQuantity != null) {
-            console.log(
-              `Before: ProductPrice ${price.id} (storageId: ${item.storage}) stockQuantity = ${price.stockQuantity}, decrement by ${item.quantity}`,
-            );
             price.stockQuantity = Math.max(
               0,
               price.stockQuantity - item.quantity,
             );
             await productPriceRepo.save(price);
-            console.log(
-              `After: ProductPrice ${price.id} stockQuantity = ${price.stockQuantity}`,
-            );
           } else {
-            console.log(`No ProductPrice found for storageId: ${item.storage}`);
           }
         } else if (item.color) {
           // Find ProductColor by region/network/productId+colorName if present, else by id
@@ -145,16 +132,10 @@ export class OrdersService {
             if (typeof regionId === 'string' && regionId.length === 24) {
               try {
                 regionId = new ObjectId(regionId);
-              } catch (e) {
-                console.log('Invalid ObjectId for region:', item.region);
-              }
+              } catch (e) {}
             }
             colorQuery = { regionId, colorName: item.colorName };
-            console.log(
-              'Looking for ProductColor with regionId and colorName:',
-              regionId,
-              item.colorName,
-            );
+
             color = await productColorRepo.findOne({ where: colorQuery });
             if (!color) {
               // Try fallback: productId + colorName
@@ -162,16 +143,10 @@ export class OrdersService {
               if (typeof productId === 'string' && productId.length === 24) {
                 try {
                   productId = new ObjectId(productId);
-                } catch (e) {
-                  console.log('Invalid ObjectId for product:', item.productId);
-                }
+                } catch (e) {}
               }
               const fallbackQuery = { productId, colorName: item.colorName };
-              console.log(
-                'Fallback: Looking for ProductColor with productId and colorName:',
-                productId,
-                item.colorName,
-              );
+
               color = await productColorRepo.findOne({ where: fallbackQuery });
             }
           } else if (item.network) {
@@ -179,16 +154,10 @@ export class OrdersService {
             if (typeof networkId === 'string' && networkId.length === 24) {
               try {
                 networkId = new ObjectId(networkId);
-              } catch (e) {
-                console.log('Invalid ObjectId for network:', item.network);
-              }
+              } catch (e) {}
             }
             colorQuery = { networkId, colorName: item.colorName };
-            console.log(
-              'Looking for ProductColor with networkId and colorName:',
-              networkId,
-              item.colorName,
-            );
+
             color = await productColorRepo.findOne({ where: colorQuery });
             if (!color) {
               // Try fallback: productId + colorName
@@ -196,16 +165,10 @@ export class OrdersService {
               if (typeof productId === 'string' && productId.length === 24) {
                 try {
                   productId = new ObjectId(productId);
-                } catch (e) {
-                  console.log('Invalid ObjectId for product:', item.productId);
-                }
+                } catch (e) {}
               }
               const fallbackQuery = { productId, colorName: item.colorName };
-              console.log(
-                'Fallback: Looking for ProductColor with productId and colorName:',
-                productId,
-                item.colorName,
-              );
+
               color = await productColorRepo.findOne({ where: fallbackQuery });
             }
           } else if (item.productId && item.colorName) {
@@ -213,60 +176,36 @@ export class OrdersService {
             if (typeof productId === 'string' && productId.length === 24) {
               try {
                 productId = new ObjectId(productId);
-              } catch (e) {
-                console.log('Invalid ObjectId for product:', item.productId);
-              }
+              } catch (e) {}
             }
             colorQuery = { productId, colorName: item.colorName };
-            console.log(
-              'Looking for ProductColor with productId and colorName:',
-              productId,
-              item.colorName,
-            );
+
             color = await productColorRepo.findOne({ where: colorQuery });
           } else {
             let colorId = item.color;
             if (typeof colorId === 'string' && colorId.length === 24) {
               try {
                 colorId = new ObjectId(colorId);
-              } catch (e) {
-                console.log('Invalid ObjectId for color:', item.color);
-              }
+              } catch (e) {}
             }
             colorQuery = { id: colorId };
-            console.log(
-              'Looking for ProductColor with id:',
-              colorId,
-              'type:',
-              typeof colorId,
-            );
+
             color = await productColorRepo.findOne({ where: colorQuery });
           }
           if (color && color.singleStockQuantity != null) {
-            console.log(
-              `Before: ProductColor ${color.id} (colorName: ${color.colorName}) singleStockQuantity = ${color.singleStockQuantity}, decrement by ${item.quantity}`,
-            );
             color.singleStockQuantity = Math.max(
               0,
               color.singleStockQuantity - item.quantity,
             );
             await productColorRepo.save(color);
-            console.log(
-              `After: ProductColor ${color.id} singleStockQuantity = ${color.singleStockQuantity}`,
-            );
           } else if (color && color.stockQuantity != null) {
             // Fallback: decrement stockQuantity if singleStockQuantity is null
-            console.log(
-              `Before: ProductColor ${color.id} (colorName: ${color.colorName}) stockQuantity = ${color.stockQuantity}, decrement by ${item.quantity}`,
-            );
+
             color.stockQuantity = Math.max(
               0,
               color.stockQuantity - item.quantity,
             );
             await productColorRepo.save(color);
-            console.log(
-              `After: ProductColor ${color.id} stockQuantity = ${color.stockQuantity}`,
-            );
           } else {
             // If no ProductColor found, try to decrement main Product stock (for basic products)
             let productId = item.productId;
@@ -277,29 +216,17 @@ export class OrdersService {
                 console.log('Invalid ObjectId for product:', item.productId);
               }
             }
-            console.log(
-              `No ProductColor found for`,
-              colorQuery,
-              '. Trying to decrement Product stock for productId:',
-              productId,
-            );
+
             const product = await productRepo.findOne({
               where: { id: productId },
             });
             if (product && product.stockQuantity != null) {
-              console.log(
-                `Before: Product ${product.id} stockQuantity = ${product.stockQuantity}, decrement by ${item.quantity}`,
-              );
               product.stockQuantity = Math.max(
                 0,
                 product.stockQuantity - item.quantity,
               );
               await productRepo.save(product);
-              console.log(
-                `After: Product ${product.id} stockQuantity = ${product.stockQuantity}`,
-              );
             } else {
-              console.log(`No Product found for id: ${item.productId}`);
             }
           }
         } else {
@@ -312,39 +239,27 @@ export class OrdersService {
               console.log('Invalid ObjectId for product:', item.productId);
             }
           }
-          console.log(
-            `Order item ${item.id} has neither storage nor color for stock decrement. Trying to decrement Product stock for productId:`,
-            productId,
-          );
+
           const product = await productRepo.findOne({
             where: { id: productId },
           });
           if (product && product.stockQuantity != null) {
-            console.log(
-              `Before: Product ${product.id} stockQuantity = ${product.stockQuantity}, decrement by ${item.quantity}`,
-            );
             product.stockQuantity = Math.max(
               0,
               product.stockQuantity - item.quantity,
             );
             await productRepo.save(product);
-            console.log(
-              `After: Product ${product.id} stockQuantity = ${product.stockQuantity}`,
-            );
           } else {
-            console.log(`No Product found for id: ${item.productId}`);
           }
         }
       }
-    } catch (e) {
-      console.log('Stock update error:', e);
-    }
+    } catch (e) {}
 
     // Create notification for new order (user)
     try {
       // User notification
       await this.notificationService.create({
-        userId: savedOrder.customer?.id,
+        userId: savedOrder.customer?.email,
         type: NotificationType.ORDER_UPDATE,
         title: 'Order Placed',
         message: `Your order ${savedOrder.orderNumber} has been placed successfully!`,
@@ -451,7 +366,9 @@ export class OrdersService {
 
   async getOrderTracking(id: string) {
     // Now fetch by orderNumber instead of id/_id
-    const order = await this.orderRepository.findOne({ where: { orderNumber: id } });
+    const order = await this.orderRepository.findOne({
+      where: { orderNumber: id },
+    });
     if (!order) throw new NotFoundException('Order not found');
 
     // Helper to get date from statusHistory
@@ -573,7 +490,6 @@ export class OrdersService {
       ? [...order.statusHistory, newStatusEntry]
       : [newStatusEntry];
 
-
     // Payment status logic
     let paymentStatus = order.paymentStatus;
     if (dto.status === 'returned') {
@@ -591,7 +507,7 @@ export class OrdersService {
       paymentStatus,
     });
 
-    // অর্ডার delivered হলে অটো ওয়ারেন্টি এন্ট্রি
+    // অর্ডার delivered হলে অটো ওয়ারেন্টি এন্ট্রি এবং reward points যোগ
     if (dto.status === 'delivered') {
       // একাধিক অর্ডার আইটেম থাকলে প্রত্যেকটির জন্য ওয়ারেন্টি এন্ট্রি
       const updatedOrder = await this.findOne(_id);
@@ -610,6 +526,22 @@ export class OrdersService {
         } catch (e) {
           // ডুপ্লিকেট বা অন্য error হলে skip
         }
+      }
+
+      // Reward points যোগ করা
+      try {
+        // User repository lazily loaded to avoid circular dependency
+        const userRepo = this.orderRepository.manager.getRepository('User');
+        // Find user by email (from order)
+        const user = await userRepo.findOne({ where: { email: updatedOrder.email } });
+        if (user) {
+          const currentPoints = user.myrewardPoints || 0;
+          const orderPoints = updatedOrder.totalRewardPoints || 0;
+          user.myrewardPoints = currentPoints + orderPoints;
+          await userRepo.save(user);
+        }
+      } catch (e) {
+        // Optionally log error
       }
     }
     return this.findOne(_id);
@@ -641,5 +573,31 @@ export class OrdersService {
       invoiceNumber: 'INV-' + order.orderNumber,
       generatedAt: new Date(),
     };
+  }
+
+  async getOrdersByCustomerEmail(email: string): Promise<Order[]> {
+    // Find orders where the email field matches
+    const orders = await this.orderRepository.find({
+      where: { email },
+      order: { createdAt: 'DESC' },
+    });
+    await Promise.all(
+      orders.map(async (order) => {
+        const items = await this.orderItemRepository.find({
+          where: { orderId: String(order.id) },
+        });
+        order.orderItems = items.map((item) => ({
+          productName: item.productName,
+          price: item.price,
+          quantity: item.quantity,
+          colorName: item.colorName,
+          storageName: item.storageName,
+          regionName: item.regionName,
+          priceType: item.priceType,
+          image: item.image,
+        }));
+      }),
+    );
+    return orders;
   }
 }

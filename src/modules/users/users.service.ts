@@ -106,6 +106,17 @@ export class UsersService {
     return this.sanitize(user);
   }
 
+
+   async getMyRewardPoints(userId: string | ObjectId): Promise<number> {
+    const _id = this.toObjectId(userId);
+    // Try both 'id' and '_id' for MongoDB compatibility
+    let user = await this.userRepository.findOne({ where: { id: _id } });
+    if (!user) {
+      user = await this.userRepository.findOne({ where: { _id: _id } } as any);
+    }
+    if (!user) throw new NotFoundException('User not found');
+    return user.myrewardPoints || 0;
+  }
   // ==========================
   // FIND BY EMAIL (AUTH)
   // ==========================

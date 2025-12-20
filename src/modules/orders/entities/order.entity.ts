@@ -37,8 +37,13 @@ export class Order {
   @Column({ nullable: true })
   deliveryMethod?: string;
 
+
   // Order items will be loaded via service, not stored as JSON
   orderItems?: any[];
+
+  // Reward points earned or used for this order
+  @Column({ type: 'int', default: 0 })
+  totalRewardPoints: number;
 
   @Column()
   total: number;

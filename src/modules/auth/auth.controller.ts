@@ -6,6 +6,13 @@ import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { SocialLoginDto } from './dto/social-login.dto';
 
+import { ApiBody } from '@nestjs/swagger';
+import { BadRequestException } from '@nestjs/common';
+
+class UpdatePasswordDto {
+  oldPassword: string;
+  newPassword: string;
+}
 @ApiBearerAuth()
 @ApiTags('auth')
 @Controller('auth')
@@ -46,6 +53,20 @@ export class AuthController {
   async logout() {
     // Optionally, you can extract the token from headers if you want to support blacklisting
     return this.authService.logout();
+  }
+
+
+  @Post('update-password/:userId')
+  @ApiOperation({ summary: 'Update user password' })
+  @ApiBody({ type: UpdatePasswordDto })
+  async updatePassword(
+    @Param('userId') userId: string,
+    @Body() dto: UpdatePasswordDto
+  ) {
+    if (!dto.oldPassword || !dto.newPassword) {
+      throw new BadRequestException('Both oldPassword and newPassword are required');
+    }
+    return this.authService.updatePassword(userId, dto.oldPassword, dto.newPassword);
   }
   
 }

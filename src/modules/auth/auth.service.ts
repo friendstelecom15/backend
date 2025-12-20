@@ -10,6 +10,9 @@ import { User } from '../users/entities/user.entity';
 import { RegisterDto } from './dto/register.dto';
 import { SocialLoginDto } from './dto/social-login.dto';
 import { Repository, DeepPartial } from 'typeorm';
+import { ObjectId } from 'mongodb';
+
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 
 interface AuthUser {
   id: string;
@@ -143,6 +146,8 @@ export class AuthService {
     return this.login(authUser);
   }
 
+  //update password
+
   /**
    * Logout method for JWT-based authentication.
    * For stateless JWT, logout is handled on the client by removing the token.
@@ -152,5 +157,32 @@ export class AuthService {
     // For stateless JWT, just instruct the client to delete the token.
     // If you implement token blacklisting, add logic here to store the token in a blacklist.
     return { message: 'Logged out successfully' };
+  }
+
+  /**
+   * Update password for a user
+   * @param userId - User's id
+   * @param oldPassword - Current password
+   * @param newPassword - New password to set
+   */
+  async updatePassword(userId: string, oldPassword: string, newPassword: string) {
+    const objectId = new ObjectId(userId);
+    let user = await this.userRepo.findOne({ where: { id: objectId } });
+    if (!user) {
+      user = await this.userRepo.findOne({ where: { _id: objectId } } as any);
+    }
+    if (!user) throw new NotFoundException('User not found');
+    if (!user.password) throw new BadRequestException('No password set for this user');
+
+    const matches = await bcrypt.compare(oldPassword, user.password);
+    if (!matches) throw new BadRequestException('Old password is incorrect');
+
+    if (!newPassword || newPassword.length < 6) {
+      throw new BadRequestException('New password must be at least 6 characters');
+    }
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    await this.userRepo.save(user);
+    return { message: 'Password updated successfully' };
   }
 }

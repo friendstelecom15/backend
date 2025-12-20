@@ -7,9 +7,10 @@ import { OrderItem } from './entities/orderitem.entity';
 
 import { NotificationModule } from '../notifications/notification.module';
 import { WarrantyModule } from '../warranty/warranty.module';
+import { UsersModule } from '../users/users.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Order, OrderItem]), NotificationModule, WarrantyModule],
+  imports: [TypeOrmModule.forFeature([Order, OrderItem]), NotificationModule, WarrantyModule, UsersModule],
   controllers: [OrdersController],
   providers: [OrdersService],
   exports: [OrdersService],

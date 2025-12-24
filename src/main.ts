@@ -34,7 +34,7 @@ async function bootstrap() {
   await app.listen(port, '0.0.0.0');
 
   console.log(`API Running: ${port}`);
-  console.log(`Swagger (production): https://friends-be-production.up.railway.app/api/docs`);
+  console.log(`Swagger (production): https://backend-production-8aca.up.railway.app/api/docs`);
   console.log(`Swagger (local): http://localhost:${port}/api/docs`);
 }
 

@@ -21,6 +21,11 @@ export class CreateCategoryDto {
   @IsOptional()
   @IsInt()
   priority?: number;
+
+  @ApiProperty({ required: false, description: 'Brand ID this category belongs to' })
+  @IsOptional()
+  @IsString()
+  brandsId?: string;
 }
 
 export class UpdateCategoryDto {
@@ -44,6 +49,11 @@ export class UpdateCategoryDto {
   @IsOptional()
   @IsInt()
   priority?: number;
+
+  @ApiProperty({ required: false, description: 'Brand ID this category belongs to' })
+  @IsOptional()
+  @IsString()
+  brandsId?: string;
 }
 
 export class CategoryFilterDto {

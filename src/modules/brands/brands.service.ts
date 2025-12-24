@@ -1,5 +1,10 @@
-
-import { BadRequestException, Injectable, NotFoundException, Inject, forwardRef } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  Inject,
+  forwardRef,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CreateBrandDto, UpdateBrandDto } from './dto/brand.dto';
@@ -9,55 +14,53 @@ import { ProductService } from '../products/products.service';
 
 @Injectable()
 export class BrandsService {
-
   constructor(
     @InjectRepository(Brand)
     private readonly brandRepository: Repository<Brand>,
     private readonly productService: ProductService,
   ) {}
 
+  async create(dto: CreateBrandDto) {
+    const slug = dto.name.toLowerCase().replace(/\s+/g, '-');
 
- async create(dto: CreateBrandDto) {
-  const slug = dto.name.toLowerCase().replace(/\s+/g, '-');
+    // 🔍 Check if brand with same name OR slug already exists
+    const exists = await this.brandRepository.findOne({
+      where: {
+        $or: [{ name: dto.name }, { slug }],
+      } as any,
+    });
 
-  // 🔍 Check if brand with same name OR slug already exists
-  const exists = await this.brandRepository.findOne({
-    where: {
-      $or: [{ name: dto.name }, { slug }],
-    } as any,
-  });
+    if (exists) {
+      throw new BadRequestException(
+        'This brand is already added. Please use another name.',
+      );
+    }
 
-  if (exists) {
-    throw new BadRequestException(
-      'This brand is already added. Please use another name.'
-    );
+    const brand = this.brandRepository.create({ ...dto, slug });
+    return this.brandRepository.save(brand);
   }
-
-  const brand = this.brandRepository.create({ ...dto, slug });
-  return this.brandRepository.save(brand);
-}
-
-
 
   async findAll() {
     const brands = await this.brandRepository.find({ order: { name: 'ASC' } });
-    return brands.map(brand => ({
+    return brands.map((brand) => ({
       id: brand.id?.toString?.() ?? String(brand.id),
       name: brand.name,
       slug: brand.slug,
       logo: brand.logo,
+      indexNumber: brand.indexNumber,
       createdAt: brand.createdAt,
       updatedAt: brand.updatedAt,
     }));
   }
-
 
   async findOne(idOrSlug: string) {
     let brand;
     try {
       // Try to treat as ObjectId
       const objectId = new ObjectId(idOrSlug);
-      brand = await this.brandRepository.findOne({ where: { _id: objectId } } as any);
+      brand = await this.brandRepository.findOne({
+        where: { _id: objectId },
+      } as any);
     } catch {
       // Fallback to slug
       brand = await this.brandRepository.findOne({ where: { slug: idOrSlug } });
@@ -68,22 +71,22 @@ export class BrandsService {
       name: brand.name,
       slug: brand.slug,
       logo: brand.logo,
+      indexNumber: brand.indexNumber,
       createdAt: brand.createdAt,
       updatedAt: brand.updatedAt,
     };
   }
-
 
   // To implement findProducts, use ProductService to fetch products by brandId
   async findProducts(slug: string) {
     const brand = await this.brandRepository.findOne({ where: { slug } });
     if (!brand) throw new NotFoundException('Brand not found');
     // Find products by brandId (MongoDB _id)
-    const products = await this.productService.findByBrandIds([brand.id?.toString?.() ?? String(brand.id)]);
+    const products = await this.productService.findByBrandIds([
+      brand.id?.toString?.() ?? String(brand.id),
+    ]);
     return products || [];
   }
-
-
 
   async update(id: string | ObjectId, dto: UpdateBrandDto) {
     const _id = typeof id === 'string' ? new ObjectId(id) : id;
@@ -99,12 +102,12 @@ export class BrandsService {
       name: brand.name,
       slug: brand.slug,
       logo: brand.logo,
+      indexNumber: brand.indexNumber,
+
       createdAt: brand.createdAt,
       updatedAt: brand.updatedAt,
     };
   }
-
-
 
   async remove(id: string | ObjectId) {
     const _id = typeof id === 'string' ? new ObjectId(id) : id;
@@ -112,17 +115,17 @@ export class BrandsService {
     return { success: true };
   }
 
-
   async getFeatured() {
     const brands = await this.brandRepository.find({
       take: 12,
       order: { name: 'ASC' },
     });
-    return brands.map(brand => ({
+    return brands.map((brand) => ({
       id: brand.id?.toString?.() ?? String(brand.id),
       name: brand.name,
       slug: brand.slug,
       logo: brand.logo,
+      indexNumber: brand.indexNumber,
       createdAt: brand.createdAt,
       updatedAt: brand.updatedAt,
     }));

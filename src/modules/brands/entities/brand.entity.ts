@@ -13,6 +13,9 @@ export class Brand {
     slug: string;
 
     @Column({ nullable: true })
+    indexNumber: number;
+
+    @Column({ nullable: true })
     logo?: string;
 
     @CreateDateColumn()

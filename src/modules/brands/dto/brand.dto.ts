@@ -15,6 +15,10 @@ export class CreateBrandDto {
   @IsOptional()
   @IsString()
   logo?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  indexNumber?: number;
 }
 
 export class UpdateBrandDto {
@@ -32,4 +36,8 @@ export class UpdateBrandDto {
   @IsOptional()
   @IsString()
   logo?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  indexNumber?: number;
 }

@@ -1,4 +1,3 @@
-
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -124,5 +123,9 @@ export class CategoriesService {
       order: { priority: 'ASC' },
       take: 6,
     });
+  }
+
+  async findByBrandId(brandsId: string) {
+    return this.categoryRepository.find({ where: { brandsId } });
   }
 }

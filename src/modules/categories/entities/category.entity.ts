@@ -26,17 +26,17 @@ export class Category {
     priority?: number;
 
 
+
     @Column({ nullable: true })
     homeCategoryId?: string;
+
+    // Brand association: which brand this category belongs to
+    @Column({ nullable: true })
+    brandsId?: string;
 
 
     @OneToMany(() => Subcategory, subcategory => subcategory.categoryId)
     subcategories?: Subcategory[];
-
-
-    // MongoDB: cares are referenced by categoryIds in ProductCare, not as a relation
-    // cares?: ProductCare[];
-
 
 
     @CreateDateColumn()

@@ -40,15 +40,41 @@ export class ProductService {
    * Create Basic Product
    */
 
-  async findByIds(ids: string[]): Promise<any[]> {
-    if (!ids || ids.length === 0) return [];
-    const objectIds = ids.map((id) =>
-      id.length === 24 ? new ObjectId(id) : id,
+  async findByIds(ids: string | string[] | any): Promise<any[]> {
+    if (!ids) return [];
+
+    // Normalize different possible input shapes into an array of ids
+    let idArray: any[] = [];
+    if (Array.isArray(ids)) {
+      idArray = ids;
+    } else if (typeof ids === 'string') {
+      try {
+        const parsed = JSON.parse(ids);
+        if (Array.isArray(parsed)) idArray = parsed;
+        else idArray = [ids];
+      } catch {
+        // fallback: comma-separated string
+        idArray = ids.split(',').map((s) => s.trim()).filter(Boolean);
+      }
+    } else if (typeof ids === 'object' && ids !== null) {
+      // handle array-like objects or objects with numeric keys
+      if (typeof (ids as any).toArray === 'function') {
+        idArray = (ids as any).toArray();
+      } else {
+        const vals = Object.values(ids).filter((v) => typeof v === 'string' || typeof v === 'number');
+        if (vals.length > 0) idArray = vals;
+      }
+    }
+
+    if (!Array.isArray(idArray) || idArray.length === 0) return [];
+
+    const objectIds = idArray.map((id) =>
+      typeof id === 'string' && id.length === 24 ? new ObjectId(id) : id,
     );
 
-    let products = await this.productRepository.find({
-      where: { _id: { $in: objectIds } },
-    } as any);
+    // Use Mongo repository to ensure $in query works reliably
+    const mongoRepo = this.productRepository.manager.getMongoRepository(Product);
+    let products = await mongoRepo.find({ where: { _id: { $in: objectIds } } } as any);
 
     products = await Promise.all(
       products.map(async (product) => {

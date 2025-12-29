@@ -36,6 +36,27 @@ export class ProductService {
     private readonly dataSource: DataSource,
   ) {}
 
+  private generateRandomAlphaNum(length = 6) {
+    const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ0123456789';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+  }
+
+  private async generateUniqueCode(field: 'productCode' | 'sku', length = 6) {
+    const maxAttempts = 10;
+    for (let i = 0; i < maxAttempts; i++) {
+      const candidate = this.generateRandomAlphaNum(length);
+      const where: any = {};
+      where[field] = candidate;
+      const existing = await this.productRepository.findOne({ where } as any);
+      if (!existing) return candidate;
+    }
+    throw new InternalServerErrorException(`Unable to generate unique ${field}`);
+  }
+
   /**
    * Create Basic Product
    */
@@ -116,12 +137,19 @@ export class ProductService {
       // 1. Create Product
       const product = new Product();
       Object.assign(product, createProductDto);
-      // serial and imei fields removed from Product entity
-      // Ensure ratingPoint is set if provided
+
       if (typeof createProductDto.ratingPoint !== 'undefined') {
         product.ratingPoint = createProductDto.ratingPoint;
       }
       product.productType = 'basic';
+
+      // Generate productCode and sku on backend if not provided by FE
+      if (!product.productCode) {
+        product.productCode = await this.generateUniqueCode('productCode', 6);
+      }
+      if (!product.sku) {
+        product.sku = await this.generateUniqueCode('sku', 6);
+      }
 
       // Handle multiple categories and brands
       if ((createProductDto as any).categoryIds) {
@@ -268,6 +296,14 @@ export class ProductService {
         product.ratingPoint = createProductDto.ratingPoint;
       }
       product.productType = 'network';
+
+      // Generate productCode and sku on backend if not provided by FE
+      if (!product.productCode) {
+        product.productCode = await this.generateUniqueCode('productCode', 6);
+      }
+      if (!product.sku) {
+        product.sku = await this.generateUniqueCode('sku', 6);
+      }
 
       // Handle multiple categories and brands
       if ((createProductDto as any).categoryIds) {
@@ -463,6 +499,14 @@ export class ProductService {
         product.ratingPoint = createProductDto.ratingPoint;
       }
       product.productType = 'region';
+
+      // Generate productCode and sku on backend if not provided by FE
+      if (!product.productCode) {
+        product.productCode = await this.generateUniqueCode('productCode', 6);
+      }
+      if (!product.sku) {
+        product.sku = await this.generateUniqueCode('sku', 6);
+      }
 
       // Handle multiple categories and brands
       if ((createProductDto as any).categoryIds) {

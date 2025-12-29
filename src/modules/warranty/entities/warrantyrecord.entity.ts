@@ -9,10 +9,10 @@ export class WarrantyRecord {
   @Column({ nullable: true })
   productId?: string;
 
-  @Column({ unique: true, nullable: true })
+  @Column({ nullable: true })
   imei?: string;
 
-  @Column({ unique: true, nullable: true })
+  @Column({ nullable: true })
   serial?: string;
 
   @Column({ nullable: true })

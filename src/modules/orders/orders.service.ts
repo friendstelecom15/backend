@@ -293,15 +293,52 @@ export class OrdersService {
   }
 
   async assignUnits(orderId: string, dto: AssignOrderItemUnitsDto[]) {
+    console.log('[Orders] assignUnits called', { orderId, items: dto?.length ?? 0 });
     for (const item of dto) {
-      const orderItem = await this.orderItemRepository.findOne({
-        where: { id: new ObjectId(item.orderItemId) } as any,
-      });
+      // Validate orderItemId before converting to ObjectId
+      let orderItem: OrderItem | null = null as any;
+      try {
+        if (typeof item.orderItemId === 'string' && ObjectId.isValid(item.orderItemId)) {
+          orderItem = await this.orderItemRepository.findOne({
+            where: { id: new ObjectId(item.orderItemId) } as any,
+          });
+        } else if (typeof item.orderItemId === 'string') {
+          // Support client temporary ids like `item-0` by mapping to saved order items by index
+          const idxMatch = /^item-(\d+)$/.exec(item.orderItemId);
+          if (idxMatch) {
+            const idx = parseInt(idxMatch[1], 10);
+            const savedItems = await this.orderItemRepository.find({ where: { orderId: String(orderId) } });
+            if (Array.isArray(savedItems) && savedItems.length > idx) {
+              orderItem = savedItems[idx] as any;
+              if (!orderItem) {
+                console.warn('[Orders] assignUnits: mapped temp id but orderItem is null', { orderItemId: item.orderItemId, orderId });
+                continue;
+              }
+              console.log('[Orders] assignUnits: mapped temp id to saved orderItem', { tempId: item.orderItemId, mappedId: orderItem.id?.toString?.() ?? String(orderItem.id) });
+            } else {
+              console.warn('[Orders] assignUnits: cannot map temp id to orderItem (index out of range)', { orderItemId: item.orderItemId, orderId });
+              continue;
+            }
+          } else {
+            console.warn('[Orders] assignUnits: invalid orderItemId (not an ObjectId)', { orderItemId: item.orderItemId });
+            continue;
+          }
+        } else {
+          console.warn('[Orders] assignUnits: invalid orderItemId type', { orderItemId: item.orderItemId });
+          continue;
+        }
+      } catch (err) {
+        console.error('[Orders] assignUnits: error finding orderItem', { orderItemId: item.orderItemId, err });
+        continue;
+      }
 
-      if (!orderItem) continue;
+      if (!orderItem) {
+        console.warn('[Orders] assignUnits: orderItem not found', { orderItemId: item.orderItemId });
+        continue;
+      }
 
       for (const unit of item.units) {
-        await this.orderItemUnitRepo.save(
+        const saved = await this.orderItemUnitRepo.save(
           this.orderItemUnitRepo.create({
             orderId,
             orderItemId: item.orderItemId,
@@ -311,6 +348,14 @@ export class OrdersService {
             status: 'assigned',
           }),
         );
+        console.log('[Orders] assignUnits: unit assigned', {
+          id: saved?.id?.toString?.() ?? String(saved?.id),
+          orderId,
+          orderItemId: item.orderItemId,
+          productId: saved.productId,
+          imei: saved.imei,
+          serial: saved.serial,
+        });
       }
     }
   }
@@ -560,9 +605,11 @@ export class OrdersService {
               continue;
             }
             if (!imei && !serial) {
-              console.warn('[Warranty] Skipping: Both IMEI and Serial missing for unit:', unit);
+              console.warn('[Warranty] Skipping: Both IMEI and Serial are missing for unit:', unit);
               continue;
             }
+            // Ensure non-empty values are passed to the warranty service
+            // Removed condition to skip empty IMEI or Serial
             await this.warrantyService.activate(
               {
                 productId: unit.productId,

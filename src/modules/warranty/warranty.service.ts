@@ -1,4 +1,3 @@
-
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -62,7 +61,11 @@ export class WarrantyService {
     } else if (dto.serial) {
       warranty = (await this.warrantyRepo.findOne({ where: { serial: dto.serial, phone: dto.phone } })) ?? undefined;
     }
-    if (!warranty) throw new NotFoundException('Warranty not found');
+    if (!warranty) {
+      throw new NotFoundException(
+        `No matching warranty found for ${dto.imei ? `IMEI: ${dto.imei}` : `Serial: ${dto.serial}`} and Phone: ${dto.phone}`
+      );
+    }
     const logs = await this.logRepo.find({ where: { warrantyId: String(warranty.id) } });
     // Calculate remaining days
     let remainingDays: number | null = null;

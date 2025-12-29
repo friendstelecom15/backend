@@ -166,10 +166,4 @@ export class Product {
 
   @Column({ nullable: true })
   faqIds?: ObjectId[];
-
-  @Column({ nullable: true })
-  serial?: string;
-
-  @Column({ nullable: true })
-  imei?: string;
 }

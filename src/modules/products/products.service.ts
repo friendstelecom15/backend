@@ -116,13 +116,7 @@ export class ProductService {
       // 1. Create Product
       const product = new Product();
       Object.assign(product, createProductDto);
-      // Ensure serial and imei are set if provided
-      if (typeof createProductDto.serial !== 'undefined') {
-        product.serial = createProductDto.serial;
-      }
-      if (typeof createProductDto.imei !== 'undefined') {
-        product.imei = createProductDto.imei;
-      }
+      // serial and imei fields removed from Product entity
       // Ensure ratingPoint is set if provided
       if (typeof createProductDto.ratingPoint !== 'undefined') {
         product.ratingPoint = createProductDto.ratingPoint;
@@ -268,13 +262,7 @@ export class ProductService {
       // 1. Create Product
       const product = new Product();
       Object.assign(product, createProductDto);
-      // Ensure serial and imei are set if provided
-      if (typeof createProductDto.serial !== 'undefined') {
-        product.serial = createProductDto.serial;
-      }
-      if (typeof createProductDto.imei !== 'undefined') {
-        product.imei = createProductDto.imei;
-      }
+      // serial and imei fields removed from Product entity
       // Ensure ratingPoint is set if provided
       if (typeof createProductDto.ratingPoint !== 'undefined') {
         product.ratingPoint = createProductDto.ratingPoint;
@@ -469,13 +457,7 @@ export class ProductService {
       // 1. Create Product
       const product = new Product();
       Object.assign(product, createProductDto);
-      // Ensure serial and imei are set if provided
-      if (typeof createProductDto.serial !== 'undefined') {
-        product.serial = createProductDto.serial;
-      }
-      if (typeof createProductDto.imei !== 'undefined') {
-        product.imei = createProductDto.imei;
-      }
+      // serial and imei fields removed from Product entity
       // Ensure ratingPoint is set if provided
       if (typeof createProductDto.ratingPoint !== 'undefined') {
         product.ratingPoint = createProductDto.ratingPoint;
@@ -683,13 +665,7 @@ async updateBasicProduct(
 
     // 2️⃣ Update main product fields
     Object.assign(product, updateProductDto);
-    // Ensure serial and imei are set if provided
-    if (typeof updateProductDto.serial !== 'undefined') {
-      product.serial = updateProductDto.serial;
-    }
-    if (typeof updateProductDto.imei !== 'undefined') {
-      product.imei = updateProductDto.imei;
-    }
+    // serial and imei fields removed from Product entity
     product.productType = 'basic';
 
     if ((updateProductDto as any).categoryIds) {
@@ -888,13 +864,7 @@ async updateBasicProduct(
 
       // 2. Update Product
       Object.assign(product, updateProductDto);
-      // Ensure serial and imei are set if provided
-      if (typeof updateProductDto.serial !== 'undefined') {
-        product.serial = updateProductDto.serial;
-      }
-      if (typeof updateProductDto.imei !== 'undefined') {
-        product.imei = updateProductDto.imei;
-      }
+      // serial and imei fields removed from Product entity
       // Ensure ratingPoint is set if provided
       if (typeof updateProductDto.ratingPoint !== 'undefined') {
         product.ratingPoint = updateProductDto.ratingPoint;
@@ -1289,13 +1259,7 @@ async updateBasicProduct(
 
       // 2. Update Product
       Object.assign(product, updateProductDto);
-      // Ensure serial and imei are set if provided
-      if (typeof updateProductDto.serial !== 'undefined') {
-        product.serial = updateProductDto.serial;
-      }
-      if (typeof updateProductDto.imei !== 'undefined') {
-        product.imei = updateProductDto.imei;
-      }
+      // serial and imei fields removed from Product entity
       // Ensure ratingPoint is set if provided
       if (typeof updateProductDto.ratingPoint !== 'undefined') {
         product.ratingPoint = updateProductDto.ratingPoint;

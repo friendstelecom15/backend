@@ -44,11 +44,6 @@ export class OrderItemDto {
   @ApiProperty({ required: false })
   selectedVariants?: any;
 
-  @ApiProperty({ required: false })
-  imei?: string;
-
-  @ApiProperty({ required: false })
-  serial?: string;
 }
 
 export enum OrderStatus {

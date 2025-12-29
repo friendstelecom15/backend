@@ -14,6 +14,7 @@ import {
   UpdateOrderStatusDto,
   EMICalculationDto,
 } from './dto/order.dto';
+import { AssignOrderItemUnitsDto } from './dto/assign-units.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -89,6 +90,18 @@ export class OrdersController {
   @ApiOperation({ summary: 'Update order status (Admin/Management)' })
   updateStatus(@Param('id') id: string, @Body() dto: UpdateOrderStatusDto) {
     return this.ordersService.updateStatus(id, dto);
+  }
+
+  @Post('admin/:id/assign-units')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'management')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Assign IMEI/Serial units to order items (Admin)' })
+  async assignUnits(
+    @Param('id') id: string,
+    @Body() dto: AssignOrderItemUnitsDto[],
+  ) {
+    return this.ordersService.assignUnits(id, dto);
   }
 
   @Get(':id/invoice')

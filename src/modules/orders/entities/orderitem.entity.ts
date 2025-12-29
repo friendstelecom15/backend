@@ -59,10 +59,5 @@ export class OrderItem {
 
     @Column()
     productId: string;
-
-    @Column({ nullable: true })
-    imei?: string;  // NEW FIELD
-
-    @Column({ nullable: true })
-    serial?: string;  // NEW FIELD
+    // IMEI and serial moved to OrderItemUnit
 }

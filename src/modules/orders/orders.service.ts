@@ -6,8 +6,10 @@ import {
   UpdateOrderStatusDto,
   EMICalculationDto,
 } from './dto/order.dto';
+import { AssignOrderItemUnitsDto } from './dto/assign-units.dto';
 import { Order } from './entities/order.entity';
 import { OrderItem } from './entities/orderitem.entity';
+import { OrderItemUnit } from './entities/order-item-unit.entity';
 import { ObjectId } from 'mongodb';
 
 import { NotificationService } from '../notifications/notification.service';
@@ -21,6 +23,8 @@ export class OrdersService {
     private readonly orderRepository: Repository<Order>,
     @InjectRepository(OrderItem)
     private readonly orderItemRepository: Repository<OrderItem>,
+    @InjectRepository(OrderItemUnit)
+    private readonly orderItemUnitRepo: Repository<OrderItemUnit>,
     private readonly notificationService: NotificationService,
     private readonly warrantyService: WarrantyService,
   ) {}
@@ -65,7 +69,7 @@ export class OrdersService {
 
     // Order Items create with ALL data from frontend
     if (dto.orderItems && dto.orderItems.length > 0) {
-      const items = dto.orderItems.map((item) => {
+          const items = dto.orderItems.map((item) => {
         // Create order item with ALL properties from frontend
         return this.orderItemRepository.create({
           productId: item.productId,
@@ -80,8 +84,7 @@ export class OrdersService {
           regionName: item.regionName, // Store region name
           priceType: item.priceType, // Store price type
           image: item.image,
-          imei: item.imei,
-          serial: item.serial,
+              // imei/serial removed from OrderItem; units should be assigned later
           dynamicInputs: item.dynamicInputs || {},
           selectedVariants: item.selectedVariants || {}, // Store complete variant info
           orderId: String(savedOrder.id),
@@ -287,6 +290,29 @@ export class OrdersService {
       // Optionally log notification error
     }
     return savedOrder;
+  }
+
+  async assignUnits(orderId: string, dto: AssignOrderItemUnitsDto[]) {
+    for (const item of dto) {
+      const orderItem = await this.orderItemRepository.findOne({
+        where: { id: new ObjectId(item.orderItemId) } as any,
+      });
+
+      if (!orderItem) continue;
+
+      for (const unit of item.units) {
+        await this.orderItemUnitRepo.save(
+          this.orderItemUnitRepo.create({
+            orderId,
+            orderItemId: item.orderItemId,
+            productId: orderItem.productId,
+            imei: unit.imei,
+            serial: unit.serial,
+            status: 'assigned',
+          }),
+        );
+      }
+    }
   }
 
   async findAll(): Promise<Order[]> {
@@ -522,25 +548,24 @@ export class OrdersService {
       } else {
         console.log('[Warranty] updatedOrder.id:', updatedOrder.id, 'typeof:', typeof updatedOrder.id);
         const orderIdStr = String(updatedOrder.id);
-        const fullOrderItems = await this.orderItemRepository.find({ where: { orderId: orderIdStr } });
-        for (const item of fullOrderItems || []) {
+        // Use unit-based warranty activation: gather all units assigned to this order
+        const units = await this.orderItemUnitRepo.find({ where: { orderId: orderIdStr } });
+        for (const unit of units || []) {
           try {
-            // Prefer direct fields, fallback to dynamicInputs
-            const dynamicInputs = item.dynamicInputs && typeof item.dynamicInputs === 'object' ? item.dynamicInputs : {};
-            const imei = item.imei || dynamicInputs.imei || '';
-            const serial = item.serial || dynamicInputs.serial || '';
-            console.log('[Warranty] Creating for productId:', item.productId, 'IMEI:', imei, 'Serial:', serial, 'OrderId:', orderIdStr);
-            if (!item.productId) {
-              console.warn('[Warranty] Skipping: productId missing for item:', item);
+            const imei = unit.imei || '';
+            const serial = unit.serial || '';
+            console.log('[Warranty] Creating for productId:', unit.productId, 'IMEI:', imei, 'Serial:', serial, 'OrderId:', orderIdStr);
+            if (!unit.productId) {
+              console.warn('[Warranty] Skipping: productId missing for unit:', unit);
               continue;
             }
             if (!imei && !serial) {
-              console.warn('[Warranty] Skipping: Both IMEI and Serial missing for item:', item);
+              console.warn('[Warranty] Skipping: Both IMEI and Serial missing for unit:', unit);
               continue;
             }
             await this.warrantyService.activate(
               {
-                productId: item.productId,
+                productId: unit.productId,
                 imei,
                 serial,
                 phone: updatedOrder.phone ?? '',
@@ -548,9 +573,9 @@ export class OrdersService {
               },
               'system',
             );
-            console.log('[Warranty] Created successfully for productId:', item.productId);
+            console.log('[Warranty] Created successfully for productId:', unit.productId);
           } catch (e) {
-            console.error('[Warranty] Error creating for productId:', item.productId, e);
+            console.error('[Warranty] Error creating for productId (unit):', unit.productId, e);
           }
         }
         // Reward points যোগ করা

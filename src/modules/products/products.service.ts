@@ -54,7 +54,9 @@ export class ProductService {
       const existing = await this.productRepository.findOne({ where } as any);
       if (!existing) return candidate;
     }
-    throw new InternalServerErrorException(`Unable to generate unique ${field}`);
+    throw new InternalServerErrorException(
+      `Unable to generate unique ${field}`,
+    );
   }
 
   /**
@@ -75,14 +77,19 @@ export class ProductService {
         else idArray = [ids];
       } catch {
         // fallback: comma-separated string
-        idArray = ids.split(',').map((s) => s.trim()).filter(Boolean);
+        idArray = ids
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean);
       }
     } else if (typeof ids === 'object' && ids !== null) {
       // handle array-like objects or objects with numeric keys
       if (typeof (ids as any).toArray === 'function') {
         idArray = (ids as any).toArray();
       } else {
-        const vals = Object.values(ids).filter((v) => typeof v === 'string' || typeof v === 'number');
+        const vals = Object.values(ids).filter(
+          (v) => typeof v === 'string' || typeof v === 'number',
+        );
         if (vals.length > 0) idArray = vals;
       }
     }
@@ -94,8 +101,11 @@ export class ProductService {
     );
 
     // Use Mongo repository to ensure $in query works reliably
-    const mongoRepo = this.productRepository.manager.getMongoRepository(Product);
-    let products = await mongoRepo.find({ where: { _id: { $in: objectIds } } } as any);
+    const mongoRepo =
+      this.productRepository.manager.getMongoRepository(Product);
+    let products = await mongoRepo.find({
+      where: { _id: { $in: objectIds } },
+    } as any);
 
     products = await Promise.all(
       products.map(async (product) => {
@@ -687,199 +697,207 @@ export class ProductService {
   /**
    * Update Basic Product
    */
-async updateBasicProduct(
-  id: string,
-  updateProductDto: CreateBasicProductDto,
-) {
-  const queryRunner = this.dataSource.createQueryRunner();
-  await queryRunner.connect();
-  await queryRunner.startTransaction();
+  async updateBasicProduct(
+    id: string,
+    updateProductDto: CreateBasicProductDto,
+  ) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
-  try {
-    const productObjectId = new ObjectId(id);
+    try {
+      const productObjectId = new ObjectId(id);
 
-    // 1️⃣ Find product
-    const product = await this.productRepository.findOne({
-      where: { _id: productObjectId } as any,
-    });
+      // 1️⃣ Find product
+      const product = await this.productRepository.findOne({
+        where: { _id: productObjectId } as any,
+      });
 
-    if (!product) throw new NotFoundException('Product not found');
-    if (product.productType !== 'basic')
-      throw new BadRequestException('Product is not basic');
+      if (!product) throw new NotFoundException('Product not found');
+      if (product.productType !== 'basic')
+        throw new BadRequestException('Product is not basic');
 
-    // 2️⃣ Update main product fields
-    Object.assign(product, updateProductDto);
-    // serial and imei fields removed from Product entity
-    product.productType = 'basic';
+      // 2️⃣ Update main product fields
+      Object.assign(product, updateProductDto);
+      // serial and imei fields removed from Product entity
+      product.productType = 'basic';
 
-    if ((updateProductDto as any).categoryIds) {
-      product.categoryIds = (updateProductDto as any).categoryIds.map(
-        (c: string) => new ObjectId(c),
-      );
-    }
-
-    if ((updateProductDto as any).brandIds) {
-      product.brandIds = (updateProductDto as any).brandIds.map(
-        (b: string) => new ObjectId(b),
-      );
-    }
-
-    // Remove nested arrays; we will handle them separately
-    delete (product as any).images;
-    delete (product as any).videos;
-    delete (product as any).specifications;
-    delete (product as any).colors;
-
-    await queryRunner.manager.save(Product, product);
-
-    // 3️⃣ IMAGES - FIXED LOGIC
-    const imagesInput = (updateProductDto as any).images || [];
-    const keepImageIds: string[] = Array.isArray((updateProductDto as any).keepImageIds)
-      ? (updateProductDto as any).keepImageIds
-      : [];
-
-    console.log('Images input:', imagesInput);
-    console.log('Keep Image IDs:', keepImageIds);
-
-    // Separate existing and new images
-    const existingImagesWithIds = imagesInput.filter(img => img.id);
-    const newImagesWithoutIds = imagesInput.filter(img => !img.id);
-
-    // For existing images: fetch and update
-    const existingImagesToUpdate: ProductImage[] = [];
-    
-    if (existingImagesWithIds.length > 0) {
-      const existingIds = existingImagesWithIds.map(img => new ObjectId(img.id));
-      
-      // Fetch existing images from database
-      const existingDbImages = await queryRunner.manager
-        .getMongoRepository(ProductImage)
-        .find({
-          where: { 
-            _id: { $in: existingIds },
-            productId: productObjectId 
-          } as any,
-        });
-
-      // Map input to database images
-      for (const imgInput of existingImagesWithIds) {
-        const existingImage = existingDbImages.find(
-          dbImg => dbImg.id.toString() === imgInput.id
+      if ((updateProductDto as any).categoryIds) {
+        product.categoryIds = (updateProductDto as any).categoryIds.map(
+          (c: string) => new ObjectId(c),
         );
-        
-        if (existingImage) {
-          // Update existing image
-          existingImage.imageUrl = imgInput.url || existingImage.imageUrl;
-          existingImage.isThumbnail = imgInput.isThumbnail ?? existingImage.isThumbnail;
-          existingImage.altText = imgInput.altText ?? existingImage.altText;
-          existingImage.displayOrder = imgInput.displayOrder ?? existingImage.displayOrder;
-          existingImagesToUpdate.push(existingImage);
-        } else {
-          // Image ID exists in input but not in DB - treat as new
-          const image = new ProductImage();
-          image.productId = productObjectId;
-          image.imageUrl = imgInput.url;
-          image.isThumbnail = imgInput.isThumbnail ?? false;
-          image.altText = imgInput.altText ?? '';
-          image.displayOrder = imgInput.displayOrder ?? existingImagesToUpdate.length;
-          existingImagesToUpdate.push(image);
+      }
+
+      if ((updateProductDto as any).brandIds) {
+        product.brandIds = (updateProductDto as any).brandIds.map(
+          (b: string) => new ObjectId(b),
+        );
+      }
+
+      // Remove nested arrays; we will handle them separately
+      delete (product as any).images;
+      delete (product as any).videos;
+      delete (product as any).specifications;
+      delete (product as any).colors;
+
+      await queryRunner.manager.save(Product, product);
+
+      // 3️⃣ IMAGES - FIXED LOGIC
+      const imagesInput = (updateProductDto as any).images || [];
+      const keepImageIds: string[] = Array.isArray(
+        (updateProductDto as any).keepImageIds,
+      )
+        ? (updateProductDto as any).keepImageIds
+        : [];
+
+      console.log('Images input:', imagesInput);
+      console.log('Keep Image IDs:', keepImageIds);
+
+      // Separate existing and new images
+      const existingImagesWithIds = imagesInput.filter((img) => img.id);
+      const newImagesWithoutIds = imagesInput.filter((img) => !img.id);
+
+      // For existing images: fetch and update
+      const existingImagesToUpdate: ProductImage[] = [];
+      let newImagesToCreate: ProductImage[] = [];
+
+      if (existingImagesWithIds.length > 0) {
+        const existingIds = existingImagesWithIds.map(
+          (img) => new ObjectId(img.id),
+        );
+
+        // Fetch existing images from database
+        const existingDbImages = await queryRunner.manager
+          .getMongoRepository(ProductImage)
+          .find({
+            where: {
+              _id: { $in: existingIds },
+              productId: productObjectId,
+            } as any,
+          });
+
+        // Map input to database images
+        for (const imgInput of existingImagesWithIds) {
+          const existingImage = existingDbImages.find(
+            (dbImg) => dbImg.id.toString() === imgInput.id,
+          );
+
+          if (existingImage) {
+            // Update existing image
+            existingImage.imageUrl = imgInput.url || existingImage.imageUrl;
+            existingImage.isThumbnail =
+              imgInput.isThumbnail ?? existingImage.isThumbnail;
+            existingImage.altText = imgInput.altText ?? existingImage.altText;
+            existingImage.displayOrder =
+              imgInput.displayOrder ?? existingImage.displayOrder;
+            existingImagesToUpdate.push(existingImage);
+          } else {
+            // Image ID exists in input but not in DB - treat as new
+            const image = new ProductImage();
+            image.productId = productObjectId;
+            image.imageUrl = imgInput.url;
+            image.isThumbnail = imgInput.isThumbnail ?? false;
+            image.altText = imgInput.altText ?? '';
+            image.displayOrder = imgInput.displayOrder ?? 0;
+            newImagesToCreate.push(image);
+          }
         }
       }
-    }
 
-    // For new images: create fresh
-    const newImagesToCreate = newImagesWithoutIds.map((imgInput, index) => {
-      const image = new ProductImage();
-      image.productId = productObjectId;
-      image.imageUrl = imgInput.url;
-      image.isThumbnail = imgInput.isThumbnail ?? false;
-      image.altText = imgInput.altText ?? '';
-      image.displayOrder = imgInput.displayOrder ?? (existingImagesToUpdate.length + index);
-      return image;
-    });
-
-    // Combine all images to save
-    const allImagesToSave = [...existingImagesToUpdate, ...newImagesToCreate];
-
-    // Delete images that are not in the input (but respect keepImageIds if provided)
-    if (keepImageIds.length > 0) {
-      // Delete images not in keepImageIds AND not in our new images list
-      const keepObjectIds = keepImageIds.map(id => new ObjectId(id));
-      const imageIdsToKeep = [
-        ...keepObjectIds,
-        ...newImagesToCreate.map(img => img.id).filter(id => id) // Newly created image IDs
-      ];
-      
-      await queryRunner.manager.getMongoRepository(ProductImage).deleteMany({
-        productId: productObjectId,
-        _id: { $nin: imageIdsToKeep }
-      } as any);
-    } else {
-      // If no keepImageIds provided, delete all existing images and recreate
-      await queryRunner.manager.getMongoRepository(ProductImage).deleteMany({
-        productId: productObjectId
+      // For new images: create fresh
+      const additionalNewImages = newImagesWithoutIds.map((imgInput, index) => {
+        const image = new ProductImage();
+        image.productId = productObjectId;
+        image.imageUrl = imgInput.url;
+        image.isThumbnail = imgInput.isThumbnail ?? false;
+        image.altText = imgInput.altText ?? '';
+        image.displayOrder =
+          imgInput.displayOrder ?? existingImagesToUpdate.length + index;
+        return image;
       });
-    }
 
-    // Save all images
-    if (allImagesToSave.length > 0) {
-      await queryRunner.manager.save(ProductImage, allImagesToSave);
-    }
+      newImagesToCreate = [...newImagesToCreate, ...additionalNewImages];
 
-    // 4️⃣ VIDEOS
-    await queryRunner.manager
-      .getMongoRepository(ProductVideo)
-      .deleteMany({ productId: productObjectId });
+      // Combine all images to save
+      const allImagesToSave = [...existingImagesToUpdate, ...newImagesToCreate];
 
-    if ((updateProductDto as any).videos) {
-      const videos = (updateProductDto as any).videos.map((v: any, idx: number) => {
-        const video = new ProductVideo();
-        video.productId = productObjectId;
-        video.videoUrl = v.videoUrl;
-        video.videoType = v.videoType;
-        video.displayOrder = v.displayOrder ?? idx;
-        return video;
-      });
-      if (videos.length > 0) {
-        await queryRunner.manager.save(ProductVideo, videos);
+      // Delete images that are not in the input (but respect keepImageIds if provided)
+      if (keepImageIds.length > 0) {
+        // Delete images not in keepImageIds AND not in our new images list
+        const keepObjectIds = keepImageIds.map((id) => new ObjectId(id));
+        const imageIdsToKeep = [
+          ...keepObjectIds,
+          ...newImagesToCreate.map((img) => img.id).filter((id) => id), // Newly created image IDs
+        ];
+
+        await queryRunner.manager.getMongoRepository(ProductImage).deleteMany({
+          productId: productObjectId,
+          _id: { $nin: imageIdsToKeep },
+        } as any);
+      } else {
+        // If no keepImageIds provided, delete all existing images and recreate
+        await queryRunner.manager.getMongoRepository(ProductImage).deleteMany({
+          productId: productObjectId,
+        });
       }
-    }
 
-    // 5️⃣ SPECIFICATIONS
-    await queryRunner.manager
-      .getMongoRepository(ProductSpecification)
-      .deleteMany({ productId: productObjectId });
-
-    if ((updateProductDto as any).specifications) {
-      const specs = (updateProductDto as any).specifications.map(
-        (s: any, index: number) => {
-          const spec = new ProductSpecification();
-          spec.productId = productObjectId;
-          spec.specKey = s.specKey;
-          spec.specValue = s.specValue;
-          spec.displayOrder = s.displayOrder ?? index;
-          return spec;
-        },
-      );
-      if (specs.length > 0) {
-        await queryRunner.manager.save(ProductSpecification, specs);
+      // Save all images
+      if (allImagesToSave.length > 0) {
+        await queryRunner.manager.save(ProductImage, allImagesToSave);
       }
-    }
 
-    await queryRunner.commitTransaction();
-    return this.findOne(product.slug);
-  } catch (err) {
-    await queryRunner.rollbackTransaction();
-    console.error('Update basic product error:', err);
-    throw new InternalServerErrorException(err.message);
-  } finally {
-    await queryRunner.release();
+      // 4️⃣ VIDEOS
+      await queryRunner.manager
+        .getMongoRepository(ProductVideo)
+        .deleteMany({ productId: productObjectId });
+
+      if ((updateProductDto as any).videos) {
+        const videos = (updateProductDto as any).videos.map(
+          (v: any, idx: number) => {
+            const video = new ProductVideo();
+            video.productId = productObjectId;
+            video.videoUrl = v.videoUrl;
+            video.videoType = v.videoType;
+            video.displayOrder = v.displayOrder ?? idx;
+            return video;
+          },
+        );
+        if (videos.length > 0) {
+          await queryRunner.manager.save(ProductVideo, videos);
+        }
+      }
+
+      // 5️⃣ SPECIFICATIONS
+      await queryRunner.manager
+        .getMongoRepository(ProductSpecification)
+        .deleteMany({ productId: productObjectId });
+
+      if ((updateProductDto as any).specifications) {
+        const specs = (updateProductDto as any).specifications.map(
+          (s: any, index: number) => {
+            const spec = new ProductSpecification();
+            spec.productId = productObjectId;
+            spec.specKey = s.specKey;
+            spec.specValue = s.specValue;
+            spec.displayOrder = s.displayOrder ?? index;
+            return spec;
+          },
+        );
+        if (specs.length > 0) {
+          await queryRunner.manager.save(ProductSpecification, specs);
+        }
+      }
+
+      await queryRunner.commitTransaction();
+      return this.findOne(product.slug);
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      console.error('Update basic product error:', err);
+      throw new InternalServerErrorException(err.message);
+    } finally {
+      await queryRunner.release();
+    }
   }
-}
-
-
-
-
 
   /**
    * Update Network Product
@@ -1042,7 +1060,9 @@ async updateBasicProduct(
 
       // 4. Save new Images (upsert/delete logic)
       const imagesInput = (updateProductDto as any).images || [];
-      const keepImageIds: string[] = Array.isArray((updateProductDto as any).keepImageIds)
+      const keepImageIds: string[] = Array.isArray(
+        (updateProductDto as any).keepImageIds,
+      )
         ? (updateProductDto as any).keepImageIds
         : [];
 
@@ -1052,8 +1072,11 @@ async updateBasicProduct(
 
       // For existing images: fetch and update
       const existingImagesToUpdate: ProductImage[] = [];
+      let newImagesToCreate: ProductImage[] = [];
       if (existingImagesWithIds.length > 0) {
-        const existingIds = existingImagesWithIds.map((img: any) => new ObjectId(img.id));
+        const existingIds = existingImagesWithIds.map(
+          (img: any) => new ObjectId(img.id),
+        );
         const existingDbImages = await queryRunner.manager
           .getMongoRepository(ProductImage)
           .find({
@@ -1064,37 +1087,44 @@ async updateBasicProduct(
           });
         for (const imgInput of existingImagesWithIds) {
           const existingImage = existingDbImages.find(
-            (dbImg) => dbImg.id.toString() === imgInput.id
+            (dbImg) => dbImg.id.toString() === imgInput.id,
           );
           if (existingImage) {
             existingImage.imageUrl = imgInput.url || existingImage.imageUrl;
-            existingImage.isThumbnail = imgInput.isThumbnail ?? existingImage.isThumbnail;
+            existingImage.isThumbnail =
+              imgInput.isThumbnail ?? existingImage.isThumbnail;
             existingImage.altText = imgInput.altText ?? existingImage.altText;
-            existingImage.displayOrder = imgInput.displayOrder ?? existingImage.displayOrder;
+            existingImage.displayOrder =
+              imgInput.displayOrder ?? existingImage.displayOrder;
             existingImagesToUpdate.push(existingImage);
           } else {
-            // Image ID exists in input but not in DB - treat as new
-            const image = new ProductImage();
-            image.productId = savedProduct.id;
-            image.imageUrl = imgInput.url;
-            image.isThumbnail = imgInput.isThumbnail ?? false;
-            image.altText = imgInput.altText ?? '';
-            image.displayOrder = imgInput.displayOrder ?? existingImagesToUpdate.length;
-            existingImagesToUpdate.push(image);
+            // If ID provided but not found, create new (fallback)
+            const newImage = new ProductImage();
+            newImage.productId = savedProduct.id;
+            newImage.imageUrl = imgInput.url;
+            newImage.isThumbnail = imgInput.isThumbnail ?? false;
+            newImage.altText = imgInput.altText ?? '';
+            newImage.displayOrder = imgInput.displayOrder ?? 0;
+            newImagesToCreate.push(newImage);
           }
         }
       }
 
       // For new images: create fresh
-      const newImagesToCreate = newImagesWithoutIds.map((imgInput: any, index: number) => {
-        const image = new ProductImage();
-        image.productId = savedProduct.id;
-        image.imageUrl = imgInput.url;
-        image.isThumbnail = imgInput.isThumbnail ?? false;
-        image.altText = imgInput.altText ?? '';
-        image.displayOrder = imgInput.displayOrder ?? (existingImagesToUpdate.length + index);
-        return image;
-      });
+      const additionalNewImages = newImagesWithoutIds.map(
+        (imgInput: any, index: number) => {
+          const image = new ProductImage();
+          image.productId = savedProduct.id;
+          image.imageUrl = imgInput.url;
+          image.isThumbnail = imgInput.isThumbnail ?? false;
+          image.altText = imgInput.altText ?? '';
+          image.displayOrder =
+            imgInput.displayOrder ?? existingImagesToUpdate.length + index;
+          return image;
+        },
+      );
+
+      newImagesToCreate = [...newImagesToCreate, ...additionalNewImages];
 
       // Combine all images to save
       const allImagesToSave = [...existingImagesToUpdate, ...newImagesToCreate];
@@ -1436,17 +1466,96 @@ async updateBasicProduct(
       });
 
       // 4. Save new Images, Videos, Specs
-      if ((updateProductDto as any).images) {
-        const images = (updateProductDto as any).images.map((img: any) => {
+      const imagesInput = (updateProductDto as any).images || [];
+      const keepImageIds: string[] = Array.isArray(
+        (updateProductDto as any).keepImageIds,
+      )
+        ? (updateProductDto as any).keepImageIds
+        : [];
+
+      // Separate existing and new images
+      const existingImagesWithIds = imagesInput.filter((img: any) => img.id);
+      const newImagesWithoutIds = imagesInput.filter((img: any) => !img.id);
+
+      // For existing images: fetch and update
+      const existingImagesToUpdate: ProductImage[] = [];
+      let newImagesToCreate: ProductImage[] = [];
+      if (existingImagesWithIds.length > 0) {
+        const existingIds = existingImagesWithIds.map(
+          (img: any) => new ObjectId(img.id),
+        );
+        const existingDbImages = await queryRunner.manager
+          .getMongoRepository(ProductImage)
+          .find({
+            where: {
+              _id: { $in: existingIds },
+              productId: savedProduct.id,
+            } as any,
+          });
+        for (const imgInput of existingImagesWithIds) {
+          const existingImage = existingDbImages.find(
+            (dbImg) => dbImg.id.toString() === imgInput.id,
+          );
+          if (existingImage) {
+            // Update existing image
+            existingImage.imageUrl = imgInput.url;
+            existingImage.isThumbnail = imgInput.isThumbnail ?? false;
+            existingImage.altText = imgInput.altText ?? '';
+            existingImage.displayOrder = imgInput.displayOrder ?? 0;
+            existingImagesToUpdate.push(existingImage);
+          } else {
+            // If ID provided but not found, create new (fallback)
+            const newImage = new ProductImage();
+            newImage.productId = savedProduct.id;
+            newImage.imageUrl = imgInput.url;
+            newImage.isThumbnail = imgInput.isThumbnail ?? false;
+            newImage.altText = imgInput.altText ?? '';
+            newImage.displayOrder = imgInput.displayOrder ?? 0;
+            newImagesToCreate.push(newImage);
+          }
+        }
+      }
+
+      // For new images: create fresh
+      const additionalNewImages = newImagesWithoutIds.map(
+        (imgInput: any, index: number) => {
           const image = new ProductImage();
           image.productId = savedProduct.id;
-          image.imageUrl = img.url;
-          image.isThumbnail = img.isThumbnail;
-          image.altText = img.altText;
-          image.displayOrder = img.displayOrder;
+          image.imageUrl = imgInput.url;
+          image.isThumbnail = imgInput.isThumbnail ?? false;
+          image.altText = imgInput.altText ?? '';
+          image.displayOrder =
+            imgInput.displayOrder ?? existingImagesToUpdate.length + index;
           return image;
+        },
+      );
+
+      newImagesToCreate = [...newImagesToCreate, ...additionalNewImages];
+
+      // Combine all images to save
+      const allImagesToSave = [...existingImagesToUpdate, ...newImagesToCreate];
+
+      // Delete images that are not in the input (but respect keepImageIds if provided)
+      if (keepImageIds.length > 0) {
+        const keepObjectIds = keepImageIds.map((id) => new ObjectId(id));
+        const imageIdsToKeep = [
+          ...keepObjectIds,
+          ...newImagesToCreate.map((img) => img.id).filter((id) => id),
+        ];
+        await queryRunner.manager.getMongoRepository(ProductImage).deleteMany({
+          productId: savedProduct.id,
+          _id: { $nin: imageIdsToKeep },
+        } as any);
+      } else {
+        // If no keepImageIds provided, delete all existing images and recreate
+        await queryRunner.manager.getMongoRepository(ProductImage).deleteMany({
+          productId: savedProduct.id,
         });
-        await queryRunner.manager.save(ProductImage, images);
+      }
+
+      // Save all images
+      if (allImagesToSave.length > 0) {
+        await queryRunner.manager.save(ProductImage, allImagesToSave);
       }
 
       if ((updateProductDto as any).videos) {

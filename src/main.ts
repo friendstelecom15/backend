@@ -10,6 +10,9 @@ import { join } from 'path';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
+  // ✅ REQUIRED for Meta Conversions API (Railway / Proxy)
+  app.set('trust proxy', 1);
+
   app.enableCors();
   app.setGlobalPrefix('api');
 
@@ -17,7 +20,7 @@ async function bootstrap() {
     prefix: '/uploads/',
   });
 
-  // ✅ FORCE Swagger to load in production
+  // Swagger
   const swaggerConfig = new DocumentBuilder()
     .setTitle('FD Telecom API')
     .setDescription('API documentation')
@@ -26,15 +29,15 @@ async function bootstrap() {
     .build();
 
   const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
-
   SwaggerModule.setup('api/docs', app, swaggerDocument);
 
   const port = Number(process.env.PORT) || 8080;
-
   await app.listen(port, '0.0.0.0');
 
   console.log(`API Running: ${port}`);
-  console.log(`Swagger (production): https://backend-production-8aca.up.railway.app/api/docs`);
+  console.log(
+    `Swagger (production): https://backend-production-8aca.up.railway.app/api/docs`,
+  );
   console.log(`Swagger (local): http://localhost:${port}/api/docs`);
 }
 

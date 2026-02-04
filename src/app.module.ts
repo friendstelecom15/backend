@@ -26,6 +26,7 @@ import { NotificationModule } from './modules/notifications/notification.module'
 import { DeliveryMethodModule } from './modules/delivery-method/delivery-method.module';
 import { CorporateDealModule } from './modules/corporate-deal/corporate-deal.module';
 import { FlashsellModule } from './modules/flashsell/flashsell.module';
+import { MetaModule } from './modules/meta/meta.module';
 
 @Module({
   imports: [
@@ -60,8 +61,9 @@ import { FlashsellModule } from './modules/flashsell/flashsell.module';
     DeliveryMethodModule,
     CorporateDealModule,
     FlashsellModule,
+    MetaModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule { }
+export class AppModule {}

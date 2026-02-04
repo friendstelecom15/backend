@@ -5,9 +5,9 @@ import * as crypto from 'crypto';
 
 @Injectable()
 export class MetaService {
-  private pixelId = process.env.META_PIXEL_ID;
-  private accessToken = process.env.META_ACCESS_TOKEN;
-  private testEventCode = process.env.META_TEST_EVENT_CODE;
+  private readonly pixelId = process.env.META_PIXEL_ID;
+  private readonly accessToken = process.env.META_ACCESS_TOKEN;
+  private readonly testEventCode = process.env.META_TEST_EVENT_CODE;
 
   constructor(private readonly http: HttpService) {}
 

@@ -7,5 +7,6 @@ import { MetaController } from './meta.controller';
   imports: [HttpModule],
   providers: [MetaService],
   controllers: [MetaController],
+  exports: [MetaService],
 })
 export class MetaModule {}

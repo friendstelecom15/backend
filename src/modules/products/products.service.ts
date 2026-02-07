@@ -1243,7 +1243,29 @@ export class ProductService {
               const color = new ProductColor();
               color.networkId = savedNetwork.id;
               color.colorName = c.colorName;
-              color.colorImage = c.colorImage;
+              // Preserve existing color image if a new one is not provided
+              if (c.colorImage) {
+                color.colorImage = c.colorImage;
+              } else {
+                const networkKey = network.networkType
+                  ? network.networkType.toLowerCase().trim()
+                  : '';
+                const colorKey = c.colorName
+                  ? c.colorName.toLowerCase().trim()
+                  : '';
+
+                if (networkKey && colorKey) {
+                  const existingColorsMap =
+                    existingNetworkColorImages.get(networkKey);
+                  const existingImage = existingColorsMap
+                    ? existingColorsMap.get(colorKey)
+                    : undefined;
+
+                  if (existingImage) {
+                    color.colorImage = existingImage;
+                  }
+                }
+              }
               color.hasStorage = (c as any).hasStorage ?? true;
               color.useDefaultStorages = (c as any).useDefaultStorages ?? true;
               color.singlePrice = c.regularPrice;
@@ -1649,7 +1671,29 @@ export class ProductService {
               const color = new ProductColor();
               color.regionId = savedRegion.id;
               color.colorName = c.colorName;
-              color.colorImage = c.colorImage;
+              // Preserve existing color image if a new one is not provided
+              if (c.colorImage) {
+                color.colorImage = c.colorImage;
+              } else {
+                const regionKey = region.regionName
+                  ? region.regionName.toLowerCase().trim()
+                  : '';
+                const colorKey = c.colorName
+                  ? c.colorName.toLowerCase().trim()
+                  : '';
+
+                if (regionKey && colorKey) {
+                  const existingColorsMap =
+                    existingRegionColorImages.get(regionKey);
+                  const existingImage = existingColorsMap
+                    ? existingColorsMap.get(colorKey)
+                    : undefined;
+
+                  if (existingImage) {
+                    color.colorImage = existingImage;
+                  }
+                }
+              }
               color.hasStorage = c.hasStorage ?? true;
               color.useDefaultStorages = c.useDefaultStorages ?? true;
               color.singlePrice = c.singlePrice;

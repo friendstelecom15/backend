@@ -62,7 +62,11 @@ export class NotificationService {
   // Mark notification as resolved
   async markAsResolved(id: string | ObjectId) {
     const _id = typeof id === 'string' ? new ObjectId(id) : id;
-    const notification = await this.notificationRepository.findOne({ where: { id: _id } });
+    // Try both _id and id fields for compatibility
+    let notification = await this.notificationRepository.findOne({ where: { _id } } as any);
+    if (!notification) {
+      notification = await this.notificationRepository.findOne({ where: { id: _id } } as any);
+    }
     if (!notification) throw new NotFoundException('Notification not found');
     notification.resolved = true;
     notification.status = 'resolved';
